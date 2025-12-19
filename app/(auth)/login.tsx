@@ -7,6 +7,7 @@ import {
 } from "react-native"
 import { LinearGradient } from "expo-linear-gradient"
 import { Film, Heart } from "lucide-react-native"
+import { router } from "expo-router"
 
 export default function LoginScren() {
   return (
@@ -54,6 +55,9 @@ export default function LoginScren() {
         <TouchableOpacity
           activeOpacity={0.9}
           className="mb-4 flex-row items-center justify-center rounded-xl border border-zinc-200 bg-white py-4"
+          onPress={() => {
+            router.push("/(tabs)/home")
+          }}
         >
           <View className="mr-3 h-5 w-5 items-center justify-center rounded-full bg-white">
             <Text className="text-base font-bold text-black">G</Text>
