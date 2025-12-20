@@ -3,17 +3,30 @@ import { View, Text, SafeAreaView, TouchableOpacity } from "react-native"
 import { LinearGradient } from "expo-linear-gradient"
 import { Film, Heart } from "lucide-react-native"
 import { router } from "expo-router"
+import { useAuth } from "@clerk/clerk-expo"
 
 export default function DateFlixOnboarding() {
+  const { isSignedIn, isLoaded } = useAuth()
+
+  // Prevent rendering before Clerk finishes loading
+  if (!isLoaded) return null
+
+  const buttonLabel = isSignedIn ? "Explore" : "Get Started"
+  const handlePress = () => {
+    if (isSignedIn) {
+      router.replace("/(tabs)/home")
+    } else {
+      router.push("/(auth)/login")
+    }
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-black">
-      
       <LinearGradient
         colors={["#0B0B0F", "#000000"]}
         className="absolute inset-0"
       />
 
-  
       <View className="flex-1 items-center justify-center">
         <View className="relative h-[180px] w-[180px] items-center justify-center rounded-full bg-zinc-900 shadow-2xl">
           <Film size={56} color="white" />
@@ -25,9 +38,7 @@ export default function DateFlixOnboarding() {
         </View>
       </View>
 
-    
       <View className="rounded-t-[28px] bg-white px-6 pt-4 pb-8">
-        
         <View className="mb-5 h-1 w-10 self-center rounded-full bg-zinc-300" />
 
         <Text className="mb-2 text-center text-2xl font-bold text-black">
@@ -39,21 +50,22 @@ export default function DateFlixOnboarding() {
           next movie night.
         </Text>
 
-        
-        <TouchableOpacity className="mb-4 h-[52px] items-center justify-center rounded-xl bg-red-600" onPress={() => {
-          router.push("/(auth)/login")
-        }}>
+        <TouchableOpacity
+          className="mb-4 h-[52px] items-center justify-center rounded-xl bg-red-600"
+          onPress={handlePress}
+        >
           <Text className="text-base font-semibold text-white">
-            Get Started
+            {buttonLabel}
           </Text>
         </TouchableOpacity>
 
-        
-        <TouchableOpacity>
-          <Text className="text-center text-sm text-zinc-400">
-            Skip
-          </Text>
-        </TouchableOpacity>
+        {!isSignedIn && (
+          <TouchableOpacity>
+            <Text className="text-center text-sm text-zinc-400">
+              Skip
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </SafeAreaView>
   )

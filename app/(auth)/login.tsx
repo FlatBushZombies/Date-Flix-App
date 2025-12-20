@@ -6,10 +6,27 @@ import {
   TouchableOpacity,
 } from "react-native"
 import { LinearGradient } from "expo-linear-gradient"
+import { useOAuth } from "@clerk/clerk-expo"
 import { Film, Heart } from "lucide-react-native"
 import { router } from "expo-router"
+import { Alert } from "react-native"
+import { googleOAuth } from "@/lib/auth"
 
 export default function LoginScren() {
+  const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" });
+
+  const handleGoogleSignIn = async () => {
+    const result = await googleOAuth(startOAuthFlow);
+
+    if (result.code === "session_exists") {
+      Alert.alert("Success", "Session exists. Redirecting to home screen.");
+      router.replace("/(tabs)/home");
+    }
+
+    Alert.alert(result.success ? "Success" : "Error", result.message);
+  };
+
+  
   return (
     <SafeAreaView className="flex-1 bg-black">
       {/* Background */}
@@ -55,9 +72,7 @@ export default function LoginScren() {
         <TouchableOpacity
           activeOpacity={0.9}
           className="mb-4 flex-row items-center justify-center rounded-xl border border-zinc-200 bg-white py-4"
-          onPress={() => {
-            router.push("/(tabs)/home")
-          }}
+          onPress={handleGoogleSignIn}
         >
           <View className="mr-3 h-5 w-5 items-center justify-center rounded-full bg-white">
             <Text className="text-base font-bold text-black">G</Text>
