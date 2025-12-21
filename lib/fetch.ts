@@ -3,10 +3,37 @@ import { useState, useEffect, useCallback } from "react";
 export const fetchAPI = async (url: string, options?: RequestInit) => {
   try {
     const response = await fetch(url, options);
+
+    const rawText = await response.text();
+
     if (!response.ok) {
-      new Error(`HTTP error! status: ${response.status}`);
+      // Try to parse error JSON, but fall back to text without throwing JSON errors
+      let errorBody: unknown = rawText;
+      try {
+        errorBody = rawText ? JSON.parse(rawText) : rawText;
+      } catch {
+        // ignore JSON parse errors, keep text body
+      }
+
+      const errorMessage =
+        typeof errorBody === "object" && errorBody !== null && "message" in errorBody
+          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (errorBody as any).message
+          : rawText || `HTTP error! status: ${response.status}`;
+
+      throw new Error(String(errorMessage));
     }
-    return await response.json();
+
+    if (!rawText) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(rawText);
+    } catch {
+      // Non-JSON success payload, return as text to avoid crashing
+      return rawText;
+    }
   } catch (error) {
     console.error("Fetch error:", error);
     throw error;

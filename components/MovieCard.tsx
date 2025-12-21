@@ -1,7 +1,6 @@
 import { View, Text, Image, Dimensions } from "react-native"
-import { PanGestureHandler, type PanGestureHandlerGestureEvent } from "react-native-gesture-handler"
+import { Gesture, GestureDetector } from "react-native-gesture-handler"
 import Animated, {
-  useAnimatedGestureHandler,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -11,6 +10,7 @@ import Animated, {
 import { LinearGradient } from "expo-linear-gradient"
 import type { Movie } from "@/types"
 import { Ionicons } from "@expo/vector-icons"
+import { useMemo } from "react"
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window")
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3
@@ -23,19 +23,33 @@ interface MovieCardProps {
 export function MovieCard({ movie, onSwipe }: MovieCardProps) {
   const translateX = useSharedValue(0)
   const translateY = useSharedValue(0)
-  const rotation = useSharedValue(Math.random() * 6 - 3)
 
-  const gestureHandler = useAnimatedGestureHandler<PanGestureHandlerGestureEvent>({
-    onActive: (event) => {
+  const baseRotation = useMemo(() => Math.random() * 6 - 3, [])
+  const rotation = useSharedValue(baseRotation)
+
+  type PanGestureEvent = {
+    translationX: number
+    translationY: number
+    velocityX: number
+  }
+
+  const panGesture = Gesture.Pan()
+    .enabled(!!onSwipe)
+    .onChange((event: PanGestureEvent) => {
+      "worklet"
       translateX.value = event.translationX
       translateY.value = event.translationY
-    },
-    onEnd: (event) => {
+    })
+    .onEnd((event: PanGestureEvent) => {
+      "worklet"
       if (Math.abs(event.translationX) > SWIPE_THRESHOLD) {
-        const direction = event.translationX > 0 ? "right" : "left"
-        translateX.value = withSpring(event.translationX > 0 ? SCREEN_WIDTH : -SCREEN_WIDTH, {
-          velocity: event.velocityX,
-        })
+        const direction: "left" | "right" = event.translationX > 0 ? "right" : "left"
+
+        translateX.value = withSpring(
+          event.translationX > 0 ? SCREEN_WIDTH : -SCREEN_WIDTH,
+          { velocity: event.velocityX }
+        )
+
         if (onSwipe) {
           runOnJS(onSwipe)(direction)
         }
@@ -43,11 +57,14 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
         translateX.value = withSpring(0)
         translateY.value = withSpring(0)
       }
-    },
-  })
+    })
 
   const cardStyle = useAnimatedStyle(() => {
-    const rotate = interpolate(translateX.value, [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2], [-15, 0, 15])
+    const rotate = interpolate(
+      translateX.value,
+      [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
+      [-15, 0, 15]
+    )
 
     return {
       transform: [
@@ -68,35 +85,100 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
     }
   })
 
-  const likeOpacity = useAnimatedStyle(() => ({
+  const likeStyle = useAnimatedStyle(() => ({
     opacity: interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0, 1]),
   }))
 
-  const nopeOpacity = useAnimatedStyle(() => ({
+  const nopeStyle = useAnimatedStyle(() => ({
     opacity: interpolate(translateX.value, [-SWIPE_THRESHOLD, 0], [1, 0]),
   }))
 
   return (
-    <PanGestureHandler onGestureEvent={gestureHandler} enabled={!!onSwipe}>
+    <GestureDetector gesture={panGesture}>
       <Animated.View style={cardStyle}>
-        <View style={{ width: SCREEN_WIDTH - 64, height: SCREEN_HEIGHT * 0.55 }}>
+        <View
+          style={{
+            width: SCREEN_WIDTH - 64,
+            height: SCREEN_HEIGHT * 0.55,
+          }}
+        >
           <Image
-            source={{ uri: `https://image.tmdb.org/t/p/w500${movie.poster_path}` }}
+            source={{
+              uri: `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
+            }}
             style={{ width: "100%", height: "100%" }}
             resizeMode="cover"
           />
 
-          <Animated.View style={[likeOpacity]} className="absolute inset-0 bg-cyan-400/20 justify-center items-center">
-            <View className="border-4 border-cyan-400 rounded-2xl p-5 items-center gap-2 -rotate-12">
+          {/* LIKE */}
+          <Animated.View
+            style={[
+              likeStyle,
+              {
+                position: "absolute",
+                inset: 0,
+                backgroundColor: "rgba(34,211,238,0.2)",
+                justifyContent: "center",
+                alignItems: "center",
+              },
+            ]}
+          >
+            <View
+              style={{
+                borderWidth: 4,
+                borderColor: "#22d3ee",
+                borderRadius: 16,
+                padding: 20,
+                alignItems: "center",
+                transform: [{ rotate: "-12deg" }],
+              }}
+            >
               <Ionicons name="heart" size={40} color="#22d3ee" />
-              <Text className="text-3xl font-extrabold text-white">LIKE</Text>
+              <Text
+                style={{
+                  fontSize: 28,
+                  fontWeight: "800",
+                  color: "#fff",
+                }}
+              >
+                LIKE
+              </Text>
             </View>
           </Animated.View>
 
-          <Animated.View style={[nopeOpacity]} className="absolute inset-0 bg-red-400/20 justify-center items-center">
-            <View className="border-4 border-red-400 rounded-2xl p-5 items-center gap-2 rotate-12">
+          {/* NOPE */}
+          <Animated.View
+            style={[
+              nopeStyle,
+              {
+                position: "absolute",
+                inset: 0,
+                backgroundColor: "rgba(248,113,113,0.2)",
+                justifyContent: "center",
+                alignItems: "center",
+              },
+            ]}
+          >
+            <View
+              style={{
+                borderWidth: 4,
+                borderColor: "#f87171",
+                borderRadius: 16,
+                padding: 20,
+                alignItems: "center",
+                transform: [{ rotate: "12deg" }],
+              }}
+            >
               <Ionicons name="close" size={40} color="#f87171" />
-              <Text className="text-3xl font-extrabold text-white">NOPE</Text>
+              <Text
+                style={{
+                  fontSize: 28,
+                  fontWeight: "800",
+                  color: "#fff",
+                }}
+              >
+                NOPE
+              </Text>
             </View>
           </Animated.View>
 
@@ -112,40 +194,19 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
               padding: 24,
             }}
           >
-            <View style={{ gap: 8 }}>
-              <Text style={{ fontSize: 32, fontWeight: "800", color: "#ffffff" }} numberOfLines={2}>
-                {movie.title}
-              </Text>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 4,
-                    backgroundColor: "rgba(255, 215, 0, 0.2)",
-                    paddingHorizontal: 8,
-                    paddingVertical: 4,
-                    borderRadius: 8,
-                  }}
-                >
-                  <Ionicons name="star" size={16} color="#FFD700" />
-                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#ffffff" }}>
-                    {movie.vote_average.toFixed(1)}
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 14, color: "#a0aec0", fontWeight: "600" }}>
-                  {new Date(movie.release_date).getFullYear()}
-                </Text>
-              </View>
-            </View>
+            <Text
+              style={{
+                fontSize: 32,
+                fontWeight: "800",
+                color: "#fff",
+              }}
+              numberOfLines={2}
+            >
+              {movie.title}
+            </Text>
           </LinearGradient>
         </View>
-        <View style={{ paddingTop: 24, paddingBottom: 8 }}>
-          <Text style={{ fontSize: 14, color: "#a0aec0", lineHeight: 20 }} numberOfLines={3}>
-            {movie.overview}
-          </Text>
-        </View>
       </Animated.View>
-    </PanGestureHandler>
+    </GestureDetector>
   )
 }

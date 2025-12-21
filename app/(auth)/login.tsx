@@ -16,15 +16,15 @@ export default function LoginScren() {
   const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" });
 
   const handleGoogleSignIn = async () => {
-    const result = await googleOAuth(startOAuthFlow);
+    const result = await googleOAuth(startOAuthFlow)
 
-    if (result.code === "session_exists") {
-      Alert.alert("Success", "Session exists. Redirecting to home screen.");
-      router.replace("/(tabs)/home");
+    if (result.success) {
+      // Let the protected post-auth screen decide between onboarding and tabs/home
+      router.replace("/(protected)/post-auth")
     }
 
-    Alert.alert(result.success ? "Success" : "Error", result.message);
-  };
+    Alert.alert(result.success ? "Success" : "Error", result.message)
+  }
 
   
   return (
