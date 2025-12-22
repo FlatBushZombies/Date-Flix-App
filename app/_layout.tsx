@@ -1,7 +1,7 @@
 import "./globals.css"
 import { Stack } from "expo-router"
 import { ClerkProvider, SignedIn, SignedOut } from "@clerk/clerk-expo"
-import "react-native-gesture-handler"
+import { GestureHandlerRootView } from "react-native-gesture-handler"
 
 import { tokenCache } from "@/lib/auth"
 
@@ -17,16 +17,18 @@ if (!publishableKey) {
 export default function RootLayout() {
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <SignedOut>
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        </SignedOut>
-        <SignedIn>
-          <Stack.Screen name="(protected)" options={{ headerShown: false }} />
-        </SignedIn>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      </Stack>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <Stack>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <SignedOut>
+            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          </SignedOut>
+          <SignedIn>
+            <Stack.Screen name="(protected)" options={{ headerShown: false }} />
+          </SignedIn>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        </Stack>
+      </GestureHandlerRootView>
     </ClerkProvider>
   )
 }
