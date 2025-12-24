@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router"
-import { Film, User } from "lucide-react-native"
+import { Film, User, BookMarked } from "lucide-react-native"
 
 export default function TabsLayout() {
   return (
@@ -24,6 +24,15 @@ export default function TabsLayout() {
         }}
       />
 
+      <Tabs.Screen
+        name="match"
+        options={{
+          title: "Matches",
+          tabBarIcon: ({ color, size }) => (
+            <BookMarked color={color} size={size} />
+          ),
+        }}
+      />
       <Tabs.Screen
         name="profile"
         options={{
