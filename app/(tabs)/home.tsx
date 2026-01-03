@@ -1,3 +1,5 @@
+"use client"
+
 import { View, Text, TouchableOpacity, Dimensions, Image, StyleSheet } from "react-native"
 import { useState, useEffect } from "react"
 import { MovieCard } from "@/components/MovieCard"
@@ -7,6 +9,7 @@ import { Ionicons } from "@expo/vector-icons"
 import Animated, { FadeIn } from "react-native-reanimated"
 import { useRouter } from "expo-router"
 import { useUser } from "@clerk/clerk-expo"
+import { saveSwipe, syncUserWithSupabase } from "@/utils/supabase-helpers"
 
 const { width } = Dimensions.get("window")
 
@@ -17,10 +20,21 @@ export default function SwipeScreen() {
   const [movies, setMovies] = useState<Movie[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [userSynced, setUserSynced] = useState(false)
 
   useEffect(() => {
     loadMovies()
   }, [])
+
+  useEffect(() => {
+    if (user && !userSynced) {
+      console.log("[v0] Syncing user on mount:", user.id)
+      syncUserWithSupabase(user).then(() => {
+        console.log("[v0] User sync completed")
+        setUserSynced(true)
+      })
+    }
+  }, [user, userSynced])
 
   const loadMovies = async () => {
     try {
@@ -33,7 +47,26 @@ export default function SwipeScreen() {
     }
   }
 
-  const handleSwipe = (direction: "left" | "right") => {
+  const handleSwipe = async (direction: "left" | "right") => {
+    const currentMovie = movies[currentIndex]
+    const liked = direction === "right"
+
+    if (user && userSynced) {
+      try {
+        console.log("[v0] Handling swipe:", { direction, movieId: currentMovie.id, userId: user.id })
+        const result = await saveSwipe(user.id, currentMovie.id, liked, currentMovie)
+        if (result) {
+          console.log("[v0] Swipe saved successfully")
+        } else {
+          console.error("[v0] Failed to save swipe - no result returned")
+        }
+      } catch (error) {
+        console.error("[v0] Exception while saving swipe:", error)
+      }
+    } else {
+      console.log("[v0] Skipping swipe save - user not synced yet")
+    }
+
     if (direction === "right") {
       if (Math.random() > 0.7) {
         router.push({
@@ -77,11 +110,7 @@ export default function SwipeScreen() {
         <View style={styles.headerLeft}>
           <View style={styles.avatarContainer}>
             {user?.imageUrl ? (
-              <Image
-                source={{ uri: user.imageUrl }}
-                style={styles.avatarImage}
-                resizeMode="cover"
-              />
+              <Image source={{ uri: user.imageUrl }} style={styles.avatarImage} resizeMode="cover" />
             ) : (
               <Ionicons name="person" size={22} color="#0891b2" />
             )}
@@ -112,27 +141,18 @@ export default function SwipeScreen() {
                 {
                   zIndex: index === 1 ? 2 : 1,
                   opacity: index === 1 ? 1 : 0.85,
-                  transform: [
-                    { scale: index === 1 ? 1 : 0.96 },
-                    { translateY: index === 1 ? 0 : 12 },
-                  ],
+                  transform: [{ scale: index === 1 ? 1 : 0.96 }, { translateY: index === 1 ? 0 : 12 }],
                 },
               ]}
             >
-              <MovieCard
-                movie={movie}
-                onSwipe={index === 1 ? handleSwipe : undefined}
-              />
+              <MovieCard movie={movie} onSwipe={index === 1 ? handleSwipe : undefined} />
             </Animated.View>
           ))}
       </View>
 
       {/* Actions */}
       <View style={styles.actionsContainer}>
-        <TouchableOpacity
-          onPress={() => handleSwipe("left")}
-          style={styles.dislikeButton}
-        >
+        <TouchableOpacity onPress={() => handleSwipe("left")} style={styles.dislikeButton}>
           <Ionicons name="close" size={32} color="#ef4444" />
         </TouchableOpacity>
 
@@ -144,10 +164,7 @@ export default function SwipeScreen() {
           <Ionicons name="arrow-undo" size={24} color="#6b7280" />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => handleSwipe("right")}
-          style={styles.likeButton}
-        >
+        <TouchableOpacity onPress={() => handleSwipe("right")} style={styles.likeButton}>
           <Ionicons name="heart" size={36} color="#ffffff" />
         </TouchableOpacity>
       </View>

@@ -82,3 +82,58 @@ export interface SwipeAction {
   movieId: number
   movie: Movie
 }
+
+export interface SupabaseUser {
+  id: string
+  clerk_id: string
+  email: string | null
+  username: string | null
+  first_name: string | null
+  last_name: string | null
+  image_url: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SupabaseSwipe {
+  id: string
+  user_id: string
+  movie_id: number
+  liked: boolean
+  movie_data: Movie | null
+  created_at: string
+}
+
+export interface SupabaseMatch {
+  id: string
+  movie_id: number
+  user1_id: string
+  user2_id: string
+  movie_data: Movie | null
+  watched: boolean
+  matched_at: string
+}
+
+export interface Invitation {
+  id: string
+  sender_id: string
+  recipient_id: string | null
+  recipient_email: string | null
+  status: "pending" | "accepted" | "declined" | "expired"
+  invite_code: string
+  expires_at: string | null
+  created_at: string
+  accepted_at: string | null
+  sender?: SupabaseUser
+}
+
+export interface SwipeSession {
+  id: string
+  user1_id: string
+  user2_id: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  user1?: SupabaseUser
+  user2?: SupabaseUser
+}
