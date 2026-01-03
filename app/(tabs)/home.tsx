@@ -151,23 +151,6 @@ export default function SwipeScreen() {
       </View>
 
       {/* Actions */}
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity onPress={() => handleSwipe("left")} style={styles.dislikeButton}>
-          <Ionicons name="close" size={32} color="#ef4444" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={handleUndo}
-          disabled={currentIndex === 0}
-          style={[styles.undoButton, currentIndex === 0 && styles.undoButtonDisabled]}
-        >
-          <Ionicons name="arrow-undo" size={24} color="#6b7280" />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => handleSwipe("right")} style={styles.likeButton}>
-          <Ionicons name="heart" size={36} color="#ffffff" />
-        </TouchableOpacity>
-      </View>
     </View>
   )
 }
@@ -258,59 +241,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 20,
+    paddingBottom: 40,
   },
   cardWrapper: {
     position: "absolute",
     width: width - 40,
-  },
-  actionsContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    columnGap: 20,
-    paddingBottom: 128,
-    paddingHorizontal: 24,
-  },
-  dislikeButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 999,
-    backgroundColor: "#ffffff",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  undoButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 999,
-    backgroundColor: "#ffffff",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  undoButtonDisabled: {
-    opacity: 0.5,
-  },
-  likeButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 999,
-    backgroundColor: "#22d3ee",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#0e7490",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 5,
   },
 })

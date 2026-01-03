@@ -1,3 +1,5 @@
+"use client"
+
 import { View, Text, Image, Dimensions, StyleSheet } from "react-native"
 import { Gesture, GestureDetector } from "react-native-gesture-handler"
 import Animated, {
@@ -9,6 +11,7 @@ import Animated, {
   Extrapolate,
 } from "react-native-reanimated"
 import { Ionicons } from "@expo/vector-icons"
+import { LinearGradient } from "expo-linear-gradient"
 import type { Movie } from "@/types"
 import { useEffect } from "react"
 
@@ -45,10 +48,9 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
         isSwiped.value = true
         const direction = event.translationX > 0 ? "right" : "left"
 
-        translateX.value = withSpring(
-          event.translationX > 0 ? SCREEN_WIDTH : -SCREEN_WIDTH,
-          { velocity: event.velocityX }
-        )
+        translateX.value = withSpring(event.translationX > 0 ? SCREEN_WIDTH : -SCREEN_WIDTH, {
+          velocity: event.velocityX,
+        })
 
         onSwipe && runOnJS(onSwipe)(direction)
       } else {
@@ -61,56 +63,83 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
     transform: [
       { translateX: translateX.value },
       { translateY: translateY.value },
+      { rotate: `${interpolate(translateX.value, [-SCREEN_WIDTH, SCREEN_WIDTH], [-30, 30])}deg` },
     ],
   }))
 
-  const likeStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      translateX.value,
-      [0, SWIPE_THRESHOLD],
-      [0, 1],
-      Extrapolate.CLAMP
-    ),
+  const likeOverlayStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0, 1], Extrapolate.CLAMP),
   }))
 
-  const nopeStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      translateX.value,
-      [-SWIPE_THRESHOLD, 0],
-      [1, 0],
-      Extrapolate.CLAMP
-    ),
+  const nopeOverlayStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [-SWIPE_THRESHOLD, 0], [1, 0], Extrapolate.CLAMP),
   }))
 
   return (
     <GestureDetector gesture={panGesture}>
       <Animated.View style={[styles.card, cardStyle]}>
-        {/* Poster Image (original size) */}
-        <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: `https://image.tmdb.org/t/p/w500${movie.poster_path}` }}
-            style={styles.image}
-            resizeMode="cover"
-          />
+        <Image
+          source={{ uri: `https://image.tmdb.org/t/p/w500${movie.poster_path}` }}
+          style={styles.posterImage}
+          resizeMode="cover"
+        />
 
-          
-        </View>
+        <LinearGradient
+          colors={["transparent", "rgba(0,0,0,0.7)"]}
+          style={styles.gradientOverlay}
+          pointerEvents="none"
+        />
 
-        {/* Bottom Info Panel */}
-        <View style={styles.infoPanel}>
-          <Text style={styles.title} numberOfLines={2}>
+        <Animated.View style={[styles.nopeOverlay, nopeOverlayStyle]} pointerEvents="none">
+          <View style={styles.nopeLabel}>
+            <Text style={styles.nopeLabelText}>NOPE</Text>
+          </View>
+        </Animated.View>
+
+        <Animated.View style={[styles.likeOverlay, likeOverlayStyle]} pointerEvents="none">
+          <View style={styles.likeLabel}>
+            <Text style={styles.likeLabelText}>LIKE</Text>
+          </View>
+        </Animated.View>
+
+        <View style={styles.infoCard}>
+          <Text style={styles.movieTitle} numberOfLines={2}>
             {movie.title}
+          </Text>
+
+          {movie.release_date && (
+            <View style={styles.metaRow}>
+              <Ionicons name="calendar-outline" size={14} color="#94a3b8" />
+              <Text style={styles.metaText}>{new Date(movie.release_date).getFullYear()}</Text>
+            </View>
+          )}
+
+          {movie.vote_average > 0 && (
+            <View style={styles.ratingRow}>
+              <Ionicons name="star" size={16} color="#fbbf24" />
+              <Text style={styles.ratingText}>{movie.vote_average.toFixed(1)}/10</Text>
+            </View>
+          )}
+
+          <Text style={styles.overview} numberOfLines={3}>
+            {movie.overview}
           </Text>
         </View>
 
-        {/* Floating Actions */}
-        <View style={styles.actions}>
-          <View style={styles.actionButton}>
-            <Ionicons name="close" size={26} color="#f87171" />
+        <View style={styles.actionButtons}>
+          <View style={styles.passButton}>
+            <Ionicons name="close" size={32} color="#ff6b6b" />
           </View>
 
-          <View style={[styles.actionButton, styles.likeButton]}>
-            <Ionicons name="heart" size={28} color="#fff" />
+          <View style={styles.likeButton}>
+            <LinearGradient
+              colors={["#ff6b6b", "#ff8e53", "#ffa94d"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.likeButtonGradient}
+            >
+              <Ionicons name="heart" size={36} color="#ffffff" />
+            </LinearGradient>
           </View>
         </View>
       </Animated.View>
@@ -121,69 +150,170 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
 const styles = StyleSheet.create({
   card: {
     width: SCREEN_WIDTH - 40,
-    height: SCREEN_HEIGHT * 0.65,
-    borderRadius: 28,
-    backgroundColor: "#f8fafc",
+    height: SCREEN_HEIGHT * 0.7,
+    borderRadius: 24,
+    backgroundColor: "#ffffff",
     shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
     overflow: "hidden",
   },
 
-  imageContainer: {
-    width: "100%",
-    height: SCREEN_HEIGHT * 0.55, // ✅ matches original MovieCard proportions
-    overflow: "hidden",
-  },
-
-  image: {
+  posterImage: {
     width: "100%",
     height: "100%",
+    position: "absolute",
   },
 
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    justifyContent: "center",
-    alignItems: "center",
+  gradientOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: "50%",
   },
 
-  infoPanel: {
+  nopeOverlay: {
+    position: "absolute",
+    top: 40,
+    left: 30,
+    transform: [{ rotate: "-20deg" }],
+  },
+
+  nopeLabel: {
+    borderWidth: 4,
+    borderColor: "#ff6b6b",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+
+  nopeLabelText: {
+    fontSize: 32,
+    fontWeight: "900",
+    color: "#ff6b6b",
+    letterSpacing: 2,
+  },
+
+  likeOverlay: {
+    position: "absolute",
+    top: 40,
+    right: 30,
+    transform: [{ rotate: "20deg" }],
+  },
+
+  likeLabel: {
+    borderWidth: 4,
+    borderColor: "#6ee7b7",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+
+  likeLabelText: {
+    fontSize: 32,
+    fontWeight: "900",
+    color: "#6ee7b7",
+    letterSpacing: 2,
+  },
+
+  infoCard: {
+    position: "absolute",
+    bottom: 100,
+    left: 20,
+    right: 20,
     backgroundColor: "#ffffff",
+    borderRadius: 20,
     padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
   },
 
-  title: {
-    fontSize: 22,
+  movieTitle: {
+    fontSize: 24,
     fontWeight: "800",
+    color: "#0f172a",
+    marginBottom: 8,
+  },
+
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+  },
+
+  metaText: {
+    fontSize: 14,
+    color: "#64748b",
+    fontWeight: "600",
+  },
+
+  ratingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 10,
+  },
+
+  ratingText: {
+    fontSize: 15,
+    fontWeight: "700",
     color: "#0f172a",
   },
 
-  actions: {
+  overview: {
+    fontSize: 13,
+    color: "#475569",
+    lineHeight: 18,
+  },
+
+  actionButtons: {
     position: "absolute",
-    bottom: 28,
+    bottom: 20,
     left: 0,
     right: 0,
     flexDirection: "row",
     justifyContent: "center",
-    gap: 24,
+    alignItems: "center",
+    gap: 20,
   },
 
-  actionButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  passButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: "#ffffff",
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowRadius: 12,
+    elevation: 6,
   },
 
   likeButton: {
-    backgroundColor: "#22d3ee",
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    shadowColor: "#ff8e53",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+
+  likeButtonGradient: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 36,
+    justifyContent: "center",
+    alignItems: "center",
   },
 })
