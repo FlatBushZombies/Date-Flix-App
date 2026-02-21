@@ -4,6 +4,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { View, Text, ScrollView, Image, TouchableOpacity, Alert, Share, TextInput, Modal } from "react-native"
 import { useUser, useClerk } from "@clerk/clerk-expo"
+import { useRouter } from "expo-router"
 import { Film, Users, Heart } from "lucide-react-native"
 import {
   syncUserWithSupabase,
@@ -19,6 +20,7 @@ import { Ionicons } from "@expo/vector-icons"
 export default function ProfileScreen() {
   const { user } = useUser()
   const { signOut } = useClerk()
+  const router = useRouter()
 
   const [stats, setStats] = useState({ totalSwipes: 0, totalMatches: 0, activeSessions: 0 })
   const [invitations, setInvitations] = useState<(Invitation & { sender: SupabaseUser })[]>([])
@@ -105,7 +107,7 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     try {
       await signOut()
-      Alert.alert("Signed out", "You have been logged out successfully")
+      router.replace("/")
     } catch (e) {
       console.error(e)
     }
@@ -121,7 +123,7 @@ export default function ProfileScreen() {
 
       {/* Avatar Cluster with Active Sessions */}
       <View className="items-center mb-6">
-        <View className="flex-row items-center space-x-4">
+        <View className="flex-row items-center gap-4">
           {/* Left Session Partner */}
           <View className="w-14 h-14 rounded-full bg-gray-200 items-center justify-center overflow-hidden">
             {sessions[0] ? (
@@ -136,7 +138,7 @@ export default function ProfileScreen() {
             )}
           </View>
 
-          {/* Main User Avatar - Updated to show actual user image */}
+          {/* Main User Avatar */}
           {user?.imageUrl ? (
             <Image source={{ uri: user.imageUrl }} className="w-20 h-20 rounded-full border-2 border-cyan-400" />
           ) : (
@@ -160,11 +162,11 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Username - Updated to show actual user info */}
+        {/* Username */}
         <Text className="mt-4 text-lg font-semibold text-gray-900">{user?.firstName || user?.username || "User"}</Text>
 
         {user?.emailAddresses?.[0]?.emailAddress && (
-          <Text className="text-sm text-gray-500">{user.emailAddresses[0].emailAddress}</Text>
+          <Text className="text-sm text-gray-500 mt-0.5">{user.emailAddresses[0].emailAddress}</Text>
         )}
 
         <Text className="text-sm text-gray-500 mt-1">Ready to pair a movie 🎬</Text>
@@ -228,7 +230,7 @@ export default function ProfileScreen() {
                 </View>
                 <View className="flex-1">
                   <Text className="font-bold text-gray-900">{partner.first_name || partner.username || "Friend"}</Text>
-                  <Text className="text-xs text-gray-500">Active session</Text>
+                  <Text className="text-xs text-gray-500 mt-0.5">Active session</Text>
                 </View>
                 <View className="w-3 h-3 bg-green-500 rounded-full" />
               </View>
@@ -238,7 +240,7 @@ export default function ProfileScreen() {
       )}
 
       {/* Movie Pairing Actions */}
-      <View className="mx-6 space-y-4">
+      <View className="mx-6 gap-3 mb-2">
         <ActionCard
           title="Movie Match"
           description="Swipe and match movies with a friend"
@@ -262,7 +264,7 @@ export default function ProfileScreen() {
       </View>
 
       {/* Footer Actions */}
-      <View className="mt-10 mx-6 border-t border-gray-200">
+      <View className="mt-8 mx-6 border-t border-gray-200 mb-8">
         <TouchableOpacity className="py-4" onPress={() => Alert.alert("Account", "Account settings coming soon")}>
           <Text className="text-gray-700 text-base">Account Settings</Text>
         </TouchableOpacity>
@@ -354,12 +356,12 @@ function ActionCard({
 }) {
   return (
     <View className="flex-row items-center justify-between bg-gray-50 rounded-2xl px-4 py-4">
-      <View className="flex-row items-center space-x-3">
+      <View className="flex-row items-center gap-3">
         <View className="w-10 h-10 rounded-full bg-white items-center justify-center shadow-sm">{icon}</View>
 
         <View>
           <Text className="text-base font-medium text-gray-900">{title}</Text>
-          <Text className="text-sm text-gray-500">{description}</Text>
+          <Text className="text-sm text-gray-500 mt-0.5">{description}</Text>
         </View>
       </View>
 
