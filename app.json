@@ -4,7 +4,7 @@
     "slug": "date_flix_app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/dateflix.png",
+    "icon": "./assets/images/duo-icon.png",
     "scheme": "dateflixapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
