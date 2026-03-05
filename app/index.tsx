@@ -4,18 +4,19 @@ import {
   Text,
   SafeAreaView,
   TouchableOpacity,
-  StyleSheet,
-  Image,
+  Dimensions,
 } from "react-native"
 import { LinearGradient } from "expo-linear-gradient"
 import { router } from "expo-router"
 import { useAuth } from "@clerk/clerk-expo"
-import { IMAGES } from "@/constants"
+import { HandThumbUpIcon } from "react-native-heroicons/solid"
+import { HeartIcon } from "react-native-heroicons/solid"
+import { FilmIcon } from "react-native-heroicons/solid"
 
 export default function DateFlixOnboarding() {
   const { isSignedIn, isLoaded } = useAuth()
 
-  if (!isLoaded) return <View className="flex-1 bg-[#0A0408]" />
+  if (!isLoaded) return <View className="flex-1 bg-white" />
 
   const buttonLabel = isSignedIn ? "Explore" : "Get Started"
 
@@ -28,136 +29,124 @@ export default function DateFlixOnboarding() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0A0408]">
-      {/* Background gradient */}
-      <LinearGradient
-        colors={["#0A0408", "#180608", "#0A0408"]}
-        style={StyleSheet.absoluteFillObject}
-      />
-
-      {/* Top brand label */}
-      <View className="items-center pt-10 pb-2">
-        <Text
-          className="text-red-600 text-xs font-bold tracking-[4px] uppercase"
-        >
-          DateFlix
-        </Text>
-      </View>
-
-      {/* Icon area — takes up remaining space above sheet */}
-      <View className="flex-1 items-center justify-center">
-
-        {/* Layered glow rings behind the icon */}
-        <View
-          className="absolute w-72 h-72 rounded-full"
-          style={{
-            backgroundColor: "#E5091408",
-            shadowColor: "#E50914",
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.6,
-            shadowRadius: 80,
-            elevation: 0,
-          }}
-        />
-        <View
-          className="absolute w-52 h-52 rounded-full"
-          style={{
-            backgroundColor: "#E5091412",
-          }}
-        />
-
-        {/* Icon card */}
-        <View
-          className="items-center justify-center"
-          style={{
-            shadowColor: "#E50914",
-            shadowOffset: { width: 0, height: 20 },
-            shadowOpacity: 0.35,
-            shadowRadius: 40,
-            elevation: 24,
-          }}
-        >
-          <Image
-            source={IMAGES.logo}
-            resizeMode="contain"
-            style={{ width: 180, height: 180 }}
-          />
-        </View>
-
-        {/* Subtle ellipse shadow beneath icon */}
-        <View
-          className="mt-4 rounded-full bg-red-700 opacity-20"
-          style={{ width: 100, height: 12 }}
-        />
-      </View>
-
-      {/* Bottom sheet */}
+    <View className="flex-1 bg-white">
+      {/* ── Red gradient top section ── */}
       <View
-        className="bg-white rounded-t-[36px] px-7 pt-5 pb-10"
-        style={{
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.12,
-          shadowRadius: 24,
-          elevation: 20,
-        }}
+        className="flex-1 overflow-hidden pt-20 px-6 justify-center items-center"
+        style={{ borderBottomLeftRadius: 40, borderBottomRightRadius: 40 }}
       >
-        {/* Pill handle */}
-        <View className="w-9 h-[3px] rounded-full bg-zinc-200 self-center mb-6" />
+        <LinearGradient
+          colors={["#FF2D2D", "#E50914", "#B2070F"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0.3, y: 1 }}
+          style={{ position: "absolute", inset: 0 }}
+        />
 
-        {/* Text block */}
+        {/* Floating feature cards */}
+        <View className="w-full items-end gap-y-[14px] pr-1">
+          {/* Card 1 — Swipe to Match */}
+          <View
+            className="flex-row items-center bg-white rounded-2xl py-3 px-4 gap-x-3 self-end mr-0"
+            style={{
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.12,
+              shadowRadius: 20,
+              elevation: 10,
+              transform: [{ rotate: "-1deg" }],
+            }}
+          >
+            <View className="w-9 h-9 rounded-xl bg-red-100 items-center justify-center">
+              <HandThumbUpIcon size={20} color="#E50914" />
+            </View>
+            <Text className="text-sm font-bold text-[#1A1A1A] tracking-tight">
+              Swipe to Match
+            </Text>
+          </View>
+
+          {/* Card 2 — Couples Picks */}
+          <View
+            className="flex-row items-center bg-white rounded-2xl py-3 px-4 gap-x-3 self-end mr-[30px]"
+            style={{
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.12,
+              shadowRadius: 20,
+              elevation: 10,
+              transform: [{ rotate: "0.5deg" }],
+            }}
+          >
+            <View className="w-9 h-9 rounded-xl bg-red-100 items-center justify-center">
+              <HeartIcon size={20} color="#E50914" />
+            </View>
+            <Text className="text-sm font-bold text-[#1A1A1A] tracking-tight">
+              Couples Picks
+            </Text>
+          </View>
+
+          {/* Card 3 — Movie Nights */}
+          <View
+            className="flex-row items-center bg-white rounded-2xl py-3 px-4 gap-x-3 self-end mr-0"
+            style={{
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.12,
+              shadowRadius: 20,
+              elevation: 10,
+              transform: [{ rotate: "-0.5deg" }],
+            }}
+          >
+            <View className="w-9 h-9 rounded-xl bg-red-100 items-center justify-center">
+              <FilmIcon size={20} color="#E50914" />
+            </View>
+            <Text className="text-sm font-bold text-[#1A1A1A] tracking-tight">
+              Movie Nights & Enjoy!
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* ── White bottom sheet ── */}
+      <View className="bg-white px-7 pt-3.5 pb-10">
+        {/* Pill handle */}
+        <View className="w-9 h-1 rounded-full bg-gray-200 self-center mb-6" />
+
+        {/* Heading */}
         <Text
-          className="text-[28px] font-extrabold text-zinc-900 text-center mb-3"
-          style={{ letterSpacing: -0.6, lineHeight: 34 }}
+          className="text-[32px] font-extrabold text-[#1A1A1A] text-center mb-3"
+          style={{ letterSpacing: -0.6, lineHeight: 40 }}
         >
-          Match Movies{"\n"}Together
+          Match Movies{" "}
+          <Text className="text-[#1A1A1A]">Together.</Text>
         </Text>
 
-        <Text className="text-[15px] leading-[24px] text-zinc-400 text-center mb-9 px-3">
+        {/* Subtitle */}
+        <Text className="text-[15px] leading-6 text-gray-400 text-center mb-7 px-2">
           Swipe movies you love and let DateFlix find the perfect match for your
           next movie night.
         </Text>
 
-        {/* Pill feature tags */}
-        <View className="flex-row justify-center gap-2 mb-8">
-          {["🎬 Swipe to match", "❤️ Couples picks", "🍿 Movie nights"].map(
-            (tag) => (
-              <View
-                key={tag}
-                className="bg-zinc-100 rounded-full px-3 py-1"
-              >
-                <Text className="text-[11px] font-medium text-zinc-500">
-                  {tag}
-                </Text>
-              </View>
-            )
-          )}
-        </View>
-
-        {/* CTA button */}
+        {/* CTA Button */}
         <TouchableOpacity
           activeOpacity={0.88}
           onPress={handlePress}
-          className="rounded-2xl overflow-hidden mb-4"
+          className="rounded-[18px] overflow-hidden mb-3"
           style={{
             shadowColor: "#E50914",
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.4,
-            shadowRadius: 18,
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.35,
+            shadowRadius: 20,
             elevation: 14,
           }}
         >
           <LinearGradient
-            colors={["#FF3020", "#E50914"]}
+            colors={["#FF2D2D", "#E50914"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            className="h-14 items-center justify-center"
+            className="h-[58px] items-center justify-center rounded-[18px]"
           >
-            <Text
-              className="text-white text-[16px] font-bold"
-              style={{ letterSpacing: 0.4 }}
-            >
-              {buttonLabel}
+            <Text className="text-white text-[17px] font-bold tracking-wide">
+              {buttonLabel}  →
             </Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -167,17 +156,14 @@ export default function DateFlixOnboarding() {
           <TouchableOpacity
             onPress={() => router.replace("/(tabs)/home")}
             activeOpacity={0.5}
-            className="items-center py-1"
+            className="items-center py-1.5"
           >
-            <Text
-              className="text-[13px] text-zinc-400"
-              style={{ letterSpacing: 0.2 }}
-            >
+            <Text className="text-[13px] text-[#B0B0B0] tracking-wide">
               Skip for now
             </Text>
           </TouchableOpacity>
         )}
       </View>
-    </SafeAreaView>
+    </View>
   )
 }
