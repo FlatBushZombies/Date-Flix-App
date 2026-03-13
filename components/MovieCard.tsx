@@ -20,11 +20,24 @@ import { useEffect } from "react"
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window")
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3
 const CARD_WIDTH = SCREEN_WIDTH - 40
-const CARD_HEIGHT = SCREEN_HEIGHT * 0.7
+const CARD_HEIGHT = SCREEN_HEIGHT * 0.75
 
 interface MovieCardProps {
   movie: Movie
   onSwipe?: (direction: "left" | "right") => void
+}
+
+// Derive genre tags from vote_average and other fields (placeholder logic — replace with real genre data)
+function getGenreTags(movie: Movie): string[] {
+  const tags: string[] = []
+  if (movie.vote_average >= 8) tags.push("⭐ Top Rated")
+  if (movie.release_date) {
+    const year = new Date(movie.release_date).getFullYear()
+    if (year >= 2023) tags.push("🎬 New Release")
+    else if (year < 2000) tags.push("🎞 Classic")
+  }
+  if (movie.vote_average > 0) tags.push(`${movie.vote_average.toFixed(1)} / 10`)
+  return tags
 }
 
 export function MovieCard({ movie, onSwipe }: MovieCardProps) {
@@ -34,7 +47,6 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
   const scale = useSharedValue(1)
 
   useEffect(() => {
-    // Smooth entrance when card mounts
     translateX.value = 0
     translateY.value = 0
     isSwiped.value = false
@@ -45,13 +57,12 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
     .enabled(!!onSwipe)
     .onBegin(() => {
       if (isSwiped.value) return
-      // Slight scale-up on grab for tactile feel
       scale.value = withTiming(1.02, { duration: 120, easing: Easing.out(Easing.quad) })
     })
     .onChange((event) => {
       if (isSwiped.value) return
       translateX.value = event.translationX
-      translateY.value = event.translationY * 0.35 // Dampen vertical drag
+      translateY.value = event.translationY * 0.35
     })
     .onEnd((event) => {
       if (isSwiped.value) return
@@ -77,7 +88,6 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
 
         onSwipe && runOnJS(onSwipe)(direction)
       } else {
-        // Snappy spring return
         translateX.value = withSpring(0, { damping: 20, stiffness: 300, mass: 0.7 })
         translateY.value = withSpring(0, { damping: 20, stiffness: 300, mass: 0.7 })
         scale.value = withSpring(1, { damping: 18, stiffness: 250 })
@@ -101,7 +111,6 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
     }
   })
 
-  // Smooth like overlay — fades in progressively
   const likeOverlayStyle = useAnimatedStyle(() => ({
     opacity: interpolate(
       translateX.value,
@@ -121,7 +130,6 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
     ],
   }))
 
-  // Smooth nope overlay
   const nopeOverlayStyle = useAnimatedStyle(() => ({
     opacity: interpolate(
       translateX.value,
@@ -141,7 +149,6 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
     ],
   }))
 
-  // Action button pulse based on swipe direction
   const likeButtonStyle = useAnimatedStyle(() => ({
     transform: [
       {
@@ -168,19 +175,8 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
     ],
   }))
 
-  // Info card slides up slightly on swipe
-  const infoCardStyle = useAnimatedStyle(() => ({
-    transform: [
-      {
-        translateY: interpolate(
-          Math.abs(translateX.value),
-          [0, SWIPE_THRESHOLD],
-          [0, -6],
-          Extrapolate.CLAMP
-        ),
-      },
-    ],
-  }))
+  const genreTags = getGenreTags(movie)
+  const releaseYear = movie.release_date ? new Date(movie.release_date).getFullYear() : null
 
   return (
     <GestureDetector gesture={panGesture}>
@@ -190,122 +186,184 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
           {
             width: CARD_WIDTH,
             height: CARD_HEIGHT,
-            borderRadius: 24,
-            backgroundColor: "#ffffff",
+            borderRadius: 28,
+            backgroundColor: "#111111",
             shadowColor: "#000",
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.15,
-            shadowRadius: 16,
-            elevation: 10,
+            shadowOffset: { width: 0, height: 16 },
+            shadowOpacity: 0.5,
+            shadowRadius: 32,
+            elevation: 20,
             overflow: "hidden",
           },
         ]}
       >
+        {/* Full-bleed poster image */}
         <Image
           source={{ uri: `https://image.tmdb.org/t/p/w500${movie.poster_path}` }}
-          className="absolute w-full h-full"
+          style={{ position: "absolute", width: "100%", height: "100%" }}
           resizeMode="cover"
         />
 
+        {/* Deep gradient overlay — darker at bottom for text legibility */}
         <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.75)"]}
-          className="absolute bottom-0 left-0 right-0 h-1/2"
+          colors={[
+            "transparent",
+            "rgba(0,0,0,0.15)",
+            "rgba(0,0,0,0.65)",
+            "rgba(0,0,0,0.92)",
+          ]}
+          locations={[0, 0.35, 0.65, 1]}
+          style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "65%" }}
           pointerEvents="none"
         />
 
-        {/* NOPE Label */}
+        {/* Top bar — close + more */}
+        <View style={{ position: "absolute", top: 16, left: 16, right: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <View style={{
+            width: 36, height: 36, borderRadius: 18,
+            backgroundColor: "rgba(255,255,255,0.15)",
+            justifyContent: "center", alignItems: "center",
+            borderWidth: 1, borderColor: "rgba(255,255,255,0.2)"
+          }}>
+            <Ionicons name="close" size={18} color="#fff" />
+          </View>
+          <View style={{
+            width: 36, height: 36, borderRadius: 18,
+            backgroundColor: "rgba(255,255,255,0.15)",
+            justifyContent: "center", alignItems: "center",
+            borderWidth: 1, borderColor: "rgba(255,255,255,0.2)"
+          }}>
+            <Ionicons name="ellipsis-horizontal" size={18} color="#fff" />
+          </View>
+        </View>
+
+        {/* NOPE stamp */}
         <Animated.View
-          style={[nopeOverlayStyle, { position: "absolute", top: 40, left: 30, transform: [{ rotate: "-20deg" }] }]}
+          style={[nopeOverlayStyle, { position: "absolute", top: 44, left: 24 }]}
           pointerEvents="none"
         >
-          <View className="border-4 border-red-400 rounded-lg px-4 py-2">
-            <Text className="text-3xl font-black text-red-400 tracking-widest">NOPE</Text>
+          <View style={{
+            borderWidth: 3, borderColor: "#ff4d6d", borderRadius: 10,
+            paddingHorizontal: 14, paddingVertical: 6,
+            transform: [{ rotate: "-18deg" }]
+          }}>
+            <Text style={{ fontSize: 26, fontWeight: "900", color: "#ff4d6d", letterSpacing: 4 }}>NOPE</Text>
           </View>
         </Animated.View>
 
-        {/* LIKE Label */}
+        {/* LIKE stamp */}
         <Animated.View
-          style={[likeOverlayStyle, { position: "absolute", top: 40, right: 30, transform: [{ rotate: "20deg" }] }]}
+          style={[likeOverlayStyle, { position: "absolute", top: 44, right: 24 }]}
           pointerEvents="none"
         >
-          <View className="border-4 border-emerald-300 rounded-lg px-4 py-2">
-            <Text className="text-3xl font-black text-emerald-300 tracking-widest">LIKE</Text>
+          <View style={{
+            borderWidth: 3, borderColor: "#d4f576", borderRadius: 10,
+            paddingHorizontal: 14, paddingVertical: 6,
+            transform: [{ rotate: "18deg" }]
+          }}>
+            <Text style={{ fontSize: 26, fontWeight: "900", color: "#d4f576", letterSpacing: 4 }}>LIKE</Text>
           </View>
         </Animated.View>
 
-        {/* Info Card */}
-        <Animated.View
-          style={[
-            infoCardStyle,
-            {
-              position: "absolute",
-              bottom: 100,
-              left: 20,
-              right: 20,
-              backgroundColor: "#ffffff",
-              borderRadius: 20,
-              padding: 20,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.12,
-              shadowRadius: 12,
-              elevation: 6,
-            },
-          ]}
-        >
-          <Text className="text-2xl font-extrabold text-slate-900 mb-2" numberOfLines={2}>
-            {movie.title}
-          </Text>
+        {/* Bottom info panel */}
+        <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, paddingHorizontal: 22, paddingBottom: 24, paddingTop: 16 }}>
 
-          {movie.release_date && (
-            <View className="flex-row items-center gap-1.5 mb-1.5">
-              <Ionicons name="calendar-outline" size={14} color="#94a3b8" />
-              <Text className="text-sm text-slate-500 font-semibold">
-                {new Date(movie.release_date).getFullYear()}
+          {/* Title + online dot */}
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10, gap: 8 }}>
+            <Text style={{
+              fontSize: 28, fontWeight: "800", color: "#ffffff",
+              letterSpacing: -0.5, flexShrink: 1
+            }} numberOfLines={1}>
+              {movie.title}
+            </Text>
+            {releaseYear && (
+              <Text style={{ fontSize: 22, fontWeight: "300", color: "rgba(255,255,255,0.6)" }}>
+                {releaseYear}
               </Text>
-            </View>
+            )}
+            {/* Online-style dot */}
+            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#4ade80", marginLeft: 2 }} />
+          </View>
+
+          {/* Badge tags row — styled like the app's colored pill tags */}
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+            {genreTags.map((tag, i) => {
+              const colors = [
+                { bg: "rgba(212,245,118,0.18)", border: "rgba(212,245,118,0.45)", text: "#d4f576" },
+                { bg: "rgba(251,191,36,0.18)", border: "rgba(251,191,36,0.45)", text: "#fbbf24" },
+                { bg: "rgba(167,139,250,0.18)", border: "rgba(167,139,250,0.45)", text: "#c4b5fd" },
+              ]
+              const c = colors[i % colors.length]
+              return (
+                <View key={tag} style={{
+                  backgroundColor: c.bg,
+                  borderWidth: 1, borderColor: c.border,
+                  borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
+                }}>
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: c.text }}>
+                    {tag}
+                  </Text>
+                </View>
+              )
+            })}
+          </View>
+
+          {/* Skills label */}
+          {movie.overview && (
+            <>
+              <Text style={{ fontSize: 10, fontWeight: "700", color: "rgba(255,255,255,0.35)", letterSpacing: 1.5, marginBottom: 7, textTransform: "uppercase" }}>
+                Overview
+              </Text>
+              <Text style={{
+                fontSize: 13.5, color: "rgba(255,255,255,0.7)",
+                lineHeight: 19, marginBottom: 18
+              }} numberOfLines={3}>
+                {movie.overview}
+              </Text>
+            </>
           )}
 
-          {movie.vote_average > 0 && (
-            <View className="flex-row items-center gap-1.5 mb-2.5">
-              <Ionicons name="star" size={16} color="#fbbf24" />
-              <Text className="text-base font-bold text-slate-900">
-                {movie.vote_average.toFixed(1)}/10
-              </Text>
-            </View>
-          )}
+          {/* Action buttons row — X, heart (yellow), chat */}
+          <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 16 }}>
 
-          <Text className="text-sm text-slate-500 leading-relaxed" numberOfLines={3}>
-            {movie.overview}
-          </Text>
-        </Animated.View>
+            {/* Pass button */}
+            <Animated.View style={passButtonStyle}>
+              <View style={{
+                width: 58, height: 58, borderRadius: 29,
+                backgroundColor: "rgba(255,255,255,0.1)",
+                borderWidth: 1, borderColor: "rgba(255,255,255,0.2)",
+                justifyContent: "center", alignItems: "center",
+              }}>
+                <Ionicons name="close" size={26} color="#ff4d6d" />
+              </View>
+            </Animated.View>
 
-        {/* Action Buttons */}
-        <View className="absolute bottom-5 left-0 right-0 flex-row justify-center items-center gap-5">
-          <Animated.View style={passButtonStyle}>
-            <View
-              className="w-16 h-16 rounded-full bg-white justify-center items-center"
-              style={{ shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 6 }}
-            >
-              <Ionicons name="close" size={32} color="#ff6b6b" />
-            </View>
-          </Animated.View>
+            {/* Like button — gold/yellow gradient (matching $ button from image) */}
+            <Animated.View style={likeButtonStyle}>
+              <View style={{
+                width: 70, height: 70, borderRadius: 35,
+                backgroundColor: "#E8C547",
+                justifyContent: "center", alignItems: "center",
+                shadowColor: "#E8C547",
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.55,
+                shadowRadius: 18,
+                elevation: 12,
+              }}>
+                <Ionicons name="heart" size={32} color="#111111" />
+              </View>
+            </Animated.View>
 
-          <Animated.View style={likeButtonStyle}>
-            <View
-              className="w-[72px] h-[72px] rounded-full"
-              style={{ shadowColor: "#ff8e53", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 8 }}
-            >
-              <LinearGradient
-                colors={["#ff6b6b", "#ff8e53", "#ffa94d"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                className="w-full h-full rounded-full justify-center items-center"
-              >
-                <Ionicons name="heart" size={36} color="#ffffff" />
-              </LinearGradient>
+            {/* Chat / info button */}
+            <View style={{
+              width: 58, height: 58, borderRadius: 29,
+              backgroundColor: "rgba(255,255,255,0.1)",
+              borderWidth: 1, borderColor: "rgba(255,255,255,0.2)",
+              justifyContent: "center", alignItems: "center",
+            }}>
+              <Ionicons name="chatbubble-ellipses-outline" size={22} color="rgba(255,255,255,0.8)" />
             </View>
-          </Animated.View>
+          </View>
         </View>
       </Animated.View>
     </GestureDetector>
