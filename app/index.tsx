@@ -126,12 +126,14 @@ export default function DateFlixOnboarding() {
           next movie night.
         </Text>
 
-        {/* CTA Button */}
+        {/* CTA Button — full pill shape */}
         <TouchableOpacity
           activeOpacity={0.88}
           onPress={handlePress}
-          className="rounded-[18px] overflow-hidden mb-3"
           style={{
+            borderRadius: 50,
+            overflow: "hidden",
+            marginBottom: 12,
             shadowColor: "#E50914",
             shadowOffset: { width: 0, height: 10 },
             shadowOpacity: 0.35,
@@ -143,7 +145,13 @@ export default function DateFlixOnboarding() {
             colors={["#FF2D2D", "#E50914"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            className="h-[58px] items-center justify-center rounded-[18px]"
+            style={{
+              height: 62,
+              borderRadius: 50,
+              alignItems: "center",
+              justifyContent: "center",
+              paddingHorizontal: 32,
+            }}
           >
             <Text className="text-white text-[17px] font-bold tracking-wide">
               {buttonLabel}  →

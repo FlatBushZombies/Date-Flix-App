@@ -406,14 +406,14 @@ export default function OnboardingScreen() {
               </LinearGradient>
               <View className="absolute -top-5 left-0 right-0 h-24">
                 {[...Array(6)].map((_, i) => (
-                  <View 
-                    key={i} 
+                  <View
+                    key={i}
                     className="absolute w-2 h-2 rounded-full"
-                    style={{ 
+                    style={{
                       backgroundColor: ["#ec4899", "#8B5CF6", "#06b6d4", "#f97316", "#10b981", "#eab308"][i],
                       left: 20 + (i * 50),
                       top: Math.random() * 60,
-                    }} 
+                    }}
                   />
                 ))}
               </View>
@@ -439,91 +439,137 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <LinearGradient colors={["#0a0c12", "#161929"]} className="flex-1">
-      {/* Header */}
-      <View className="flex-row justify-between items-center px-5 pt-[60px] h-[100px]">
-        {currentScreen > 0 ? (
-          <Animated.View entering={FadeIn}>
-            <TouchableOpacity onPress={handleBack} className="w-11 h-11 rounded-full bg-white/10 items-center justify-center">
-              <Ionicons name="chevron-back" size={24} color="rgba(255,255,255,0.6)" />
-            </TouchableOpacity>
-          </Animated.View>
-        ) : (
-          <View className="w-11" />
-        )}
-        {currentScreen < SCREENS.length - 1 && (
-          <Animated.View entering={FadeIn.delay(600)}>
-            <TouchableOpacity onPress={handleSkip} className="px-4 py-2 rounded-2xl bg-white/10">
-              <Text className="text-white/50 text-sm font-semibold">Skip</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
-      </View>
-
-      {/* Content */}
-      <Animated.View
-        key={currentScreen}
-        entering={SlideInRight.duration(400).springify()}
-        exiting={SlideOutLeft.duration(300)}
-        className="flex-1 pt-2.5"
-      >
-        <View className="px-7 mb-6">
-          <Animated.Text entering={FadeInUp.delay(100).springify()} className="text-[32px] font-black leading-10 tracking-tight text-white mb-3">
-            {screen.headline}
-          </Animated.Text>
-
-          {"subtext" in screen && screen.subtext && (
-            <Animated.Text entering={FadeInDown.delay(200).springify()} className="text-base text-white/55 leading-6 mb-2">
-              {screen.subtext}
-            </Animated.Text>
+    // Dark background on the wrapping View prevents any white flash during navigation
+    <View style={{ flex: 1, backgroundColor: "#0a0c12" }}>
+      <LinearGradient colors={["#0a0c12", "#161929"]} style={{ flex: 1 }}>
+        {/* Header */}
+        <View className="flex-row justify-between items-center px-5 pt-[60px] h-[100px]">
+          {currentScreen > 0 ? (
+            <Animated.View entering={FadeIn}>
+              <TouchableOpacity onPress={handleBack} className="w-11 h-11 rounded-full bg-white/10 items-center justify-center">
+                <Ionicons name="chevron-back" size={24} color="rgba(255,255,255,0.6)" />
+              </TouchableOpacity>
+            </Animated.View>
+          ) : (
+            <View className="w-11" />
           )}
-
-          {"micro" in screen && screen.micro && (
-            <Animated.View entering={FadeIn.delay(400)} className="flex-row items-center gap-1.5 mt-2">
-              <Ionicons name="people" size={14} color={screen.accent} />
-              <Text className="text-[13px] font-semibold" style={{ color: screen.accent }}>{screen.micro}</Text>
+          {currentScreen < SCREENS.length - 1 && (
+            <Animated.View entering={FadeIn.delay(600)}>
+              <TouchableOpacity onPress={handleSkip} className="px-4 py-2 rounded-2xl bg-white/10">
+                <Text className="text-white/50 text-sm font-semibold">Skip</Text>
+              </TouchableOpacity>
             </Animated.View>
           )}
         </View>
 
-        {renderContent()}
-      </Animated.View>
+        {/* Content */}
+        <Animated.View
+          key={currentScreen}
+          entering={SlideInRight.duration(400).springify()}
+          exiting={SlideOutLeft.duration(300)}
+          className="flex-1 pt-2.5"
+        >
+          <View className="px-7 mb-6">
+            <Animated.Text entering={FadeInUp.delay(100).springify()} className="text-[32px] font-black leading-10 tracking-tight text-white mb-3">
+              {screen.headline}
+            </Animated.Text>
 
-      {/* Bottom Area */}
-      <View className="px-7 pb-10 gap-5">
-        <View className="items-center gap-2">
-          <View className="w-full h-1 bg-white/10 rounded-sm overflow-hidden">
-            <View className="h-full rounded-sm" style={{ width: `${((currentScreen + 1) / SCREENS.length) * 100}%`, backgroundColor: screen.accent }} />
+            {"subtext" in screen && screen.subtext && (
+              <Animated.Text entering={FadeInDown.delay(200).springify()} className="text-base text-white/55 leading-6 mb-2">
+                {screen.subtext}
+              </Animated.Text>
+            )}
+
+            {"micro" in screen && screen.micro && (
+              <Animated.View entering={FadeIn.delay(400)} className="flex-row items-center gap-1.5 mt-2">
+                <Ionicons name="people" size={14} color={screen.accent} />
+                <Text className="text-[13px] font-semibold" style={{ color: screen.accent }}>{screen.micro}</Text>
+              </Animated.View>
+            )}
           </View>
-          <Text className="text-xs text-white/30 font-medium">{currentScreen + 1} of {SCREENS.length}</Text>
-        </View>
 
-        {screen.type === "final" ? (
-          <View className="gap-3">
+          {renderContent()}
+        </Animated.View>
+
+        {/* Bottom Area */}
+        <View className="px-7 pb-10 gap-5">
+          <View className="items-center gap-2">
+            <View className="w-full h-1 bg-white/10 rounded-sm overflow-hidden">
+              <View className="h-full rounded-sm" style={{ width: `${((currentScreen + 1) / SCREENS.length) * 100}%`, backgroundColor: screen.accent }} />
+            </View>
+            <Text className="text-xs text-white/30 font-medium">{currentScreen + 1} of {SCREENS.length}</Text>
+          </View>
+
+          {screen.type === "final" ? (
+            <View className="gap-3">
+              <Animated.View style={animatedButtonStyle}>
+                <TouchableOpacity
+                  onPressIn={handlePressIn}
+                  onPressOut={handlePressOut}
+                  onPress={handleNext}
+                  style={{ borderRadius: 50, overflow: "hidden" }}
+                >
+                  <LinearGradient
+                    colors={["#ec4899", "#f472b6"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      paddingVertical: 18,
+                      paddingHorizontal: 32,
+                      borderRadius: 50,
+                    }}
+                  >
+                    <Ionicons name="people" size={20} color="#fff" style={{ marginRight: 8 }} />
+                    <Text className="text-white text-[17px] font-extrabold tracking-wide">{"ctaPrimary" in screen ? screen.ctaPrimary : ""}</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </Animated.View>
+              <TouchableOpacity
+                onPress={completeOnboarding}
+                style={{
+                  alignItems: "center",
+                  paddingVertical: 16,
+                  borderRadius: 50,
+                  borderWidth: 1.5,
+                  borderColor: "rgba(255,255,255,0.15)",
+                }}
+              >
+                <Text className="text-white/60 text-base font-bold">{"ctaSecondary" in screen ? screen.ctaSecondary : ""}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
             <Animated.View style={animatedButtonStyle}>
-              <TouchableOpacity onPressIn={handlePressIn} onPressOut={handlePressOut} onPress={handleNext} className="rounded-[18px] overflow-hidden shadow-lg">
-                <LinearGradient colors={["#ec4899", "#f472b6"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} className="flex-row items-center justify-center py-[18px] rounded-[18px]">
-                  <Ionicons name="people" size={20} color="#fff" style={{ marginRight: 8 }} />
-                  <Text className="text-white text-[17px] font-extrabold tracking-wide">{screen.ctaPrimary}</Text>
+              <TouchableOpacity
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                onPress={handleNext}
+                style={{ borderRadius: 50, overflow: "hidden" }}
+              >
+                <LinearGradient
+                  colors={[screen.accent, adjustColor(screen.accent)]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    paddingVertical: 18,
+                    paddingHorizontal: 32,
+                    borderRadius: 50,
+                  }}
+                >
+                  <Text className="text-white text-[17px] font-extrabold tracking-wide">{"cta" in screen ? screen.cta : ""}</Text>
+                  <Ionicons name="arrow-forward" size={20} color="#fff" style={{ marginLeft: 8 }} />
                 </LinearGradient>
               </TouchableOpacity>
             </Animated.View>
-            <TouchableOpacity onPress={completeOnboarding} className="items-center py-4 rounded-[18px] border-[1.5px] border-white/15">
-              <Text className="text-white/60 text-base font-bold">{screen.ctaSecondary}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <Animated.View style={animatedButtonStyle}>
-            <TouchableOpacity onPressIn={handlePressIn} onPressOut={handlePressOut} onPress={handleNext} className="rounded-[18px] overflow-hidden shadow-lg">
-              <LinearGradient colors={[screen.accent, adjustColor(screen.accent)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} className="flex-row items-center justify-center py-[18px] rounded-[18px]">
-                <Text className="text-white text-[17px] font-extrabold tracking-wide">{screen.cta}</Text>
-                <Ionicons name="arrow-forward" size={20} color="#fff" style={{ marginLeft: 8 }} />
-              </LinearGradient>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
-      </View>
-    </LinearGradient>
+          )}
+        </View>
+      </LinearGradient>
+    </View>
   )
 }
 
