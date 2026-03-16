@@ -1,8 +1,6 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { MovieNightPlan } from '../types/planner';
-import { MovieCard } from '../components/MovieCard';
-
 
 interface ResultsScreenProps {
   plan: MovieNightPlan;
@@ -30,17 +28,50 @@ export function ResultsScreen({ plan, prompt, onReset }: ResultsScreenProps) {
           </Text>
         </View>
         <Text
-          className="text-2xl text-text-primary text-center"
+          className="text-2xl text-text-primary text-center mb-3"
           style={{ fontFamily: 'PlayfairDisplay_600SemiBold' }}
         >
           Your movie night is ready
         </Text>
+        {!!plan.summary && (
+          <Text className="text-sm text-text-secondary text-center px-4 leading-relaxed">
+            {plan.summary}
+          </Text>
+        )}
       </View>
 
-      {/* Movie cards */}
-      {plan.movies.map((movie, i) => (
-        <MovieCard key={i} movie={movie} />
-      ))}
+      {/* Movie list from AI plan */}
+      <View className="mt-2 mb-4" style={{ gap: 12 }}>
+        {plan.movies.map((movie, i) => (
+          <View
+            key={`${movie.title}-${i}`}
+            className="rounded-2xl p-4 border border-surface-2"
+            style={{ backgroundColor: '#151520' }}
+          >
+            <View className="flex-row justify-between items-center mb-1.5">
+              <Text className="text-base text-white font-semibold flex-shrink">
+                {movie.title}
+              </Text>
+              <Text className="text-xs text-text-muted">
+                {movie.year} • {movie.genre}
+              </Text>
+            </View>
+            <Text className="text-xs text-text-muted mb-1.5">
+              {movie.duration} • {movie.rating} • {movie.streaming}
+            </Text>
+            <Text className="text-xs text-text-secondary leading-relaxed mb-1.5">
+              {movie.reason}
+            </Text>
+            {movie.topPick && (
+              <View className="self-start mt-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: '#2a0d14' }}>
+                <Text className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#FF9FB3' }}>
+                  Top pick
+                </Text>
+              </View>
+            )}
+          </View>
+        ))}
+      </View>
 
       {/* Divider */}
       <View className="items-center my-5">

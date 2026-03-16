@@ -72,4 +72,5 @@ export interface MovieNightPlan {
   movies: MovieResult[];
   snack: string;
   ambiance: string;
+  summary: string;
 }
