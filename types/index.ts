@@ -137,3 +137,36 @@ export interface SwipeSession {
   user1?: SupabaseUser
   user2?: SupabaseUser
 }
+
+// Debate Session Types
+export interface DebateSession {
+  id: string
+  code: string
+  host_id: string
+  partner_id: string | null
+  partner_email: string | null
+  host_preferences: string | null
+  partner_preferences: string | null
+  status: "waiting" | "both_joined" | "host_ready" | "partner_ready" | "settling" | "settled"
+  ai_verdict: AIVerdict | null
+  created_at: string
+  updated_at: string
+  expires_at: string
+  host?: SupabaseUser
+  partner?: SupabaseUser
+}
+
+export interface AIVerdict {
+  recommendation: string
+  reasoning: string
+  compatibilityScore: number
+  compromiseOptions: string[]
+  movieSuggestions: {
+    title: string
+    reason: string
+    posterPath?: string
+    tmdbId?: number
+  }[]
+  coupleInsight: string
+}
+

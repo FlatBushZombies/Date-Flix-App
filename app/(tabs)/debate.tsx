@@ -9,952 +9,1114 @@ import {
   StyleSheet,
   Dimensions,
   Alert,
-  Share,
-  Linking,
   ActivityIndicator,
   Modal,
   Image,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { useUser } from "@clerk/clerk-expo"
 import { Ionicons } from "@expo/vector-icons"
 import { LinearGradient } from "expo-linear-gradient"
-import Animated, { FadeInDown, FadeIn, useSharedValue, useAnimatedStyle, withSpring, withRepeat, withTiming } from "react-native-reanimated"
-import * as Clipboard from "expo-clipboard"
+import Animated, {
+  FadeInDown,
+  FadeIn,
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  withSequence,
+  Easing,
+} from "react-native-reanimated"
+import {
+  createDebateSession,
+  sendDebateInviteEmail,
+  joinDebateSession,
+  submitDebatePreferences,
+  getDebateSessionByCode,
+  getUserDebateSessions,
+  saveDebateVerdict,
+  syncUserWithSupabase,
+} from "@/utils/supabase-helpers"
+import { settleDebateWithAI as callAI, isAIConfigured, getAIProviderName } from "@/utils/ai-service"
+import type { DebateSession, AIVerdict } from "@/types"
 
 const { width, height } = Dimensions.get("window")
 
-// Puter.js will be loaded dynamically for web
-// For React Native, we'll use a WebView approach or REST API
-const PUTER_API_BASE = "https://api.puter.com"
-
-interface DebateParticipant {
-  id: string
-  name: string
-  email: string
-  avatar?: string
-  moviePreferences: string[]
-  joined: boolean
-}
-
-interface DebateSession {
-  id: string
-  code: string
-  hostId: string
-  participants: DebateParticipant[]
-  status: "waiting" | "voting" | "settled"
-  aiVerdict?: AIVerdict
-  createdAt: Date
-}
-
-interface AIVerdict {
-  recommendation: string
-  reasoning: string
-  compromiseOptions: string[]
-  matchScore: number
-  movieSuggestions: {
-    title: string
-    reason: string
-    tmdbId?: number
-  }[]
-}
-
 export default function DebateSettlerScreen() {
   const { user } = useUser()
-  
+
   // Session state
   const [activeSession, setActiveSession] = useState<DebateSession | null>(null)
-  const [sessionCode, setSessionCode] = useState("")
-  const [isCreatingSession, setIsCreatingSession] = useState(false)
-  const [isJoining, setIsJoining] = useState(false)
-  
-  // Invite state
-  const [showInviteModal, setShowInviteModal] = useState(false)
-  const [inviteEmail, setInviteEmail] = useState("")
-  const [inviteLink, setInviteLink] = useState("")
-  
-  // Preferences state
+  const [joinCode, setJoinCode] = useState("")
+  const [partnerEmail, setPartnerEmail] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+
+  // UI state
+  const [currentView, setCurrentView] = useState<"home" | "create" | "join" | "session">("home")
   const [myPreferences, setMyPreferences] = useState("")
-  const [partnerPreferences, setPartnerPreferences] = useState("")
-  const [hasSubmittedPreferences, setHasSubmittedPreferences] = useState(false)
-  
-  // AI state
-  const [isSettlingDebate, setIsSettlingDebate] = useState(false)
-  const [aiVerdict, setAiVerdict] = useState<AIVerdict | null>(null)
+  const [isSettling, setIsSettling] = useState(false)
   const [showVerdictModal, setShowVerdictModal] = useState(false)
-  
-  // Animation
-  const pulseScale = useSharedValue(1)
-  const rotateValue = useSharedValue(0)
-  
+
+  // Animations
+  const heartScale = useSharedValue(1)
+  const floatY = useSharedValue(0)
+  const pulseOpacity = useSharedValue(0.5)
+
   useEffect(() => {
-    pulseScale.value = withRepeat(
-      withTiming(1.05, { duration: 1000 }),
+    // Heart pulse animation
+    heartScale.value = withRepeat(
+      withSequence(
+        withTiming(1.2, { duration: 600, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }),
+        withTiming(1, { duration: 600, easing: Easing.bezier(0.25, 0.1, 0.25, 1) })
+      ),
+      -1,
+      true
+    )
+
+    // Float animation
+    floatY.value = withRepeat(
+      withSequence(
+        withTiming(-8, { duration: 2000 }),
+        withTiming(0, { duration: 2000 })
+      ),
+      -1,
+      true
+    )
+
+    // Pulse glow
+    pulseOpacity.value = withRepeat(
+      withSequence(
+        withTiming(0.8, { duration: 1500 }),
+        withTiming(0.3, { duration: 1500 })
+      ),
       -1,
       true
     )
   }, [])
 
-  const pulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulseScale.value }],
+  useEffect(() => {
+    if (user) {
+      syncUserWithSupabase(user)
+    }
+  }, [user])
+
+  const heartStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: heartScale.value }],
   }))
 
-  // Generate unique session code
-  const generateSessionCode = () => {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-    let code = ""
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length))
-    }
-    return code
-  }
+  const floatStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: floatY.value }],
+  }))
 
-  // Create a new debate session
-  const createDebateSession = async () => {
-    if (!user) {
-      Alert.alert("Sign In Required", "Please sign in to create a debate session")
+  const pulseStyle = useAnimatedStyle(() => ({
+    opacity: pulseOpacity.value,
+  }))
+
+  // Create new debate session
+  const handleCreateSession = async () => {
+    if (!user || !partnerEmail.trim()) {
+      Alert.alert("Email Required", "Please enter your partner's email address")
       return
     }
-    
-    setIsCreatingSession(true)
-    
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(partnerEmail)) {
+      Alert.alert("Invalid Email", "Please enter a valid email address")
+      return
+    }
+
+    setIsLoading(true)
+
     try {
-      const code = generateSessionCode()
-      const newSession: DebateSession = {
-        id: `debate_${Date.now()}`,
-        code,
-        hostId: user.id,
-        participants: [
-          {
-            id: user.id,
-            name: user.firstName || "You",
-            email: user.primaryEmailAddress?.emailAddress || "",
-            avatar: user.imageUrl,
-            moviePreferences: [],
-            joined: true,
-          },
-        ],
-        status: "waiting",
-        createdAt: new Date(),
+      const session = await createDebateSession(user.id, partnerEmail)
+
+      if (session) {
+        // Try to send email invite via Supabase Edge Function
+        const emailSent = await sendDebateInviteEmail(
+          user.firstName || "Your partner",
+          partnerEmail,
+          session.code
+        )
+
+        setActiveSession(session)
+        setCurrentView("session")
+        
+        // Show appropriate message based on email status
+        if (emailSent) {
+          Alert.alert(
+            "Invite Sent!",
+            `We've sent an invite to ${partnerEmail}. They'll receive a code to join your debate.`
+          )
+        } else {
+          // Fallback - show code for manual sharing
+          Alert.alert(
+            "Session Created!",
+            `Share this code with your partner: ${session.code}\n\nThey can enter it in the app to join your debate.`,
+            [
+              { text: "Copy Code", onPress: () => copyToClipboard(session.code) },
+              { text: "OK" }
+            ]
+          )
+        }
       }
-      
-      setActiveSession(newSession)
-      setSessionCode(code)
-      
-      // Generate invite link
-      const link = `moviematch://debate/join?code=${code}`
-      setInviteLink(link)
-      setShowInviteModal(true)
-      
     } catch (error) {
       Alert.alert("Error", "Failed to create session. Please try again.")
     } finally {
-      setIsCreatingSession(false)
+      setIsLoading(false)
+    }
+  }
+  
+  // Copy code to clipboard
+  const copyToClipboard = async (code: string) => {
+    try {
+      const Clipboard = await import("expo-clipboard")
+      await Clipboard.setStringAsync(code)
+      Alert.alert("Copied!", "Code copied to clipboard")
+    } catch {
+      Alert.alert("Code", code)
     }
   }
 
   // Join existing session
-  const joinDebateSession = async (code: string) => {
-    if (!user || !code.trim()) return
-    
-    setIsJoining(true)
-    
-    try {
-      // In production, this would fetch from your backend
-      // For now, simulate joining
-      const newParticipant: DebateParticipant = {
-        id: user.id,
-        name: user.firstName || "Friend",
-        email: user.primaryEmailAddress?.emailAddress || "",
-        avatar: user.imageUrl,
-        moviePreferences: [],
-        joined: true,
-      }
-      
-      if (activeSession) {
-        setActiveSession({
-          ...activeSession,
-          participants: [...activeSession.participants, newParticipant],
-        })
-      }
-      
-      Alert.alert("Joined!", "You've joined the debate session")
-      
-    } catch (error) {
-      Alert.alert("Error", "Failed to join session. Check the code and try again.")
-    } finally {
-      setIsJoining(false)
-    }
-  }
-
-  // Send email invite
-  const sendEmailInvite = async () => {
-    if (!inviteEmail.trim()) {
-      Alert.alert("Email Required", "Please enter your friend's email")
+  const handleJoinSession = async () => {
+    if (!user || !joinCode.trim()) {
+      Alert.alert("Code Required", "Please enter the invite code")
       return
     }
-    
-    const subject = encodeURIComponent("Let's Settle Our Movie Debate!")
-    const body = encodeURIComponent(
-      `Hey! I want to find the perfect movie for us to watch together.\n\n` +
-      `Join my MovieMatch debate session with this code: ${sessionCode}\n\n` +
-      `Or click this link: ${inviteLink}\n\n` +
-      `Let's let AI settle what we should watch!`
-    )
-    
-    const emailUrl = `mailto:${inviteEmail}?subject=${subject}&body=${body}`
-    
+
+    setIsLoading(true)
+
     try {
-      await Linking.openURL(emailUrl)
-      setInviteEmail("")
+      const result = await joinDebateSession(joinCode.trim(), user.id)
+
+      if (result.success && result.session) {
+        setActiveSession(result.session)
+        setCurrentView("session")
+      } else {
+        Alert.alert("Error", result.error || "Failed to join session")
+      }
     } catch (error) {
-      Alert.alert("Error", "Could not open email client")
+      Alert.alert("Error", "Failed to join session. Please check the code.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  // Share invite link
-  const shareInviteLink = async () => {
-    try {
-      await Share.share({
-        message: `Join my MovieMatch debate! Use code: ${sessionCode}\n\nLet's find the perfect movie together!`,
-      })
-    } catch (error) {
-      console.error("Share error:", error)
-    }
-  }
-
-  // Copy code to clipboard
-  const copyCode = async () => {
-    await Clipboard.setStringAsync(sessionCode)
-    Alert.alert("Copied!", "Session code copied to clipboard")
-  }
-
-  // Submit movie preferences
-  const submitPreferences = () => {
-    if (!myPreferences.trim()) {
-      Alert.alert("Tell Us More", "Please describe what kind of movie you're in the mood for")
+  // Submit preferences
+  const handleSubmitPreferences = async () => {
+    if (!activeSession || !user || !myPreferences.trim()) {
+      Alert.alert("Tell us more", "Please describe what kind of movie you're in the mood for")
       return
     }
-    
-    setHasSubmittedPreferences(true)
-    
-    if (activeSession) {
-      setActiveSession({
-        ...activeSession,
-        status: "voting",
-      })
-    }
-  }
 
-  // Settle the debate with AI (using Puter.js)
-  const settleDebateWithAI = async () => {
-    setIsSettlingDebate(true)
-    
+    setIsLoading(true)
+
     try {
-      // Build the prompt for AI
-      const prompt = `You are a movie recommendation AI that helps friends decide what to watch together.
+      const isHost = activeSession.host_id === user.id
+      const updated = await submitDebatePreferences(
+        activeSession.id,
+        user.id,
+        myPreferences,
+        isHost
+      )
 
-Person 1 wants: "${myPreferences}"
-Person 2 wants: "${partnerPreferences || "something fun and engaging"}"
+      if (updated) {
+        setActiveSession(updated)
 
-Based on these preferences, provide a JSON response with:
-1. "recommendation": A single movie recommendation that would satisfy both
-2. "reasoning": Why this movie works for both people (2-3 sentences)
-3. "compromiseOptions": An array of 3 alternative movies they might both enjoy
-4. "matchScore": A number 1-100 indicating how well this matches both preferences
-5. "movieSuggestions": An array of 3 objects with "title" and "reason" for each suggestion
-
-Respond ONLY with valid JSON, no markdown or explanation.`
-
-      // Use Puter.js AI chat - this will prompt user to sign in with Puter
-      // In React Native, we'll simulate this or use a WebView
-      // For demonstration, using a mock response that shows the expected structure
-      
-      // In production with Puter.js (web):
-      // const response = await puter.ai.chat(prompt, { model: 'gpt-5-nano' })
-      
-      // Simulated AI response (replace with actual Puter.js call in production)
-      const mockResponse: AIVerdict = {
-        recommendation: "Everything Everywhere All at Once",
-        reasoning: "This film perfectly blends action, comedy, drama, and sci-fi elements. It has something for everyone - mind-bending visuals for sci-fi lovers, heartfelt family drama, and plenty of humor. It's the kind of movie that sparks conversation afterward.",
-        compromiseOptions: [
-          "Spider-Man: Across the Spider-Verse",
-          "The Grand Budapest Hotel", 
-          "Knives Out"
-        ],
-        matchScore: 87,
-        movieSuggestions: [
-          {
-            title: "Everything Everywhere All at Once",
-            reason: "Perfect blend of action, comedy, and heart that appeals to diverse tastes"
-          },
-          {
-            title: "Spider-Man: Across the Spider-Verse",
-            reason: "Visually stunning with universal appeal and emotional depth"
-          },
-          {
-            title: "Knives Out",
-            reason: "Clever mystery with humor that keeps everyone engaged"
-          }
-        ]
+        // If both ready, trigger AI settlement
+        if (updated.status === "settling" || (updated.host_preferences && updated.partner_preferences)) {
+          await settleDebate(updated)
+        }
       }
-      
-      // Simulate AI processing time
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      setAiVerdict(mockResponse)
-      setShowVerdictModal(true)
-      
-      if (activeSession) {
-        setActiveSession({
-          ...activeSession,
-          status: "settled",
-          aiVerdict: mockResponse,
-        })
-      }
-      
     } catch (error) {
-      Alert.alert("AI Error", "Failed to get AI recommendation. Please try again.")
+      Alert.alert("Error", "Failed to submit preferences")
     } finally {
-      setIsSettlingDebate(false)
+      setIsLoading(false)
     }
   }
 
-  // Reset session
+  // AI Settlement using configured provider (Gemini, Groq, or Puter)
+  const settleDebate = async (session: DebateSession) => {
+    if (!session.host_preferences || !session.partner_preferences) {
+      Alert.alert("Not Ready", "Both partners need to submit their preferences first.")
+      return
+    }
+
+    setIsSettling(true)
+
+    try {
+      // Check if AI is configured
+      if (!isAIConfigured()) {
+        Alert.alert(
+          "AI Not Configured",
+          "Please add your FREE Gemini API key:\n\n1. Go to aistudio.google.com/apikey\n2. Create a key\n3. Add EXPO_PUBLIC_GEMINI_API_KEY to your .env file",
+          [{ text: "OK" }]
+        )
+        setIsSettling(false)
+        return
+      }
+
+      // Call the AI service
+      const result = await callAI(session.host_preferences, session.partner_preferences)
+
+      if (result.success && result.verdict) {
+        const updated = await saveDebateVerdict(session.id, result.verdict)
+        if (updated) {
+          setActiveSession(updated)
+          setShowVerdictModal(true)
+        }
+      } else {
+        Alert.alert(
+          "AI Error",
+          result.error || "Couldn't get a recommendation. Please try again.",
+          [{ text: "Retry", onPress: () => settleDebate(session) }, { text: "Cancel" }]
+        )
+      }
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "AI couldn't settle the debate. Please try again.")
+    } finally {
+      setIsSettling(false)
+    }
+  }
+
+  // Refresh session
+  const refreshSession = async () => {
+    if (!activeSession) return
+
+    const updated = await getDebateSessionByCode(activeSession.code)
+    if (updated) {
+      setActiveSession(updated)
+
+      // Check if both preferences are in and we should settle
+      if (
+        updated.host_preferences &&
+        updated.partner_preferences &&
+        updated.status !== "settled" &&
+        !isSettling
+      ) {
+        await settleDebate(updated)
+      }
+    }
+  }
+
+  // Poll for partner joining
+  useEffect(() => {
+    if (activeSession && activeSession.status === "waiting") {
+      const interval = setInterval(refreshSession, 5000)
+      return () => clearInterval(interval)
+    }
+  }, [activeSession])
+
+  // Reset everything
   const resetSession = () => {
     setActiveSession(null)
-    setSessionCode("")
-    setInviteLink("")
+    setJoinCode("")
+    setPartnerEmail("")
     setMyPreferences("")
-    setPartnerPreferences("")
-    setHasSubmittedPreferences(false)
-    setAiVerdict(null)
+    setCurrentView("home")
+    setShowVerdictModal(false)
   }
 
-  // Render initial state (no active session)
-  if (!activeSession) {
-    return (
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Debate Settler</Text>
-          <Text style={styles.headerSubtitle}>
-            Can't agree on a movie? Let AI find the perfect compromise
-          </Text>
-        </View>
+  // ===================== RENDER FUNCTIONS =====================
 
-        {/* Hero Illustration */}
-        <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.heroContainer}>
+  // Home screen - choosing create or join
+  const renderHomeScreen = () => (
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Hero Section */}
+      <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.heroSection}>
+        {/* Animated Hearts Background */}
+        <Animated.View style={[styles.pulseGlow, pulseStyle]} />
+
+        <Animated.View style={[styles.heroIconContainer, floatStyle]}>
           <LinearGradient
-            colors={["#7C3AED", "#EC4899"]}
+            colors={["#ec4899", "#f472b6", "#fb7185"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.heroGradient}
+            style={styles.heroIconGradient}
           >
-            <View style={styles.heroIconContainer}>
-              <Ionicons name="people" size={40} color="#fff" />
-              <View style={styles.heroIconDivider}>
-                <Ionicons name="flash" size={24} color="#fbbf24" />
-              </View>
-              <Ionicons name="film" size={40} color="#fff" />
-            </View>
-            <Text style={styles.heroText}>AI-Powered Movie Mediator</Text>
+            <Animated.View style={heartStyle}>
+              <Ionicons name="heart" size={48} color="#fff" />
+            </Animated.View>
           </LinearGradient>
+          <View style={styles.filmIconOverlay}>
+            <Ionicons name="film" size={20} color="#ec4899" />
+          </View>
         </Animated.View>
 
-        {/* Create Session Button */}
-        <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.actionSection}>
+        <Text style={styles.heroTitle}>Date Night Debate</Text>
+        <Text style={styles.heroSubtitle}>
+          Can't agree on a movie? Let AI find the perfect film for both of you
+        </Text>
+      </Animated.View>
+
+      {/* Couple Illustration */}
+      <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.coupleIllustration}>
+        <View style={styles.coupleAvatarContainer}>
+          <View style={styles.coupleAvatar}>
+            {user?.imageUrl ? (
+              <Image source={{ uri: user.imageUrl }} style={styles.avatarImage} />
+            ) : (
+              <LinearGradient colors={["#8B5CF6", "#7C3AED"]} style={styles.avatarPlaceholder}>
+                <Ionicons name="person" size={24} color="#fff" />
+              </LinearGradient>
+            )}
+          </View>
+          <View style={styles.heartConnector}>
+            <Ionicons name="heart" size={16} color="#ec4899" />
+          </View>
+          <View style={styles.coupleAvatar}>
+            <LinearGradient colors={["#ec4899", "#f472b6"]} style={styles.avatarPlaceholder}>
+              <Ionicons name="person" size={24} color="#fff" />
+            </LinearGradient>
+          </View>
+        </View>
+        <Text style={styles.coupleText}>You + Your Person</Text>
+      </Animated.View>
+
+      {/* Action Buttons */}
+      <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.actionsContainer}>
+        {/* Create Session */}
+        <TouchableOpacity style={styles.primaryButton} onPress={() => setCurrentView("create")}>
+          <LinearGradient
+            colors={["#ec4899", "#db2777"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.primaryButtonGradient}
+          >
+            <Ionicons name="mail" size={22} color="#fff" />
+            <Text style={styles.primaryButtonText}>Invite Your Partner</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <View style={styles.dividerContainer}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        {/* Join Session */}
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => setCurrentView("join")}>
+          <Ionicons name="enter-outline" size={22} color="#ec4899" />
+          <Text style={styles.secondaryButtonText}>I Have a Code</Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* How It Works */}
+      <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.stepsSection}>
+        <Text style={styles.sectionTitle}>How It Works</Text>
+
+        {[
+          {
+            icon: "mail-outline",
+            title: "Send an Invite",
+            desc: "Enter your partner's email to invite them",
+          },
+          {
+            icon: "chatbubble-ellipses-outline",
+            title: "Share Your Mood",
+            desc: "Both describe what you're feeling tonight",
+          },
+          {
+            icon: "sparkles",
+            title: "AI Magic",
+            desc: "Our AI finds a movie you'll both love",
+          },
+        ].map((step, index) => (
+          <View key={index} style={styles.stepItem}>
+            <View style={styles.stepIconContainer}>
+              <LinearGradient
+                colors={["#fce7f3", "#fbcfe8"]}
+                style={styles.stepIconBg}
+              >
+                <Ionicons name={step.icon as any} size={22} color="#ec4899" />
+              </LinearGradient>
+            </View>
+            <View style={styles.stepContent}>
+              <Text style={styles.stepTitle}>{step.title}</Text>
+              <Text style={styles.stepDesc}>{step.desc}</Text>
+            </View>
+            <Text style={styles.stepNumber}>{index + 1}</Text>
+          </View>
+        ))}
+      </Animated.View>
+    </ScrollView>
+  )
+
+  // Create session screen
+  const renderCreateScreen = () => (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.container}
+    >
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={styles.screenHeader}>
+          <TouchableOpacity style={styles.backButton} onPress={() => setCurrentView("home")}>
+            <Ionicons name="arrow-back" size={24} color="#374151" />
+          </TouchableOpacity>
+          <Text style={styles.screenTitle}>Invite Your Partner</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        {/* Illustration */}
+        <Animated.View entering={FadeInDown.delay(100)} style={styles.createIllustration}>
+          <LinearGradient colors={["#fce7f3", "#fff"]} style={styles.illustrationBg}>
+            <Ionicons name="mail" size={56} color="#ec4899" />
+          </LinearGradient>
+          <Text style={styles.illustrationText}>
+            We'll send them a beautiful invite email with a code to join your debate
+          </Text>
+        </Animated.View>
+
+        {/* Email Input */}
+        <Animated.View entering={FadeInDown.delay(200)} style={styles.inputSection}>
+          <Text style={styles.inputLabel}>Partner's Email</Text>
+          <View style={styles.inputContainer}>
+            <Ionicons name="heart-outline" size={20} color="#ec4899" style={styles.inputIcon} />
+            <TextInput
+              style={styles.textInput}
+              placeholder="love@example.com"
+              placeholderTextColor="#9ca3af"
+              value={partnerEmail}
+              onChangeText={setPartnerEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+            />
+          </View>
+        </Animated.View>
+
+        {/* Send Button */}
+        <Animated.View entering={FadeInDown.delay(300)} style={styles.submitSection}>
           <TouchableOpacity
-            style={styles.createButton}
-            onPress={createDebateSession}
-            disabled={isCreatingSession}
+            style={[styles.primaryButton, !partnerEmail.trim() && styles.buttonDisabled]}
+            onPress={handleCreateSession}
+            disabled={!partnerEmail.trim() || isLoading}
           >
             <LinearGradient
-              colors={["#8B5CF6", "#7C3AED"]}
+              colors={partnerEmail.trim() ? ["#ec4899", "#db2777"] : ["#d1d5db", "#9ca3af"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.createButtonGradient}
+              style={styles.primaryButtonGradient}
             >
-              {isCreatingSession ? (
+              {isLoading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <>
-                  <Ionicons name="add-circle" size={24} color="#fff" />
-                  <Text style={styles.createButtonText}>Start New Debate</Text>
+                  <Ionicons name="send" size={20} color="#fff" />
+                  <Text style={styles.primaryButtonText}>Send Invite</Text>
                 </>
               )}
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  )
 
-        {/* Join Session Section */}
-        <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.joinSection}>
-          <Text style={styles.joinTitle}>Have a code? Join a session</Text>
-          
-          <View style={styles.joinInputContainer}>
+  // Join session screen
+  const renderJoinScreen = () => (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.container}
+    >
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={styles.screenHeader}>
+          <TouchableOpacity style={styles.backButton} onPress={() => setCurrentView("home")}>
+            <Ionicons name="arrow-back" size={24} color="#374151" />
+          </TouchableOpacity>
+          <Text style={styles.screenTitle}>Join Debate</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        {/* Illustration */}
+        <Animated.View entering={FadeInDown.delay(100)} style={styles.createIllustration}>
+          <LinearGradient colors={["#f3e8ff", "#fff"]} style={styles.illustrationBg}>
+            <Ionicons name="ticket" size={56} color="#8B5CF6" />
+          </LinearGradient>
+          <Text style={styles.illustrationText}>
+            Enter the 6-digit code from your partner's invite
+          </Text>
+        </Animated.View>
+
+        {/* Code Input */}
+        <Animated.View entering={FadeInDown.delay(200)} style={styles.inputSection}>
+          <Text style={styles.inputLabel}>Invite Code</Text>
+          <View style={styles.codeInputContainer}>
             <TextInput
-              style={styles.joinInput}
-              placeholder="Enter 6-digit code"
+              style={styles.codeInput}
+              placeholder="ABC123"
               placeholderTextColor="#9ca3af"
-              value={sessionCode}
-              onChangeText={setSessionCode}
+              value={joinCode}
+              onChangeText={(text) => setJoinCode(text.toUpperCase())}
               autoCapitalize="characters"
               maxLength={6}
             />
-            
-            <TouchableOpacity
-              style={[styles.joinButton, !sessionCode.trim() && styles.joinButtonDisabled]}
-              onPress={() => joinDebateSession(sessionCode)}
-              disabled={!sessionCode.trim() || isJoining}
-            >
-              {isJoining ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Ionicons name="arrow-forward" size={20} color="#fff" />
-              )}
-            </TouchableOpacity>
           </View>
         </Animated.View>
 
-        {/* How It Works */}
-        <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.howItWorksSection}>
-          <Text style={styles.sectionTitle}>How It Works</Text>
-          
-          {[
-            { icon: "link", title: "Create & Share", desc: "Generate a unique link and invite your friend" },
-            { icon: "chatbubbles", title: "Share Preferences", desc: "Both describe what kind of movie you want" },
-            { icon: "sparkles", title: "AI Settles It", desc: "Our AI finds the perfect movie for both of you" },
-          ].map((step, index) => (
-            <View key={index} style={styles.stepCard}>
-              <View style={styles.stepNumber}>
-                <Text style={styles.stepNumberText}>{index + 1}</Text>
-              </View>
-              <View style={styles.stepIconContainer}>
-                <Ionicons name={step.icon as any} size={24} color="#8B5CF6" />
-              </View>
-              <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>{step.title}</Text>
-                <Text style={styles.stepDesc}>{step.desc}</Text>
-              </View>
-            </View>
-          ))}
-        </Animated.View>
-      </ScrollView>
-    )
-  }
-
-  // Render active session
-  return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header with Session Info */}
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={resetSession} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#374151" />
-          </TouchableOpacity>
-          <View style={styles.sessionBadge}>
-            <Text style={styles.sessionBadgeText}>Session: {activeSession.code}</Text>
-          </View>
-        </View>
-        <Text style={styles.headerTitle}>Movie Debate</Text>
-      </View>
-
-      {/* Participants */}
-      <Animated.View entering={FadeInDown.delay(100)} style={styles.participantsCard}>
-        <Text style={styles.participantsTitle}>Participants</Text>
-        <View style={styles.participantsList}>
-          {activeSession.participants.map((participant, index) => (
-            <View key={participant.id} style={styles.participantItem}>
-              <View style={styles.participantAvatar}>
-                {participant.avatar ? (
-                  <Image source={{ uri: participant.avatar }} style={styles.avatarImage} />
-                ) : (
-                  <LinearGradient
-                    colors={index === 0 ? ["#8B5CF6", "#7C3AED"] : ["#EC4899", "#F472B6"]}
-                    style={styles.avatarPlaceholder}
-                  >
-                    <Text style={styles.avatarInitial}>
-                      {participant.name[0].toUpperCase()}
-                    </Text>
-                  </LinearGradient>
-                )}
-                {participant.joined && (
-                  <View style={styles.onlineIndicator} />
-                )}
-              </View>
-              <Text style={styles.participantName}>{participant.name}</Text>
-            </View>
-          ))}
-          
-          {activeSession.participants.length < 2 && (
-            <TouchableOpacity 
-              style={styles.addParticipantButton}
-              onPress={() => setShowInviteModal(true)}
-            >
-              <View style={styles.addParticipantIcon}>
-                <Ionicons name="add" size={24} color="#8B5CF6" />
-              </View>
-              <Text style={styles.addParticipantText}>Invite Friend</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </Animated.View>
-
-      {/* Preferences Input */}
-      {!hasSubmittedPreferences ? (
-        <Animated.View entering={FadeInDown.delay(200)} style={styles.preferencesCard}>
-          <Text style={styles.preferencesTitle}>What are you in the mood for?</Text>
-          <Text style={styles.preferencesSubtitle}>
-            Describe your ideal movie night - genre, mood, pace, anything!
-          </Text>
-          
-          <TextInput
-            style={styles.preferencesInput}
-            placeholder="e.g., Something thrilling with plot twists, not too long, maybe sci-fi..."
-            placeholderTextColor="#9ca3af"
-            value={myPreferences}
-            onChangeText={setMyPreferences}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-          />
-          
+        {/* Join Button */}
+        <Animated.View entering={FadeInDown.delay(300)} style={styles.submitSection}>
           <TouchableOpacity
-            style={[styles.submitButton, !myPreferences.trim() && styles.submitButtonDisabled]}
-            onPress={submitPreferences}
-            disabled={!myPreferences.trim()}
+            style={[styles.primaryButton, joinCode.length !== 6 && styles.buttonDisabled]}
+            onPress={handleJoinSession}
+            disabled={joinCode.length !== 6 || isLoading}
           >
             <LinearGradient
-              colors={myPreferences.trim() ? ["#8B5CF6", "#7C3AED"] : ["#d1d5db", "#9ca3af"]}
+              colors={joinCode.length === 6 ? ["#8B5CF6", "#7C3AED"] : ["#d1d5db", "#9ca3af"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.submitButtonGradient}
+              style={styles.primaryButtonGradient}
             >
-              <Text style={styles.submitButtonText}>Submit My Preferences</Text>
-              <Ionicons name="checkmark-circle" size={20} color="#fff" />
+              {isLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="enter" size={20} color="#fff" />
+                  <Text style={styles.primaryButtonText}>Join Debate</Text>
+                </>
+              )}
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
-      ) : (
-        <Animated.View entering={FadeIn} style={styles.preferencesSubmittedCard}>
-          <Ionicons name="checkmark-circle" size={32} color="#22c55e" />
-          <Text style={styles.preferencesSubmittedText}>Your preferences submitted!</Text>
-          <Text style={styles.preferencesPreview}>"{myPreferences}"</Text>
-        </Animated.View>
-      )}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  )
 
-      {/* Partner Preferences (for demo) */}
-      {hasSubmittedPreferences && (
-        <Animated.View entering={FadeInDown.delay(100)} style={styles.partnerPreferencesCard}>
-          <Text style={styles.preferencesTitle}>Your friend's preferences</Text>
-          <Text style={styles.preferencesSubtitle}>
-            (In a real session, this would come from your friend)
-          </Text>
-          
-          <TextInput
-            style={styles.preferencesInput}
-            placeholder="Enter what your friend wants to watch..."
-            placeholderTextColor="#9ca3af"
-            value={partnerPreferences}
-            onChangeText={setPartnerPreferences}
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-          />
-        </Animated.View>
-      )}
+  // Active session screen
+  const renderSessionScreen = () => {
+    if (!activeSession) return null
 
-      {/* Settle Button */}
-      {hasSubmittedPreferences && (
-        <Animated.View entering={FadeInDown.delay(200)} style={styles.settleSection}>
-          <Animated.View style={pulseStyle}>
-            <TouchableOpacity
-              style={styles.settleButton}
-              onPress={settleDebateWithAI}
-              disabled={isSettlingDebate}
-            >
-              <LinearGradient
-                colors={["#EC4899", "#8B5CF6"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.settleButtonGradient}
-              >
-                {isSettlingDebate ? (
-                  <>
-                    <ActivityIndicator color="#fff" style={{ marginRight: 12 }} />
-                    <Text style={styles.settleButtonText}>AI is thinking...</Text>
-                  </>
-                ) : (
-                  <>
-                    <Ionicons name="sparkles" size={24} color="#fff" />
-                    <Text style={styles.settleButtonText}>Settle This Debate!</Text>
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          </Animated.View>
-          
-          <Text style={styles.settleHint}>
-            Powered by AI - You'll sign in with Puter to use your own AI credits
-          </Text>
-        </Animated.View>
-      )}
+    const isHost = activeSession.host_id === user?.id
+    const myPrefsSubmitted = isHost
+      ? !!activeSession.host_preferences
+      : !!activeSession.partner_preferences
+    const partnerPrefsSubmitted = isHost
+      ? !!activeSession.partner_preferences
+      : !!activeSession.host_preferences
+    const partnerJoined = !!activeSession.partner_id
 
-      {/* Invite Modal */}
-      <Modal
-        visible={showInviteModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowInviteModal(false)}
+    const host = activeSession.host
+    const partner = activeSession.partner
+
+    return (
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.container}
       >
-        <View style={styles.modalOverlay}>
-          <Animated.View entering={FadeInDown.springify()} style={styles.inviteModalContainer}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHandle} />
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => setShowInviteModal(false)}
-              >
-                <Ionicons name="close" size={24} color="#6b7280" />
-              </TouchableOpacity>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <View style={styles.screenHeader}>
+            <TouchableOpacity style={styles.backButton} onPress={resetSession}>
+              <Ionicons name="close" size={24} color="#374151" />
+            </TouchableOpacity>
+            <View style={styles.sessionCodeBadge}>
+              <Text style={styles.sessionCodeText}>{activeSession.code}</Text>
+            </View>
+            <TouchableOpacity style={styles.refreshButton} onPress={refreshSession}>
+              <Ionicons name="refresh" size={20} color="#6b7280" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Participants */}
+          <Animated.View entering={FadeInDown.delay(100)} style={styles.participantsSection}>
+            <View style={styles.participantCard}>
+              <View style={styles.participantAvatar}>
+                {host?.image_url ? (
+                  <Image source={{ uri: host.image_url }} style={styles.avatarImage} />
+                ) : (
+                  <LinearGradient colors={["#8B5CF6", "#7C3AED"]} style={styles.avatarPlaceholder}>
+                    <Text style={styles.avatarInitial}>
+                      {host?.first_name?.[0] || "?"}
+                    </Text>
+                  </LinearGradient>
+                )}
+                <View
+                  style={[
+                    styles.statusDot,
+                    { backgroundColor: isHost && myPrefsSubmitted ? "#22c55e" : "#fbbf24" },
+                  ]}
+                />
+              </View>
+              <Text style={styles.participantName}>
+                {isHost ? "You" : host?.first_name || "Partner"}
+              </Text>
+              <Text style={styles.participantStatus}>
+                {(isHost && myPrefsSubmitted) || (!isHost && activeSession.host_preferences)
+                  ? "Ready"
+                  : "Thinking..."}
+              </Text>
             </View>
 
-            <View style={styles.inviteModalContent}>
-              <LinearGradient
-                colors={["#fce7f3", "#f3e8ff"]}
-                style={styles.inviteIconContainer}
-              >
-                <Ionicons name="mail" size={40} color="#8B5CF6" />
-              </LinearGradient>
-              
-              <Text style={styles.inviteModalTitle}>Invite Your Friend</Text>
-              <Text style={styles.inviteModalSubtitle}>
-                Share the code or send them an email invite
+            <View style={styles.vsContainer}>
+              <Animated.View style={heartStyle}>
+                <Ionicons name="heart" size={28} color="#ec4899" />
+              </Animated.View>
+            </View>
+
+            <View style={styles.participantCard}>
+              {partnerJoined ? (
+                <>
+                  <View style={styles.participantAvatar}>
+                    {partner?.image_url ? (
+                      <Image source={{ uri: partner.image_url }} style={styles.avatarImage} />
+                    ) : (
+                      <LinearGradient
+                        colors={["#ec4899", "#f472b6"]}
+                        style={styles.avatarPlaceholder}
+                      >
+                        <Text style={styles.avatarInitial}>
+                          {partner?.first_name?.[0] || "?"}
+                        </Text>
+                      </LinearGradient>
+                    )}
+                    <View
+                      style={[
+                        styles.statusDot,
+                        { backgroundColor: partnerPrefsSubmitted ? "#22c55e" : "#fbbf24" },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.participantName}>
+                    {!isHost ? "You" : partner?.first_name || "Partner"}
+                  </Text>
+                  <Text style={styles.participantStatus}>
+                    {partnerPrefsSubmitted ? "Ready" : "Thinking..."}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <View style={styles.participantAvatar}>
+                    <View style={styles.waitingAvatar}>
+                      <ActivityIndicator color="#ec4899" />
+                    </View>
+                  </View>
+                  <Text style={styles.participantName}>Waiting...</Text>
+                  <Text style={styles.participantStatus}>Invite sent</Text>
+                </>
+              )}
+            </View>
+          </Animated.View>
+
+          {/* Status Message */}
+          {!partnerJoined && (
+            <Animated.View entering={FadeIn} style={styles.waitingMessage}>
+              <Ionicons name="time-outline" size={20} color="#f59e0b" />
+              <Text style={styles.waitingText}>
+                Waiting for your partner to join with code{" "}
+                <Text style={styles.codeHighlight}>{activeSession.code}</Text>
+              </Text>
+            </Animated.View>
+          )}
+
+          {/* Preferences Input */}
+          {partnerJoined && !myPrefsSubmitted && (
+            <Animated.View entering={FadeInDown.delay(200)} style={styles.preferencesSection}>
+              <Text style={styles.preferencesTitle}>What are you in the mood for?</Text>
+              <Text style={styles.preferencesSubtitle}>
+                Describe your perfect movie tonight - genre, mood, length, anything!
               </Text>
 
-              {/* Session Code Display */}
-              <View style={styles.codeDisplayContainer}>
-                <Text style={styles.codeLabel}>Your Session Code</Text>
-                <View style={styles.codeBox}>
-                  <Text style={styles.codeText}>{activeSession?.code || sessionCode}</Text>
-                </View>
-                <View style={styles.codeActions}>
-                  <TouchableOpacity style={styles.codeActionButton} onPress={copyCode}>
-                    <Ionicons name="copy-outline" size={18} color="#6b7280" />
-                    <Text style={styles.codeActionText}>Copy</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.codeActionButton} onPress={shareInviteLink}>
-                    <Ionicons name="share-outline" size={18} color="#6b7280" />
-                    <Text style={styles.codeActionText}>Share</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+              <TextInput
+                style={styles.preferencesInput}
+                placeholder="e.g., Something romantic but not too cheesy, maybe with a bit of humor..."
+                placeholderTextColor="#9ca3af"
+                value={myPreferences}
+                onChangeText={setMyPreferences}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
 
-              {/* Email Invite */}
-              <View style={styles.emailInviteSection}>
-                <Text style={styles.emailLabel}>Or invite via email</Text>
-                <View style={styles.emailInputContainer}>
-                  <TextInput
-                    style={styles.emailInput}
-                    placeholder="friend@example.com"
-                    placeholderTextColor="#9ca3af"
-                    value={inviteEmail}
-                    onChangeText={setInviteEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                  <TouchableOpacity
-                    style={styles.sendEmailButton}
-                    onPress={sendEmailInvite}
-                  >
-                    <LinearGradient
-                      colors={["#8B5CF6", "#7C3AED"]}
-                      style={styles.sendEmailGradient}
-                    >
-                      <Ionicons name="send" size={18} color="#fff" />
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </Animated.View>
-        </View>
-      </Modal>
+              <TouchableOpacity
+                style={[styles.primaryButton, !myPreferences.trim() && styles.buttonDisabled]}
+                onPress={handleSubmitPreferences}
+                disabled={!myPreferences.trim() || isLoading}
+              >
+                <LinearGradient
+                  colors={myPreferences.trim() ? ["#ec4899", "#db2777"] : ["#d1d5db", "#9ca3af"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.primaryButtonGradient}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                      <Text style={styles.primaryButtonText}>Submit My Mood</Text>
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
 
-      {/* AI Verdict Modal */}
-      <Modal
-        visible={showVerdictModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowVerdictModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <Animated.View entering={FadeInDown.springify()} style={styles.verdictModalContainer}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.modalHeader}>
-                <View style={styles.modalHandle} />
+          {/* Waiting for Partner Preferences */}
+          {myPrefsSubmitted && !partnerPrefsSubmitted && (
+            <Animated.View entering={FadeIn} style={styles.waitingPrefsSection}>
+              <View style={styles.checkmark}>
+                <Ionicons name="checkmark-circle" size={48} color="#22c55e" />
               </View>
+              <Text style={styles.waitingPrefsTitle}>You're all set!</Text>
+              <Text style={styles.waitingPrefsText}>
+                Waiting for your partner to share their mood...
+              </Text>
+              <ActivityIndicator color="#ec4899" style={{ marginTop: 16 }} />
+            </Animated.View>
+          )}
 
-              {aiVerdict && (
-                <View style={styles.verdictContent}>
-                  {/* Success Animation */}
+          {/* Settling Animation */}
+          {isSettling && (
+            <Animated.View entering={FadeIn} style={styles.settlingSection}>
+              <LinearGradient
+                colors={["#fce7f3", "#fff"]}
+                style={styles.settlingContainer}
+              >
+                <Animated.View style={heartStyle}>
+                  <Ionicons name="sparkles" size={48} color="#ec4899" />
+                </Animated.View>
+                <Text style={styles.settlingTitle}>Finding Your Perfect Movie...</Text>
+                <Text style={styles.settlingText}>
+                  Our AI is analyzing both your preferences
+                </Text>
+                <ActivityIndicator color="#ec4899" style={{ marginTop: 20 }} />
+              </LinearGradient>
+            </Animated.View>
+          )}
+        </ScrollView>
+
+        {/* Verdict Modal */}
+        <Modal
+          visible={showVerdictModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowVerdictModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <Animated.View entering={FadeInDown.springify()} style={styles.verdictModal}>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Header */}
+                <View style={styles.verdictHeader}>
                   <LinearGradient
-                    colors={["#dcfce7", "#d1fae5"]}
-                    style={styles.verdictSuccessIcon}
+                    colors={["#ec4899", "#8B5CF6"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.verdictIconContainer}
                   >
-                    <Ionicons name="checkmark-circle" size={48} color="#22c55e" />
+                    <Ionicons name="heart" size={32} color="#fff" />
                   </LinearGradient>
-                  
-                  <Text style={styles.verdictTitle}>Debate Settled!</Text>
-                  
-                  {/* Match Score */}
-                  <View style={styles.matchScoreContainer}>
-                    <Text style={styles.matchScoreLabel}>Compatibility</Text>
-                    <View style={styles.matchScoreBar}>
-                      <LinearGradient
-                        colors={["#8B5CF6", "#EC4899"]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={[styles.matchScoreFill, { width: `${aiVerdict.matchScore}%` }]}
-                      />
+                  <Text style={styles.verdictTitle}>Perfect Match Found!</Text>
+                </View>
+
+                {activeSession.ai_verdict && (
+                  <>
+                    {/* Main Recommendation */}
+                    <View style={styles.mainRecommendation}>
+                      <Text style={styles.recommendationLabel}>Tonight's Pick</Text>
+                      <Text style={styles.recommendationTitle}>
+                        {activeSession.ai_verdict.recommendation}
+                      </Text>
+                      <View style={styles.scoreContainer}>
+                        <Text style={styles.scoreLabel}>Compatibility</Text>
+                        <Text style={styles.scoreValue}>
+                          {activeSession.ai_verdict.compatibilityScore}%
+                        </Text>
+                      </View>
                     </View>
-                    <Text style={styles.matchScoreValue}>{aiVerdict.matchScore}%</Text>
-                  </View>
 
-                  {/* Main Recommendation */}
-                  <View style={styles.recommendationCard}>
-                    <Text style={styles.recommendationLabel}>AI Recommends</Text>
-                    <Text style={styles.recommendationTitle}>{aiVerdict.recommendation}</Text>
-                    <Text style={styles.recommendationReason}>{aiVerdict.reasoning}</Text>
-                  </View>
+                    {/* Reasoning */}
+                    <View style={styles.reasoningSection}>
+                      <Text style={styles.reasoningText}>
+                        {activeSession.ai_verdict.reasoning}
+                      </Text>
+                    </View>
 
-                  {/* Alternative Options */}
-                  <View style={styles.alternativesSection}>
-                    <Text style={styles.alternativesTitle}>Also Consider</Text>
-                    {aiVerdict.movieSuggestions.map((movie, index) => (
-                      <View key={index} style={styles.alternativeCard}>
-                        <View style={styles.alternativeNumber}>
-                          <Text style={styles.alternativeNumberText}>{index + 1}</Text>
-                        </View>
-                        <View style={styles.alternativeContent}>
+                    {/* Couple Insight */}
+                    <View style={styles.insightSection}>
+                      <Ionicons name="sparkles" size={18} color="#ec4899" />
+                      <Text style={styles.insightText}>
+                        {activeSession.ai_verdict.coupleInsight}
+                      </Text>
+                    </View>
+
+                    {/* Alternatives */}
+                    <View style={styles.alternativesSection}>
+                      <Text style={styles.alternativesTitle}>Other Great Options</Text>
+                      {activeSession.ai_verdict.movieSuggestions.slice(1).map((movie, index) => (
+                        <View key={index} style={styles.alternativeItem}>
                           <Text style={styles.alternativeTitle}>{movie.title}</Text>
                           <Text style={styles.alternativeReason}>{movie.reason}</Text>
                         </View>
-                      </View>
-                    ))}
-                  </View>
+                      ))}
+                    </View>
+                  </>
+                )}
 
-                  {/* Action Buttons */}
-                  <View style={styles.verdictActions}>
-                    <TouchableOpacity
-                      style={styles.watchNowButton}
-                      onPress={() => {
-                        setShowVerdictModal(false)
-                        Alert.alert("Great Choice!", `Let's watch "${aiVerdict.recommendation}" together!`)
-                      }}
+                {/* Actions */}
+                <View style={styles.verdictActions}>
+                  <TouchableOpacity
+                    style={styles.primaryButton}
+                    onPress={() => {
+                      setShowVerdictModal(false)
+                      // Could navigate to discover or search
+                      Alert.alert(
+                        "Enjoy Your Movie Night!",
+                        "Head to the Discover tab to find where to watch your movie."
+                      )
+                    }}
+                  >
+                    <LinearGradient
+                      colors={["#ec4899", "#db2777"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.primaryButtonGradient}
                     >
-                      <LinearGradient
-                        colors={["#8B5CF6", "#7C3AED"]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.watchNowGradient}
-                      >
-                        <Ionicons name="play" size={20} color="#fff" />
-                        <Text style={styles.watchNowText}>Watch This One!</Text>
-                      </LinearGradient>
-                    </TouchableOpacity>
+                      <Ionicons name="play-circle" size={20} color="#fff" />
+                      <Text style={styles.primaryButtonText}>Let's Watch!</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={styles.tryAgainButton}
-                      onPress={() => {
-                        setShowVerdictModal(false)
-                        setAiVerdict(null)
-                        setHasSubmittedPreferences(false)
-                        setMyPreferences("")
-                        setPartnerPreferences("")
-                      }}
-                    >
-                      <Text style={styles.tryAgainText}>Try Different Preferences</Text>
-                    </TouchableOpacity>
-                  </View>
+                  <TouchableOpacity style={styles.secondaryButton} onPress={resetSession}>
+                    <Text style={styles.secondaryButtonText}>Start New Debate</Text>
+                  </TouchableOpacity>
                 </View>
-              )}
-            </ScrollView>
-          </Animated.View>
-        </View>
-      </Modal>
-    </ScrollView>
-  )
+              </ScrollView>
+            </Animated.View>
+          </View>
+        </Modal>
+      </KeyboardAvoidingView>
+    )
+  }
+
+  // Main render
+  switch (currentView) {
+    case "create":
+      return renderCreateScreen()
+    case "join":
+      return renderJoinScreen()
+    case "session":
+      return renderSessionScreen()
+    default:
+      return renderHomeScreen()
+  }
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#fff9fb",
   },
-  header: {
-    paddingTop: 64,
-    paddingHorizontal: 24,
-    paddingBottom: 16,
+  scrollContent: {
+    paddingBottom: 40,
   },
-  headerRow: {
-    flexDirection: "row",
+
+  // Hero Section
+  heroSection: {
     alignItems: "center",
-    marginBottom: 12,
+    paddingTop: 80,
+    paddingHorizontal: 24,
+    paddingBottom: 32,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  pulseGlow: {
+    position: "absolute",
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: "rgba(236, 72, 153, 0.15)",
+    top: 60,
+  },
+  heroIconContainer: {
+    position: "relative",
+    marginBottom: 24,
+  },
+  heroIconGradient: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#ec4899",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  filmIconOverlay: {
+    position: "absolute",
+    bottom: -4,
+    right: -4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  sessionBadge: {
-    marginLeft: 12,
-    backgroundColor: "#f3e8ff",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  sessionBadgeText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#7C3AED",
-  },
-  headerTitle: {
+  heroTitle: {
     fontSize: 32,
     fontWeight: "900",
-    color: "#111827",
-    marginBottom: 8,
+    color: "#1f2937",
+    marginBottom: 12,
+    textAlign: "center",
   },
-  headerSubtitle: {
+  heroSubtitle: {
     fontSize: 16,
     color: "#6b7280",
+    textAlign: "center",
     lineHeight: 24,
+    paddingHorizontal: 20,
   },
-  heroContainer: {
-    marginHorizontal: 24,
-    marginTop: 8,
-    borderRadius: 24,
-    overflow: "hidden",
-    shadowColor: "#7C3AED",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  heroGradient: {
-    paddingVertical: 40,
-    paddingHorizontal: 24,
+
+  // Couple Illustration
+  coupleIllustration: {
     alignItems: "center",
+    paddingVertical: 24,
   },
-  heroIconContainer: {
+  coupleAvatarContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  heroIconDivider: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "rgba(255,255,255,0.2)",
+  coupleAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    overflow: "hidden",
+    borderWidth: 3,
+    borderColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  heartConnector: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
-    marginHorizontal: 16,
+    marginHorizontal: -8,
+    zIndex: 1,
+    shadowColor: "#ec4899",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  heroText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#fff",
+  coupleText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#ec4899",
   },
-  actionSection: {
+
+  // Actions
+  actionsContainer: {
     paddingHorizontal: 24,
-    marginTop: 24,
+    paddingTop: 16,
   },
-  createButton: {
+  primaryButton: {
     borderRadius: 20,
     overflow: "hidden",
-    shadowColor: "#7C3AED",
-    shadowOffset: { width: 0, height: 6 },
+    shadowColor: "#ec4899",
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  createButtonGradient: {
+  primaryButtonGradient: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 18,
-    gap: 12,
+    gap: 10,
   },
-  createButtonText: {
-    fontSize: 18,
-    fontWeight: "700",
+  primaryButtonText: {
     color: "#fff",
-  },
-  joinSection: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  joinTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#6b7280",
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  joinInputContainer: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  joinInput: {
-    flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "700",
-    textAlign: "center",
-    letterSpacing: 4,
-    color: "#111827",
-    borderWidth: 2,
-    borderColor: "#e5e7eb",
   },
-  joinButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: "#8B5CF6",
-    justifyContent: "center",
+  buttonDisabled: {
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  dividerContainer: {
+    flexDirection: "row",
     alignItems: "center",
+    marginVertical: 24,
   },
-  joinButtonDisabled: {
-    backgroundColor: "#d1d5db",
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#e5e7eb",
   },
-  howItWorksSection: {
-    marginTop: 40,
+  dividerText: {
+    marginHorizontal: 16,
+    color: "#9ca3af",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  secondaryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 18,
+    backgroundColor: "#fdf2f8",
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: "#fbcfe8",
+    gap: 10,
+  },
+  secondaryButtonText: {
+    color: "#ec4899",
+    fontSize: 17,
+    fontWeight: "700",
+  },
+
+  // Steps Section
+  stepsSection: {
     paddingHorizontal: 24,
-    paddingBottom: 40,
+    paddingTop: 40,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#111827",
+    color: "#1f2937",
     marginBottom: 20,
   },
-  stepCard: {
+  stepItem: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#fff",
-    borderRadius: 16,
     padding: 16,
+    borderRadius: 16,
     marginBottom: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -962,28 +1124,15 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  stepNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#f3e8ff",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  stepNumberText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#7C3AED",
-  },
   stepIconContainer: {
+    marginRight: 16,
+  },
+  stepIconBg: {
     width: 48,
     height: 48,
-    borderRadius: 12,
-    backgroundColor: "#f3e8ff",
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 16,
   },
   stepContent: {
     flex: 1,
@@ -991,483 +1140,410 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#111827",
+    color: "#1f2937",
     marginBottom: 4,
   },
   stepDesc: {
     fontSize: 14,
     color: "#6b7280",
   },
-  participantsCard: {
-    marginHorizontal: 24,
-    marginTop: 8,
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+  stepNumber: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#f3e8ff",
   },
-  participantsTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#6b7280",
-    marginBottom: 16,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  participantsList: {
+
+  // Screen Header
+  screenHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 20,
+    justifyContent: "space-between",
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
-  participantItem: {
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#f3f4f6",
+    justifyContent: "center",
     alignItems: "center",
   },
-  participantAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  screenTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1f2937",
+  },
+
+  // Create Screen
+  createIllustration: {
+    alignItems: "center",
+    paddingVertical: 32,
+  },
+  illustrationBg: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  illustrationText: {
+    fontSize: 16,
+    color: "#6b7280",
+    textAlign: "center",
+    paddingHorizontal: 40,
+    lineHeight: 24,
+  },
+  inputSection: {
+    paddingHorizontal: 24,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#374151",
     marginBottom: 8,
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: "#f3f4f6",
+    paddingHorizontal: 16,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  textInput: {
+    flex: 1,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: "#1f2937",
+  },
+  codeInputContainer: {
+    alignItems: "center",
+  },
+  codeInput: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: "#e9d5ff",
+    paddingVertical: 20,
+    paddingHorizontal: 32,
+    fontSize: 28,
+    fontWeight: "800",
+    letterSpacing: 8,
+    color: "#1f2937",
+    textAlign: "center",
+    width: "100%",
+  },
+  submitSection: {
+    paddingHorizontal: 24,
+    paddingTop: 32,
+  },
+
+  // Session Screen
+  sessionCodeBadge: {
+    backgroundColor: "#fdf2f8",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#fbcfe8",
+  },
+  sessionCodeText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#ec4899",
+    letterSpacing: 2,
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#f3f4f6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  // Participants
+  participantsSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+    gap: 20,
+  },
+  participantCard: {
+    alignItems: "center",
+    flex: 1,
+  },
+  participantAvatar: {
     position: "relative",
+    marginBottom: 12,
   },
   avatarImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 28,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
   },
   avatarPlaceholder: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 28,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     justifyContent: "center",
     alignItems: "center",
   },
   avatarInitial: {
-    fontSize: 20,
+    fontSize: 28,
     fontWeight: "700",
     color: "#fff",
   },
-  onlineIndicator: {
+  statusDot: {
     position: "absolute",
     bottom: 2,
     right: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "#22c55e",
-    borderWidth: 2,
-    borderColor: "#fff",
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 3,
+    borderColor: "#fff9fb",
   },
-  participantName: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#374151",
-  },
-  addParticipantButton: {
-    alignItems: "center",
-  },
-  addParticipantIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 2,
-    borderColor: "#e5e7eb",
-    borderStyle: "dashed",
+  waitingAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#fdf2f8",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: "#fbcfe8",
+    borderStyle: "dashed",
   },
-  addParticipantText: {
+  participantName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1f2937",
+    marginBottom: 4,
+  },
+  participantStatus: {
     fontSize: 13,
-    fontWeight: "600",
-    color: "#8B5CF6",
+    color: "#6b7280",
   },
-  preferencesCard: {
+  vsContainer: {
+    paddingHorizontal: 8,
+  },
+
+  // Waiting Message
+  waitingMessage: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fef3c7",
     marginHorizontal: 24,
-    marginTop: 20,
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    gap: 10,
+  },
+  waitingText: {
+    fontSize: 14,
+    color: "#92400e",
+  },
+  codeHighlight: {
+    fontWeight: "800",
+    color: "#b45309",
+  },
+
+  // Preferences
+  preferencesSection: {
+    paddingHorizontal: 24,
+    paddingTop: 32,
   },
   preferencesTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#111827",
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#1f2937",
     marginBottom: 8,
   },
   preferencesSubtitle: {
     fontSize: 14,
     color: "#6b7280",
-    marginBottom: 16,
+    marginBottom: 20,
+    lineHeight: 20,
   },
   preferencesInput: {
-    backgroundColor: "#f9fafb",
-    borderRadius: 16,
-    padding: 16,
-    fontSize: 15,
-    color: "#111827",
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    minHeight: 100,
-  },
-  submitButton: {
-    marginTop: 16,
-    borderRadius: 16,
-    overflow: "hidden",
-  },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
-    gap: 10,
-  },
-  submitButtonText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  preferencesSubmittedCard: {
-    marginHorizontal: 24,
-    marginTop: 20,
-    backgroundColor: "#dcfce7",
-    borderRadius: 20,
-    padding: 20,
-    alignItems: "center",
-  },
-  preferencesSubmittedText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#166534",
-    marginTop: 8,
-  },
-  preferencesPreview: {
-    fontSize: 14,
-    color: "#166534",
-    fontStyle: "italic",
-    marginTop: 8,
-    textAlign: "center",
-  },
-  partnerPreferencesCard: {
-    marginHorizontal: 24,
-    marginTop: 16,
     backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  settleSection: {
-    marginHorizontal: 24,
-    marginTop: 24,
-    marginBottom: 40,
-    alignItems: "center",
-  },
-  settleButton: {
-    borderRadius: 24,
-    overflow: "hidden",
-    shadowColor: "#EC4899",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  settleButtonGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 20,
-    paddingHorizontal: 40,
-    gap: 12,
-  },
-  settleButtonText: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#fff",
-  },
-  settleHint: {
-    fontSize: 12,
-    color: "#9ca3af",
-    marginTop: 16,
-    textAlign: "center",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
-  inviteModalContainer: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingBottom: 40,
-    maxHeight: height * 0.8,
-  },
-  modalHeader: {
-    alignItems: "center",
-    paddingTop: 12,
-    paddingHorizontal: 20,
-  },
-  modalHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: "#d1d5db",
-    borderRadius: 2,
-  },
-  modalCloseButton: {
-    position: "absolute",
-    right: 20,
-    top: 12,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#f3f4f6",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  inviteModalContent: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    alignItems: "center",
-  },
-  inviteIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  inviteModalTitle: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#111827",
-    marginBottom: 8,
-  },
-  inviteModalSubtitle: {
-    fontSize: 14,
-    color: "#6b7280",
-    textAlign: "center",
-    marginBottom: 24,
-  },
-  codeDisplayContainer: {
-    width: "100%",
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  codeLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#6b7280",
-    marginBottom: 8,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  codeBox: {
-    backgroundColor: "#f3e8ff",
-    paddingVertical: 16,
-    paddingHorizontal: 32,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: "#e9d5ff",
+    borderColor: "#f3f4f6",
+    padding: 16,
+    fontSize: 16,
+    color: "#1f2937",
+    minHeight: 120,
+    marginBottom: 24,
+    textAlignVertical: "top",
   },
-  codeText: {
-    fontSize: 32,
-    fontWeight: "900",
-    color: "#7C3AED",
-    letterSpacing: 6,
-  },
-  codeActions: {
-    flexDirection: "row",
-    gap: 16,
-    marginTop: 16,
-  },
-  codeActionButton: {
-    flexDirection: "row",
+
+  // Waiting Prefs
+  waitingPrefsSection: {
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 12,
-    gap: 6,
+    paddingHorizontal: 24,
+    paddingVertical: 48,
   },
-  codeActionText: {
-    fontSize: 14,
-    fontWeight: "600",
+  checkmark: {
+    marginBottom: 16,
+  },
+  waitingPrefsTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1f2937",
+    marginBottom: 8,
+  },
+  waitingPrefsText: {
+    fontSize: 15,
+    color: "#6b7280",
+    textAlign: "center",
+  },
+
+  // Settling
+  settlingSection: {
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+  },
+  settlingContainer: {
+    alignItems: "center",
+    paddingVertical: 48,
+    borderRadius: 24,
+  },
+  settlingTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1f2937",
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  settlingText: {
+    fontSize: 15,
     color: "#6b7280",
   },
-  emailInviteSection: {
-    width: "100%",
-    borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-    paddingTop: 24,
-  },
-  emailLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-    marginBottom: 12,
-  },
-  emailInputContainer: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  emailInput: {
+
+  // Verdict Modal
+  modalOverlay: {
     flex: 1,
-    backgroundColor: "#f9fafb",
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    color: "#111827",
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "flex-end",
   },
-  sendEmailButton: {
-    borderRadius: 16,
-    overflow: "hidden",
-  },
-  sendEmailGradient: {
-    width: 52,
-    height: 52,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  verdictModalContainer: {
+  verdictModal: {
     backgroundColor: "#fff",
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    paddingBottom: 40,
-    maxHeight: height * 0.9,
-  },
-  verdictContent: {
+    maxHeight: height * 0.85,
     paddingHorizontal: 24,
-    paddingTop: 16,
-    alignItems: "center",
+    paddingTop: 24,
+    paddingBottom: 40,
   },
-  verdictSuccessIcon: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+  verdictHeader: {
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  verdictIconContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 16,
   },
   verdictTitle: {
-    fontSize: 28,
-    fontWeight: "900",
-    color: "#111827",
-    marginBottom: 24,
-  },
-  matchScoreContainer: {
-    width: "100%",
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  matchScoreLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#6b7280",
-    marginBottom: 8,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  matchScoreBar: {
-    width: "100%",
-    height: 8,
-    backgroundColor: "#e5e7eb",
-    borderRadius: 4,
-    overflow: "hidden",
-  },
-  matchScoreFill: {
-    height: "100%",
-    borderRadius: 4,
-  },
-  matchScoreValue: {
     fontSize: 24,
     fontWeight: "800",
-    color: "#7C3AED",
-    marginTop: 8,
+    color: "#1f2937",
   },
-  recommendationCard: {
-    width: "100%",
-    backgroundColor: "#f3e8ff",
+  mainRecommendation: {
+    backgroundColor: "#fdf2f8",
     borderRadius: 20,
-    padding: 20,
-    marginBottom: 24,
+    padding: 24,
+    alignItems: "center",
+    marginBottom: 20,
   },
   recommendationLabel: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#7C3AED",
-    marginBottom: 8,
+    color: "#ec4899",
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 1,
+    marginBottom: 8,
   },
   recommendationTitle: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#111827",
-    marginBottom: 12,
+    fontSize: 28,
+    fontWeight: "900",
+    color: "#1f2937",
+    textAlign: "center",
+    marginBottom: 16,
   },
-  recommendationReason: {
-    fontSize: 15,
-    color: "#374151",
-    lineHeight: 22,
+  scoreContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  scoreLabel: {
+    fontSize: 14,
+    color: "#6b7280",
+  },
+  scoreValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#ec4899",
+  },
+  reasoningSection: {
+    marginBottom: 20,
+  },
+  reasoningText: {
+    fontSize: 16,
+    color: "#4b5563",
+    lineHeight: 24,
+    textAlign: "center",
+  },
+  insightSection: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#f3e8ff",
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 24,
+    gap: 12,
+  },
+  insightText: {
+    flex: 1,
+    fontSize: 14,
+    color: "#7c3aed",
+    fontStyle: "italic",
+    lineHeight: 20,
   },
   alternativesSection: {
-    width: "100%",
     marginBottom: 24,
   },
   alternativesTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#111827",
+    color: "#1f2937",
     marginBottom: 16,
   },
-  alternativeCard: {
-    flexDirection: "row",
-    alignItems: "flex-start",
+  alternativeItem: {
     backgroundColor: "#f9fafb",
-    borderRadius: 16,
     padding: 16,
-    marginBottom: 12,
-  },
-  alternativeNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#e5e7eb",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  alternativeNumberText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#6b7280",
-  },
-  alternativeContent: {
-    flex: 1,
+    borderRadius: 12,
+    marginBottom: 8,
   },
   alternativeTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
-    color: "#111827",
+    color: "#1f2937",
     marginBottom: 4,
   },
   alternativeReason: {
@@ -1475,37 +1551,6 @@ const styles = StyleSheet.create({
     color: "#6b7280",
   },
   verdictActions: {
-    width: "100%",
     gap: 12,
-  },
-  watchNowButton: {
-    borderRadius: 20,
-    overflow: "hidden",
-    shadowColor: "#7C3AED",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  watchNowGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 18,
-    gap: 10,
-  },
-  watchNowText: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  tryAgainButton: {
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-  tryAgainText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#6b7280",
   },
 })

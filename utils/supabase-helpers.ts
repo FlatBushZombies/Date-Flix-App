@@ -277,3 +277,237 @@ export const getUserStats = async (userId: string) => {
     activeSessions: sessionsResult.count || 0,
   }
 }
+
+// ==================== DEBATE SESSION FUNCTIONS ====================
+
+import type { DebateSession, AIVerdict } from "@/types"
+
+// Generate unique debate code
+const generateDebateCode = () => {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+  let code = ""
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return code
+}
+
+// Create a new debate session
+export const createDebateSession = async (hostId: string, partnerEmail: string) => {
+  const code = generateDebateCode()
+  const expiresAt = new Date()
+  expiresAt.setHours(expiresAt.getHours() + 24) // 24 hours expiry
+
+  const { data, error } = await supabase
+    .from("debate_sessions")
+    .insert({
+      code,
+      host_id: hostId,
+      partner_email: partnerEmail,
+      status: "waiting",
+      expires_at: expiresAt.toISOString(),
+    })
+    .select(`
+      *,
+      host:users!debate_sessions_host_id_fkey(*)
+    `)
+    .single()
+
+  if (error) {
+    console.error("[v0] Error creating debate session:", error)
+    return null
+  }
+
+  return data as DebateSession
+}
+
+// Send debate invite email via Supabase Edge Function
+export const sendDebateInviteEmail = async (
+  hostName: string,
+  partnerEmail: string,
+  debateCode: string
+) => {
+  // Use Supabase's built-in email or call an edge function
+  const { data, error } = await supabase.functions.invoke("clever-task", {
+    body: {
+      to: partnerEmail,
+      hostName,
+      debateCode,
+      subject: `${hostName} wants to settle a movie debate with you!`,
+    },
+  })
+
+  if (error) {
+    console.error("[v0] Error sending invite email:", error)
+    return false
+  }
+
+  return !!(data && typeof data === "object" && "sent" in (data as any) && (data as any).sent === true)
+}
+
+// Join debate session with code
+export const joinDebateSession = async (code: string, userId: string) => {
+  // First, find the session
+  const { data: session, error: fetchError } = await supabase
+    .from("debate_sessions")
+    .select(`
+      *,
+      host:users!debate_sessions_host_id_fkey(*)
+    `)
+    .eq("code", code.toUpperCase())
+    .single()
+
+  if (fetchError || !session) {
+    return { success: false, error: "Invalid code. Please check and try again." }
+  }
+
+  // Check if expired
+  if (new Date(session.expires_at) < new Date()) {
+    return { success: false, error: "This debate session has expired." }
+  }
+
+  // Check if already has a partner
+  if (session.partner_id && session.partner_id !== userId) {
+    return { success: false, error: "This session already has two participants." }
+  }
+
+  // Check if user is the host (can't join own session)
+  if (session.host_id === userId) {
+    return { success: false, error: "You can't join your own debate session!" }
+  }
+
+  // Update session with partner
+  const { data: updatedSession, error: updateError } = await supabase
+    .from("debate_sessions")
+    .update({
+      partner_id: userId,
+      status: "both_joined",
+    })
+    .eq("id", session.id)
+    .select(`
+      *,
+      host:users!debate_sessions_host_id_fkey(*),
+      partner:users!debate_sessions_partner_id_fkey(*)
+    `)
+    .single()
+
+  if (updateError) {
+    return { success: false, error: "Failed to join session." }
+  }
+
+  return { success: true, session: updatedSession as DebateSession }
+}
+
+// Get debate session by code
+export const getDebateSessionByCode = async (code: string) => {
+  const { data, error } = await supabase
+    .from("debate_sessions")
+    .select(`
+      *,
+      host:users!debate_sessions_host_id_fkey(*),
+      partner:users!debate_sessions_partner_id_fkey(*)
+    `)
+    .eq("code", code.toUpperCase())
+    .single()
+
+  if (error) {
+    return null
+  }
+
+  return data as DebateSession
+}
+
+// Get user's active debate sessions
+export const getUserDebateSessions = async (userId: string) => {
+  const { data, error } = await supabase
+    .from("debate_sessions")
+    .select(`
+      *,
+      host:users!debate_sessions_host_id_fkey(*),
+      partner:users!debate_sessions_partner_id_fkey(*)
+    `)
+    .or(`host_id.eq.${userId},partner_id.eq.${userId}`)
+    .neq("status", "settled")
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("[v0] Error fetching debate sessions:", error)
+    return []
+  }
+
+  return data as DebateSession[]
+}
+
+// Submit preferences for debate
+export const submitDebatePreferences = async (
+  sessionId: string,
+  userId: string,
+  preferences: string,
+  isHost: boolean
+) => {
+  const updateField = isHost ? "host_preferences" : "partner_preferences"
+  const newStatus = isHost ? "host_ready" : "partner_ready"
+
+  // Get current session to check status
+  const { data: current } = await supabase
+    .from("debate_sessions")
+    .select("status, host_preferences, partner_preferences")
+    .eq("id", sessionId)
+    .single()
+
+  // Determine final status
+  let finalStatus = newStatus
+  if (current) {
+    if (isHost && current.partner_preferences) {
+      finalStatus = "settling"
+    } else if (!isHost && current.host_preferences) {
+      finalStatus = "settling"
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("debate_sessions")
+    .update({
+      [updateField]: preferences,
+      status: finalStatus,
+    })
+    .eq("id", sessionId)
+    .select(`
+      *,
+      host:users!debate_sessions_host_id_fkey(*),
+      partner:users!debate_sessions_partner_id_fkey(*)
+    `)
+    .single()
+
+  if (error) {
+    console.error("[v0] Error submitting preferences:", error)
+    return null
+  }
+
+  return data as DebateSession
+}
+
+// Save AI verdict
+export const saveDebateVerdict = async (sessionId: string, verdict: AIVerdict) => {
+  const { data, error } = await supabase
+    .from("debate_sessions")
+    .update({
+      ai_verdict: verdict,
+      status: "settled",
+    })
+    .eq("id", sessionId)
+    .select(`
+      *,
+      host:users!debate_sessions_host_id_fkey(*),
+      partner:users!debate_sessions_partner_id_fkey(*)
+    `)
+    .single()
+
+  if (error) {
+    console.error("[v0] Error saving verdict:", error)
+    return null
+  }
+
+  return data as DebateSession
+}
