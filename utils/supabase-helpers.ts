@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase"
-import type { Movie, SupabaseUser, SupabaseMatch, Invitation, SwipeSession } from "@/types"
+import type { Movie, SupabaseUser, SupabaseMatch, Invitation, SwipeSession, AppNotification } from "@/types"
 
 // User Management
 export const syncUserWithSupabase = async (clerkUser: any) => {
@@ -113,6 +113,21 @@ export const checkForMatch = async (userId: string, movieId: number, movieData: 
         .single()
 
       if (!error) {
+        // Create notifications for both users (best-effort)
+        await Promise.allSettled([
+          createNotification(userId, {
+            type: "movie_matched",
+            title: "It's a match! 💞",
+            body: `You both liked "${movieData.title}".`,
+            data: { movieId, matchId: match.id, partnerId },
+          }),
+          createNotification(partnerId, {
+            type: "movie_matched",
+            title: "It's a match! 💞",
+            body: `You both liked "${movieData.title}".`,
+            data: { movieId, matchId: match.id, partnerId: userId },
+          }),
+        ])
         return match
       }
     }
@@ -214,7 +229,106 @@ export const acceptInvitation = async (inviteCode: string, userId: string) => {
     return { success: false, error: "Failed to create session" }
   }
 
+  // Notify the sender that someone joined (best-effort)
+  await Promise.allSettled([
+    createNotification(invitation.sender_id, {
+      type: "session_joined",
+      title: "Someone joined your session",
+      body: "Your friend joined your swipe session. Start swiping together!",
+      data: { sessionId: session.id, userId },
+    }),
+    createNotification(userId, {
+      type: "session_joined",
+      title: "Session joined",
+      body: "You're now swiping together. Good luck matching!",
+      data: { sessionId: session.id, userId: invitation.sender_id },
+    }),
+  ])
+
   return { success: true, session }
+}
+
+// ==================== NOTIFICATIONS ====================
+
+export const getNotifications = async (userId: string, limit = 50) => {
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error("[v0] Error fetching notifications:", error)
+    return []
+  }
+
+  return data as AppNotification[]
+}
+
+export const getUnreadNotificationCount = async (userId: string) => {
+  const { count, error } = await supabase
+    .from("notifications")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .is("read_at", null)
+
+  if (error) {
+    console.error("[v0] Error counting notifications:", error)
+    return 0
+  }
+
+  return count || 0
+}
+
+export const markAllNotificationsRead = async (userId: string) => {
+  const { error } = await supabase
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .is("read_at", null)
+
+  if (error) {
+    console.error("[v0] Error marking notifications read:", error)
+    return false
+  }
+  return true
+}
+
+export const markNotificationRead = async (notificationId: string) => {
+  const { error } = await supabase
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("id", notificationId)
+
+  if (error) {
+    console.error("[v0] Error marking notification read:", error)
+    return false
+  }
+  return true
+}
+
+export const createNotification = async (
+  userId: string,
+  payload: Pick<AppNotification, "type" | "title" | "body" | "data">,
+) => {
+  const { data, error } = await supabase
+    .from("notifications")
+    .insert({
+      user_id: userId,
+      type: payload.type,
+      title: payload.title,
+      body: payload.body,
+      data: payload.data ?? null,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error("[v0] Error creating notification:", error)
+    return null
+  }
+  return data as AppNotification
 }
 
 export const getUserInvitations = async (userId: string) => {

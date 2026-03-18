@@ -13,6 +13,8 @@ import { saveSwipe, syncUserWithSupabase, createInvitation, acceptInvitation, ge
 import { LinearGradient } from "expo-linear-gradient"
 import * as Clipboard from "expo-clipboard"
 import type { SwipeSession, SupabaseUser } from "@/types"
+import { useNotifications } from "@/hooks/useNotifications"
+import { NotificationsModal } from "@/components/NotificationsModal"
 
 const { width, height } = Dimensions.get("window")
 
@@ -33,6 +35,10 @@ export default function SwipeScreen() {
   const [isJoining, setIsJoining] = useState(false)
   const [activeTab, setActiveTab] = useState<"create" | "join">("create")
   const [activeSessions, setActiveSessions] = useState<(SwipeSession & { user1: SupabaseUser; user2: SupabaseUser })[]>([])
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+
+  const { items: notifications, unreadCount, loading: notificationsLoading, markAllRead, markRead } =
+    useNotifications(user?.id)
 
   useEffect(() => {
     loadMovies()
@@ -181,8 +187,25 @@ export default function SwipeScreen() {
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.notificationButton}>
+          <TouchableOpacity
+            style={styles.notificationButton}
+            onPress={async () => {
+              setNotificationsOpen(true)
+              // Mark as read when opened so red dot/count clears
+              await markAllRead()
+            }}
+          >
             <Ionicons name="notifications-outline" size={22} color="#0f172a" />
+            {unreadCount > 0 && (
+              <>
+                <View style={styles.notificationDot} />
+                <View style={styles.notificationCount}>
+                  <Text style={styles.notificationCountText}>
+                    {unreadCount > 99 ? "99+" : String(unreadCount)}
+                  </Text>
+                </View>
+              </>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -384,6 +407,20 @@ export default function SwipeScreen() {
           </Animated.View>
         </View>
       </Modal>
+
+      <NotificationsModal
+        visible={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
+        items={notifications}
+        loading={notificationsLoading}
+        onMarkAllRead={() => {
+          markAllRead()
+        }}
+        onPressItem={(n) => {
+          if (!n.read_at) markRead(n.id)
+          // Optional: navigate based on notification type/data later
+        }}
+      />
     </View>
   )
 }
@@ -494,6 +531,37 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
+    position: "relative",
+  },
+  notificationDot: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#ef4444",
+    borderWidth: 2,
+    borderColor: "#ffffff",
+  },
+  notificationCount: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    borderRadius: 9,
+    backgroundColor: "#ef4444",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#ffffff",
+  },
+  notificationCountText: {
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "800",
   },
   activeSessionBanner: {
     flexDirection: "row",

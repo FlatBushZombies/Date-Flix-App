@@ -170,3 +170,17 @@ export interface AIVerdict {
   coupleInsight: string
 }
 
+// Notifications
+export type NotificationType = "session_joined" | "movie_matched"
+
+export interface AppNotification {
+  id: string
+  user_id: string
+  type: NotificationType
+  title: string
+  body: string
+  data: any | null
+  created_at: string
+  read_at: string | null
+}
+

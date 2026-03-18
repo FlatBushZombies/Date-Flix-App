@@ -35,7 +35,7 @@ export function useMoviePlanner() {
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke(
-        'ai-movie-planner',
+        'super-function',
         { body: { prompt: builtPrompt } }
       );
 
