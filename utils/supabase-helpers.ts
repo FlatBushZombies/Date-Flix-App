@@ -435,6 +435,21 @@ export const createDebateSession = async (hostId: string, partnerEmail: string) 
   return data as DebateSession
 }
 
+export type DebateInviteEmailResult = {
+  sent: boolean
+  provider?: 'resend'
+  mode?: 'test' | 'production'
+  reason?:
+    | 'missing_fields'
+    | 'missing_provider_config'
+    | 'domain_verification_required'
+    | 'from_domain_not_verified'
+    | 'provider_error'
+  error?: string
+  action?: string
+  emailId?: string
+}
+
 // Send debate invite email via Supabase Edge Function
 export const sendDebateInviteEmail = async (
   hostName: string,
@@ -453,10 +468,22 @@ export const sendDebateInviteEmail = async (
 
   if (error) {
     console.error("[v0] Error sending invite email:", error)
-    return false
+    return {
+      sent: false,
+      reason: "provider_error",
+      error: error.message,
+    } satisfies DebateInviteEmailResult
   }
 
-  return !!(data && typeof data === "object" && "sent" in (data as any) && (data as any).sent === true)
+  if (!data || typeof data !== "object") {
+    return {
+      sent: false,
+      reason: "provider_error",
+      error: "Unexpected invite response",
+    } satisfies DebateInviteEmailResult
+  }
+
+  return data as DebateInviteEmailResult
 }
 
 // Join debate session with code

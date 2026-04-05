@@ -1,15 +1,32 @@
 "use client"
 
-import { View, Text, TouchableOpacity, Dimensions, Image, StyleSheet, Modal, Share, TextInput, Alert } from "react-native"
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Dimensions,
+  Image,
+  Modal,
+  Share,
+  TextInput,
+  Alert,
+} from "react-native"
 import { useState, useEffect } from "react"
 import { MovieCard } from "@/components/MovieCard"
 import { fetchTrendingMovies } from "@/utils/tmdb"
 import type { Movie } from "@/types"
 import { Ionicons } from "@expo/vector-icons"
-import Animated, { FadeIn, FadeInDown, FadeOut } from "react-native-reanimated"
+import { BellIcon } from "react-native-heroicons/outline"
+import Animated, { FadeIn, FadeInDown } from "react-native-reanimated"
 import { useRouter } from "expo-router"
 import { useUser } from "@clerk/clerk-expo"
-import { saveSwipe, syncUserWithSupabase, createInvitation, acceptInvitation, getActiveSwipeSessions } from "@/utils/supabase-helpers"
+import {
+  saveSwipe,
+  syncUserWithSupabase,
+  createInvitation,
+  acceptInvitation,
+  getActiveSwipeSessions,
+} from "@/utils/supabase-helpers"
 import { LinearGradient } from "expo-linear-gradient"
 import * as Clipboard from "expo-clipboard"
 import type { SwipeSession, SupabaseUser } from "@/types"
@@ -26,7 +43,7 @@ export default function SwipeScreen() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(true)
   const [userSynced, setUserSynced] = useState(false)
-  
+
   // Invite modal state
   const [inviteModalVisible, setInviteModalVisible] = useState(false)
   const [inviteCode, setInviteCode] = useState("")
@@ -34,11 +51,18 @@ export default function SwipeScreen() {
   const [isCreatingInvite, setIsCreatingInvite] = useState(false)
   const [isJoining, setIsJoining] = useState(false)
   const [activeTab, setActiveTab] = useState<"create" | "join">("create")
-  const [activeSessions, setActiveSessions] = useState<(SwipeSession & { user1: SupabaseUser; user2: SupabaseUser })[]>([])
+  const [activeSessions, setActiveSessions] = useState<
+    (SwipeSession & { user1: SupabaseUser; user2: SupabaseUser })[]
+  >([])
   const [notificationsOpen, setNotificationsOpen] = useState(false)
 
-  const { items: notifications, unreadCount, loading: notificationsLoading, markAllRead, markRead } =
-    useNotifications(user?.id)
+  const {
+    items: notifications,
+    unreadCount,
+    loading: notificationsLoading,
+    markAllRead,
+    markRead,
+  } = useNotifications(user?.id)
 
   useEffect(() => {
     loadMovies()
@@ -73,12 +97,8 @@ export default function SwipeScreen() {
   const handleCreateInvite = async () => {
     if (!user) return
     setIsCreatingInvite(true)
-    
     const invitation = await createInvitation(user.id)
-    if (invitation) {
-      setInviteCode(invitation.invite_code)
-    }
-    
+    if (invitation) setInviteCode(invitation.invite_code)
     setIsCreatingInvite(false)
   }
 
@@ -100,9 +120,7 @@ export default function SwipeScreen() {
   const handleJoinSession = async () => {
     if (!user || !joinCode.trim()) return
     setIsJoining(true)
-    
     const result = await acceptInvitation(joinCode.trim().toUpperCase(), user.id)
-    
     if (result.success) {
       Alert.alert("Success!", "You've joined the swipe session. Start swiping to find matches!")
       setInviteModalVisible(false)
@@ -111,122 +129,131 @@ export default function SwipeScreen() {
     } else {
       Alert.alert("Error", result.error || "Failed to join session")
     }
-    
     setIsJoining(false)
   }
 
   const handleSwipe = async (direction: "left" | "right") => {
     const currentMovie = movies[currentIndex]
     const liked = direction === "right"
-
     if (user && userSynced) {
       try {
-        const result = await saveSwipe(user.id, currentMovie.id, liked, currentMovie)
-        if (result) {
-          // Check if this created a match (result would contain match info)
-        }
+        await saveSwipe(user.id, currentMovie.id, liked, currentMovie)
       } catch (error) {
         console.error("[v0] Exception while saving swipe:", error)
       }
     }
-
     setCurrentIndex((prev) => prev + 1)
-
-    if (currentIndex >= movies.length - 3) {
-      loadMovies()
-    }
+    if (currentIndex >= movies.length - 3) loadMovies()
   }
 
   const currentMovie = movies[currentIndex]
 
   if (!currentMovie && !loading) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyTitle}>No more movies!</Text>
-
-        <TouchableOpacity onPress={loadMovies} style={styles.loadMoreButton}>
-          <Text style={styles.loadMoreButtonText}>Load More</Text>
+      <View className="flex-1 bg-cyan-50 justify-center items-center px-10">
+        <Text className="text-2xl font-extrabold text-gray-900 mb-4">No more movies!</Text>
+        <TouchableOpacity
+          onPress={loadMovies}
+          className="bg-cyan-400 px-8 py-4 rounded-3xl shadow-md shadow-cyan-700/30"
+        >
+          <Text className="text-white font-bold text-base">Load More</Text>
         </TouchableOpacity>
       </View>
     )
   }
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.headerContainer}>
-        <View style={styles.headerLeft}>
-          <View style={styles.avatarContainer}>
+    <View className="flex-1 bg-cyan-50">
+      {/* ── Header ── */}
+      <View className="pt-16 px-6 flex-row items-center justify-between">
+        {/* Left: avatar + greeting */}
+        <View className="flex-row items-center gap-3">
+          <View className="w-11 h-11 rounded-full bg-sky-200 overflow-hidden justify-center items-center">
             {user?.imageUrl ? (
-              <Image source={{ uri: user.imageUrl }} style={styles.avatarImage} resizeMode="cover" />
+              <Image
+                source={{ uri: user.imageUrl }}
+                className="w-full h-full"
+                resizeMode="cover"
+              />
             ) : (
               <Ionicons name="person" size={22} color="#0891b2" />
             )}
           </View>
-
           <View>
-            <Text style={styles.welcomeLabel}>Welcome</Text>
-            <Text style={styles.welcomeName}>{user?.firstName ?? "You"}</Text>
+            <Text className="text-xs text-gray-500 font-semibold">Welcome</Text>
+            <Text className="text-lg font-extrabold text-gray-900">
+              {user?.firstName ?? "You"}
+            </Text>
           </View>
         </View>
 
-        <View style={styles.headerRight}>
-          {/* Invite Button */}
-          <TouchableOpacity 
-            style={styles.inviteButton}
+        {/* Right: invite + bell */}
+        <View className="flex-row items-center gap-3">
+          {/* Invite button */}
+          <TouchableOpacity
             onPress={() => setInviteModalVisible(true)}
+            className="rounded-3xl overflow-hidden shadow-md shadow-pink-500/30"
           >
             <LinearGradient
               colors={["#f472b6", "#ec4899"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.inviteButtonGradient}
+              className="flex-row items-center px-4 py-2.5 gap-1.5"
             >
               <Ionicons name="people" size={18} color="#fff" />
-              <Text style={styles.inviteButtonText}>Invite</Text>
+              <Text className="text-white font-bold text-sm">Invite</Text>
             </LinearGradient>
           </TouchableOpacity>
 
+          {/* Bell / notifications */}
           <TouchableOpacity
-            style={styles.notificationButton}
             onPress={async () => {
               setNotificationsOpen(true)
-              // Mark as read when opened so red dot/count clears
               await markAllRead()
             }}
+            className="w-11 h-11 rounded-full bg-white justify-center items-center shadow shadow-black/10"
           >
-            <Ionicons name="notifications-outline" size={22} color="#0f172a" />
+            <BellIcon size={22} color="#0f172a" strokeWidth={1.8} />
             {unreadCount > 0 && (
-              <>
-                <View style={styles.notificationDot} />
-                <View style={styles.notificationCount}>
-                  <Text style={styles.notificationCountText}>
-                    {unreadCount > 99 ? "99+" : String(unreadCount)}
-                  </Text>
-                </View>
-              </>
+              <View className="absolute top-0 right-0 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 border-2 border-white items-center justify-center">
+                <Text className="text-white text-[10px] font-extrabold leading-none">
+                  {unreadCount > 99 ? "99+" : String(unreadCount)}
+                </Text>
+              </View>
             )}
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Active Sessions Indicator */}
+      {/* ── Active Sessions Banner ── */}
       {activeSessions.length > 0 && (
-        <Animated.View entering={FadeInDown.delay(200)} style={styles.activeSessionBanner}>
-          <View style={styles.activeSessionDot} />
-          <Text style={styles.activeSessionText}>
-            Swiping with {activeSessions.length} {activeSessions.length === 1 ? "friend" : "friends"}
+        <Animated.View
+          entering={FadeInDown.delay(200)}
+          className="mx-6 mt-4 flex-row items-center px-4 py-3 bg-white rounded-2xl shadow shadow-black/10"
+        >
+          <View className="w-2 h-2 rounded-full bg-green-500 mr-2.5" />
+          <Text className="flex-1 text-sm font-semibold text-gray-700">
+            Swiping with {activeSessions.length}{" "}
+            {activeSessions.length === 1 ? "friend" : "friends"}
           </Text>
-          <View style={styles.sessionAvatars}>
+          <View className="flex-row items-center">
             {activeSessions.slice(0, 3).map((session, index) => {
-              const partner = session.user1_id === user?.id ? session.user2 : session.user1
+              const partner =
+                session.user1_id === user?.id ? session.user2 : session.user1
               return (
-                <View key={session.id} style={[styles.sessionAvatar, { marginLeft: index > 0 ? -8 : 0 }]}>
+                <View
+                  key={session.id}
+                  className="w-7 h-7 rounded-full border-2 border-white overflow-hidden"
+                  style={{ marginLeft: index > 0 ? -8 : 0 }}
+                >
                   {partner.image_url ? (
-                    <Image source={{ uri: partner.image_url }} style={styles.sessionAvatarImage} />
+                    <Image
+                      source={{ uri: partner.image_url }}
+                      className="w-full h-full"
+                    />
                   ) : (
-                    <View style={styles.sessionAvatarPlaceholder}>
-                      <Text style={styles.sessionAvatarInitial}>
+                    <View className="w-full h-full bg-pink-100 justify-center items-center">
+                      <Text className="text-xs font-bold text-pink-500">
                         {partner.first_name?.[0] || "?"}
                       </Text>
                     </View>
@@ -238,8 +265,8 @@ export default function SwipeScreen() {
         </Animated.View>
       )}
 
-      {/* Cards */}
-      <View style={styles.cardsContainer}>
+      {/* ── Cards ── */}
+      <View className="flex-1 justify-center items-center px-5 pb-10">
         {movies
           .slice(currentIndex, currentIndex + 2)
           .reverse()
@@ -247,163 +274,194 @@ export default function SwipeScreen() {
             <Animated.View
               key={movie.id}
               entering={FadeIn.duration(250)}
-              style={[
-                styles.cardWrapper,
-                {
-                  zIndex: index === 1 ? 2 : 1,
-                  opacity: index === 1 ? 1 : 0.85,
-                  transform: [{ scale: index === 1 ? 1 : 0.96 }, { translateY: index === 1 ? 0 : 12 }],
-                },
-              ]}
+              style={{
+                position: "absolute",
+                width: width - 40,
+                zIndex: index === 1 ? 2 : 1,
+                opacity: index === 1 ? 1 : 0.85,
+                transform: [
+                  { scale: index === 1 ? 1 : 0.96 },
+                  { translateY: index === 1 ? 0 : 12 },
+                ],
+              }}
             >
-              <MovieCard movie={movie} onSwipe={index === 1 ? handleSwipe : undefined} />
+              <MovieCard
+                movie={movie}
+                onSwipe={index === 1 ? handleSwipe : undefined}
+              />
             </Animated.View>
           ))}
       </View>
 
-      {/* Invite Modal */}
+      {/* ── Invite Modal ── */}
       <Modal
         visible={inviteModalVisible}
         animationType="slide"
-        transparent={true}
+        transparent
         onRequestClose={() => setInviteModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <Animated.View entering={FadeInDown.springify()} style={styles.modalContainer}>
-            {/* Modal Header */}
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHandle} />
-              <TouchableOpacity 
-                style={styles.modalCloseButton}
+        <View className="flex-1 bg-black/50 justify-end">
+          <Animated.View
+            entering={FadeInDown.springify()}
+            className="bg-white rounded-t-[32px] pb-10"
+            style={{ minHeight: height * 0.55 }}
+          >
+            {/* Handle + close */}
+            <View className="items-center pt-3 px-5">
+              <View className="w-10 h-1 rounded-full bg-gray-300" />
+              <TouchableOpacity
                 onPress={() => setInviteModalVisible(false)}
+                className="absolute right-5 top-3 w-9 h-9 rounded-full bg-gray-100 justify-center items-center"
               >
-                <Ionicons name="close" size={24} color="#6b7280" />
+                <Ionicons name="close" size={22} color="#6b7280" />
               </TouchableOpacity>
             </View>
 
-            {/* Modal Title */}
-            <View style={styles.modalTitleContainer}>
+            {/* Title section */}
+            <View className="items-center px-6 pt-6">
               <LinearGradient
                 colors={["#fce7f3", "#fbcfe8"]}
-                style={styles.modalIconContainer}
+                className="w-16 h-16 rounded-full justify-center items-center mb-4"
               >
                 <Ionicons name="heart-circle" size={32} color="#ec4899" />
               </LinearGradient>
-              <Text style={styles.modalTitle}>Swipe Together</Text>
-              <Text style={styles.modalSubtitle}>
+              <Text className="text-2xl font-extrabold text-gray-900 mb-2">
+                Swipe Together
+              </Text>
+              <Text className="text-sm text-gray-500 text-center leading-5">
                 Invite friends to swipe and find movies you both love
               </Text>
             </View>
 
-            {/* Tab Switcher */}
-            <View style={styles.tabContainer}>
-              <TouchableOpacity
-                style={[styles.tab, activeTab === "create" && styles.tabActive]}
-                onPress={() => setActiveTab("create")}
-              >
-                <Text style={[styles.tabText, activeTab === "create" && styles.tabTextActive]}>
-                  Create Invite
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tab, activeTab === "join" && styles.tabActive]}
-                onPress={() => setActiveTab("join")}
-              >
-                <Text style={[styles.tabText, activeTab === "join" && styles.tabTextActive]}>
-                  Join Session
-                </Text>
-              </TouchableOpacity>
+            {/* Tab switcher */}
+            <View className="flex-row mx-6 mt-6 bg-gray-100 rounded-2xl p-1">
+              {(["create", "join"] as const).map((tab) => (
+                <TouchableOpacity
+                  key={tab}
+                  onPress={() => setActiveTab(tab)}
+                  className={`flex-1 py-3 items-center rounded-xl ${
+                    activeTab === tab
+                      ? "bg-white shadow shadow-black/10"
+                      : ""
+                  }`}
+                >
+                  <Text
+                    className={`text-sm font-semibold ${
+                      activeTab === tab ? "text-gray-900" : "text-gray-500"
+                    }`}
+                  >
+                    {tab === "create" ? "Create Invite" : "Join Session"}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
-            {/* Tab Content */}
-            {activeTab === "create" ? (
-              <View style={styles.tabContent}>
-                {!inviteCode ? (
+            {/* Tab content */}
+            <View className="px-6 pt-6">
+              {activeTab === "create" ? (
+                !inviteCode ? (
                   <TouchableOpacity
-                    style={styles.createInviteButton}
                     onPress={handleCreateInvite}
                     disabled={isCreatingInvite}
+                    className="rounded-2xl overflow-hidden shadow-md shadow-pink-500/30"
                   >
                     <LinearGradient
                       colors={["#ec4899", "#f472b6"]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
-                      style={styles.createInviteGradient}
+                      className="flex-row items-center justify-center py-[18px] gap-2.5"
                     >
                       {isCreatingInvite ? (
-                        <Text style={styles.createInviteText}>Creating...</Text>
+                        <Text className="text-white text-base font-bold">Creating...</Text>
                       ) : (
                         <>
                           <Ionicons name="add-circle" size={24} color="#fff" />
-                          <Text style={styles.createInviteText}>Generate Invite Code</Text>
+                          <Text className="text-white text-base font-bold">
+                            Generate Invite Code
+                          </Text>
                         </>
                       )}
                     </LinearGradient>
                   </TouchableOpacity>
                 ) : (
-                  <View style={styles.inviteCodeContainer}>
-                    <Text style={styles.inviteCodeLabel}>Your Invite Code</Text>
-                    <View style={styles.inviteCodeBox}>
-                      <Text style={styles.inviteCodeText}>{inviteCode}</Text>
+                  <View className="items-center">
+                    <Text className="text-sm font-semibold text-gray-500 mb-3">
+                      Your Invite Code
+                    </Text>
+                    <View className="bg-gray-100 py-5 px-10 rounded-2xl border-2 border-dashed border-gray-300">
+                      <Text className="text-3xl font-extrabold text-gray-900 tracking-widest">
+                        {inviteCode}
+                      </Text>
                     </View>
-                    
-                    <View style={styles.inviteActions}>
-                      <TouchableOpacity style={styles.inviteActionButton} onPress={handleCopyCode}>
+                    <View className="flex-row gap-3 mt-6">
+                      <TouchableOpacity
+                        onPress={handleCopyCode}
+                        className="flex-row items-center px-5 py-3.5 rounded-2xl bg-gray-100 gap-2"
+                      >
                         <Ionicons name="copy-outline" size={20} color="#6b7280" />
-                        <Text style={styles.inviteActionText}>Copy</Text>
+                        <Text className="text-sm font-semibold text-gray-500">Copy</Text>
                       </TouchableOpacity>
-                      
-                      <TouchableOpacity 
-                        style={[styles.inviteActionButton, styles.shareButton]}
+                      <TouchableOpacity
                         onPress={handleShareInvite}
+                        className="flex-row items-center px-5 py-3.5 rounded-2xl bg-pink-500 gap-2"
                       >
                         <Ionicons name="share-social" size={20} color="#fff" />
-                        <Text style={styles.shareButtonText}>Share</Text>
+                        <Text className="text-sm font-semibold text-white">Share</Text>
                       </TouchableOpacity>
                     </View>
-
-                    <Text style={styles.inviteExpiry}>
+                    <Text className="mt-5 text-xs text-gray-400">
                       Code expires in 7 days
                     </Text>
                   </View>
-                )}
-              </View>
-            ) : (
-              <View style={styles.tabContent}>
-                <Text style={styles.joinLabel}>Enter Invite Code</Text>
-                <TextInput
-                  style={styles.joinInput}
-                  placeholder="e.g. ABC123XY"
-                  placeholderTextColor="#9ca3af"
-                  value={joinCode}
-                  onChangeText={setJoinCode}
-                  autoCapitalize="characters"
-                  maxLength={8}
-                />
-                
-                <TouchableOpacity
-                  style={[styles.joinButton, !joinCode.trim() && styles.joinButtonDisabled]}
-                  onPress={handleJoinSession}
-                  disabled={!joinCode.trim() || isJoining}
-                >
-                  <LinearGradient
-                    colors={joinCode.trim() ? ["#06b6d4", "#0891b2"] : ["#d1d5db", "#9ca3af"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.joinButtonGradient}
+                )
+              ) : (
+                <View>
+                  <Text className="text-sm font-semibold text-gray-700 mb-3">
+                    Enter Invite Code
+                  </Text>
+                  <TextInput
+                    className="bg-gray-100 rounded-2xl px-5 py-[18px] text-lg font-bold text-center tracking-widest text-gray-900 border-2 border-gray-200"
+                    placeholder="e.g. ABC123XY"
+                    placeholderTextColor="#9ca3af"
+                    value={joinCode}
+                    onChangeText={setJoinCode}
+                    autoCapitalize="characters"
+                    maxLength={8}
+                  />
+                  <TouchableOpacity
+                    onPress={handleJoinSession}
+                    disabled={!joinCode.trim() || isJoining}
+                    className={`mt-5 rounded-2xl overflow-hidden ${
+                      joinCode.trim()
+                        ? "shadow-md shadow-cyan-600/30"
+                        : "opacity-70"
+                    }`}
                   >
-                    {isJoining ? (
-                      <Text style={styles.joinButtonText}>Joining...</Text>
-                    ) : (
-                      <>
-                        <Ionicons name="enter-outline" size={22} color="#fff" />
-                        <Text style={styles.joinButtonText}>Join Session</Text>
-                      </>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            )}
+                    <LinearGradient
+                      colors={
+                        joinCode.trim()
+                          ? ["#06b6d4", "#0891b2"]
+                          : ["#d1d5db", "#9ca3af"]
+                      }
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      className="flex-row items-center justify-center py-[18px] gap-2.5"
+                    >
+                      {isJoining ? (
+                        <Text className="text-white text-base font-bold">Joining...</Text>
+                      ) : (
+                        <>
+                          <Ionicons name="enter-outline" size={22} color="#fff" />
+                          <Text className="text-white text-base font-bold">
+                            Join Session
+                          </Text>
+                        </>
+                      )}
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
           </Animated.View>
         </View>
       </Modal>
@@ -413,437 +471,11 @@ export default function SwipeScreen() {
         onClose={() => setNotificationsOpen(false)}
         items={notifications}
         loading={notificationsLoading}
-        onMarkAllRead={() => {
-          markAllRead()
-        }}
+        onMarkAllRead={() => markAllRead()}
         onPressItem={(n) => {
           if (!n.read_at) markRead(n.id)
-          // Optional: navigate based on notification type/data later
         }}
       />
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#ecfeff",
-  },
-  emptyContainer: {
-    flex: 1,
-    backgroundColor: "#ecfeff",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 40,
-  },
-  emptyTitle: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#111827",
-    marginBottom: 16,
-  },
-  loadMoreButton: {
-    backgroundColor: "#22d3ee",
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 24,
-    shadowColor: "#0e7490",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  loadMoreButtonText: {
-    color: "#ffffff",
-    fontWeight: "700",
-  },
-  headerContainer: {
-    paddingTop: 64,
-    paddingHorizontal: 24,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    columnGap: 12,
-  },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  avatarContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 999,
-    backgroundColor: "#bae6fd",
-    overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  avatarImage: {
-    width: "100%",
-    height: "100%",
-  },
-  welcomeLabel: {
-    fontSize: 12,
-    color: "#6b7280",
-    fontWeight: "600",
-  },
-  welcomeName: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#111827",
-  },
-  inviteButton: {
-    borderRadius: 24,
-    overflow: "hidden",
-    shadowColor: "#ec4899",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  inviteButtonGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 6,
-  },
-  inviteButtonText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 14,
-  },
-  notificationButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 999,
-    backgroundColor: "#ffffff",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-    position: "relative",
-  },
-  notificationDot: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#ef4444",
-    borderWidth: 2,
-    borderColor: "#ffffff",
-  },
-  notificationCount: {
-    position: "absolute",
-    top: -6,
-    right: -6,
-    minWidth: 18,
-    height: 18,
-    paddingHorizontal: 5,
-    borderRadius: 9,
-    backgroundColor: "#ef4444",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#ffffff",
-  },
-  notificationCountText: {
-    color: "#ffffff",
-    fontSize: 10,
-    fontWeight: "800",
-  },
-  activeSessionBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 24,
-    marginTop: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  activeSessionDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#22c55e",
-    marginRight: 10,
-  },
-  activeSessionText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-  },
-  sessionAvatars: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  sessionAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: "#fff",
-    overflow: "hidden",
-  },
-  sessionAvatarImage: {
-    width: "100%",
-    height: "100%",
-  },
-  sessionAvatarPlaceholder: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#fce7f3",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  sessionAvatarInitial: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#ec4899",
-  },
-  cardsContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  cardWrapper: {
-    position: "absolute",
-    width: width - 40,
-  },
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
-  modalContainer: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingBottom: 40,
-    minHeight: height * 0.55,
-  },
-  modalHeader: {
-    alignItems: "center",
-    paddingTop: 12,
-    paddingHorizontal: 20,
-  },
-  modalHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: "#d1d5db",
-    borderRadius: 2,
-  },
-  modalCloseButton: {
-    position: "absolute",
-    right: 20,
-    top: 12,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#f3f4f6",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalTitleContainer: {
-    alignItems: "center",
-    paddingHorizontal: 24,
-    paddingTop: 24,
-  },
-  modalIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#111827",
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: "#6b7280",
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  tabContainer: {
-    flexDirection: "row",
-    marginHorizontal: 24,
-    marginTop: 24,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 16,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: "center",
-    borderRadius: 12,
-  },
-  tabActive: {
-    backgroundColor: "#fff",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#6b7280",
-  },
-  tabTextActive: {
-    color: "#111827",
-  },
-  tabContent: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-  },
-  createInviteButton: {
-    borderRadius: 20,
-    overflow: "hidden",
-    shadowColor: "#ec4899",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  createInviteGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 18,
-    gap: 10,
-  },
-  createInviteText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  inviteCodeContainer: {
-    alignItems: "center",
-  },
-  inviteCodeLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#6b7280",
-    marginBottom: 12,
-  },
-  inviteCodeBox: {
-    backgroundColor: "#f3f4f6",
-    paddingVertical: 20,
-    paddingHorizontal: 40,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: "#e5e7eb",
-    borderStyle: "dashed",
-  },
-  inviteCodeText: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#111827",
-    letterSpacing: 4,
-  },
-  inviteActions: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 24,
-  },
-  inviteActionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: 16,
-    backgroundColor: "#f3f4f6",
-    gap: 8,
-  },
-  inviteActionText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#6b7280",
-  },
-  shareButton: {
-    backgroundColor: "#ec4899",
-  },
-  shareButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#fff",
-  },
-  inviteExpiry: {
-    marginTop: 20,
-    fontSize: 12,
-    color: "#9ca3af",
-  },
-  joinLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-    marginBottom: 12,
-  },
-  joinInput: {
-    backgroundColor: "#f3f4f6",
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-    fontSize: 18,
-    fontWeight: "700",
-    textAlign: "center",
-    letterSpacing: 4,
-    color: "#111827",
-    borderWidth: 2,
-    borderColor: "#e5e7eb",
-  },
-  joinButton: {
-    marginTop: 20,
-    borderRadius: 20,
-    overflow: "hidden",
-    shadowColor: "#06b6d4",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  joinButtonDisabled: {
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  joinButtonGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 18,
-    gap: 10,
-  },
-  joinButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-})

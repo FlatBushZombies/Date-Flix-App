@@ -135,7 +135,7 @@ export default function DebateSettlerScreen() {
 
       if (session) {
         // Try to send email invite via Supabase Edge Function
-        const emailSent = await sendDebateInviteEmail(
+        const inviteResult = await sendDebateInviteEmail(
           user.firstName || "Your partner",
           partnerEmail,
           session.code
@@ -145,16 +145,23 @@ export default function DebateSettlerScreen() {
         setCurrentView("session")
         
         // Show appropriate message based on email status
-        if (emailSent) {
+        if (inviteResult.sent) {
           Alert.alert(
             "Invite Sent!",
             `We've sent an invite to ${partnerEmail}. They'll receive a code to join your debate.`
           )
         } else {
+          const extraMessage =
+            inviteResult.reason === "domain_verification_required" || inviteResult.reason === "from_domain_not_verified"
+              ? "\n\nEmail sending is still in Resend test mode. Verify a sending domain and set INVITE_FROM_EMAIL in your Supabase Edge Function secrets to send to real recipients."
+              : inviteResult.reason === "missing_provider_config"
+                ? "\n\nEmail sending is not configured on the server yet."
+                : ""
+
           // Fallback - show code for manual sharing
           Alert.alert(
             "Session Created!",
-            `Share this code with your partner: ${session.code}\n\nThey can enter it in the app to join your debate.`,
+            `Share this code with your partner: ${session.code}\n\nThey can enter it in the app to join your debate.${extraMessage}`,
             [
               { text: "Copy Code", onPress: () => copyToClipboard(session.code) },
               { text: "OK" }
@@ -252,7 +259,7 @@ export default function DebateSettlerScreen() {
       if (!isAIConfigured()) {
         Alert.alert(
           "AI Not Configured",
-          "Please add your FREE Gemini API key:\n\n1. Go to aistudio.google.com/apikey\n2. Create a key\n3. Add EXPO_PUBLIC_GEMINI_API_KEY to your .env file",
+          "Set a Gemini API key in your Supabase Edge Function secrets as GEMINI_API_KEY, then redeploy the function. Avoid using EXPO_PUBLIC_GEMINI_API_KEY in the app.",
           [{ text: "OK" }]
         )
         setIsSettling(false)

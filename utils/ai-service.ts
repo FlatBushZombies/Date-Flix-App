@@ -1,29 +1,31 @@
 /**
  * AI Service for Movie Debate Settler
  * 
- * Supports multiple free AI providers:
- * 1. Google Gemini (FREE - 60 req/min, 1500/day) - RECOMMENDED
+ * Supports multiple AI providers:
+ * 1. Google Gemini via Supabase Edge Functions - RECOMMENDED
  * 2. Groq (FREE tier with rate limits)
  * 3. Puter.js (User pays, developer free)
  * 
- * To get your FREE Google Gemini API key:
+ * To use Gemini safely:
  * 1. Go to https://aistudio.google.com/apikey
- * 2. Sign in with Google
- * 3. Click "Create API Key"
- * 4. Add to your .env: EXPO_PUBLIC_GEMINI_API_KEY=your_key_here
+ * 2. Create a Gemini API key in Google AI Studio
+ * 3. Add it to Supabase Edge Function secrets as GEMINI_API_KEY
+ * 4. Do not expose it with EXPO_PUBLIC_* in the client
  */
 
 import type { AIVerdict } from "@/types"
+import { supabase } from "@/lib/supabase"
 
 // API Keys from environment
-const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY
 
 // Determine which provider to use
 type AIProvider = "gemini" | "groq" | "puter"
 
 const getActiveProvider = (): AIProvider => {
-  if (GEMINI_API_KEY) return "gemini"
+  // Prefer server-side Gemini via Supabase Edge Function.
+  // This avoids shipping API keys in the client.
+  return "gemini"
   if (GROQ_API_KEY) return "groq"
   return "puter" // Fallback to Puter.js (user pays)
 }
@@ -54,38 +56,18 @@ Use real movie titles that actually exist.
 Respond ONLY with valid JSON, no markdown or extra text.`
 }
 
-// Google Gemini API (FREE - 60 req/min, 1500/day)
+// Gemini via Supabase Edge Function (server-side key)
 const callGeminiAPI = async (prompt: string): Promise<string> => {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: prompt }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 1024,
-        },
-      }),
-    }
-  )
+  const { data, error } = await supabase.functions.invoke("super-function", {
+    body: { prompt },
+  })
 
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Gemini API error: ${error}`)
+  if (error) {
+    throw new Error(error.message || "Edge Function error")
   }
 
-  const data = await response.json()
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || ""
+  // The Edge Function returns JSON already; turn it back into string for the existing parser.
+  return JSON.stringify(data ?? {})
 }
 
 // Groq API (FREE tier available)
@@ -127,7 +109,7 @@ const callGroqAPI = async (prompt: string): Promise<string> => {
 const callPuterAPI = async (prompt: string): Promise<string> => {
   // For React Native, Puter.js requires a WebView bridge
   // This is a placeholder - in production, use a WebView component
-  throw new Error("Puter.js requires WebView integration. Please set EXPO_PUBLIC_GEMINI_API_KEY for free API access.")
+  throw new Error("Puter.js requires WebView integration. Prefer Gemini through the Supabase Edge Function instead.")
 }
 
 // Parse AI response to structured verdict
@@ -227,7 +209,8 @@ export const settleDebateWithAI = async (
 
 // Check if AI is configured
 export const isAIConfigured = (): boolean => {
-  return !!(GEMINI_API_KEY || GROQ_API_KEY)
+  // Gemini is expected to be configured server-side via Supabase secrets.
+  return true
 }
 
 // Get active provider name for display

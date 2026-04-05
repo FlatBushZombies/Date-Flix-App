@@ -4,8 +4,8 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// ✅ Gemini model — swap to 'gemini-1.5-pro' for more complex tasks
-const GEMINI_MODEL = 'gemini-1.5-flash';
+// Use a current stable model for production traffic.
+const GEMINI_MODEL = 'gemini-2.5-flash';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 Deno.serve(async (req) => {
@@ -22,13 +22,12 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Server-side secret (preferred). Keep API keys out of the client.
-    // Fallback to EXPO_PUBLIC_* only for local/dev if you explicitly set it.
+    // Server-side secret only. Never ship Gemini keys in the client.
     const apiKey =
-      Deno.env.get('GEMINI_API_KEY') ?? Deno.env.get('EXPO_PUBLIC_GEMINI_API_KEY');
+      Deno.env.get('GEMINI_API_KEY') ?? Deno.env.get('GOOGLE_API_KEY');
     if (!apiKey) {
       throw new Error(
-        'Missing Gemini API key. Set GEMINI_API_KEY as a Supabase secret for this Edge Function.'
+        'Missing Gemini API key. Set GEMINI_API_KEY or GOOGLE_API_KEY as a Supabase Edge Function secret.'
       );
     }
 
@@ -74,6 +73,11 @@ Deno.serve(async (req) => {
 
     if (!geminiRes.ok) {
       const errBody = await geminiRes.text();
+      if (errBody.includes('reported as leaked')) {
+        throw new Error(
+          'Gemini API key has been flagged as leaked. Rotate it in Google AI Studio and update the Supabase Edge Function secret.'
+        );
+      }
       throw new Error(`Gemini API error ${geminiRes.status}: ${errBody}`);
     }
 

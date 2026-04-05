@@ -29,6 +29,7 @@ IMPORTANT: Only recommend movies actually available on the specified streaming s
 
 Respond ONLY with valid JSON (no markdown, no backticks, no explanation):
 {
+  "summary": "1-2 warm sentences summarizing the vibe + why these picks fit tonight",
   "movies": [
     {
       "title": "string",
