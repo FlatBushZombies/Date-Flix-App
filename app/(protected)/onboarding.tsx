@@ -1,7 +1,34 @@
 import { View, Text, TouchableOpacity, Dimensions, ScrollView } from "react-native"
 import { useState } from "react"
 import { useRouter } from "expo-router"
-import { Ionicons } from "@expo/vector-icons"
+import {
+  FilmIcon,
+  VideoCameraIcon,
+  HeartIcon,
+  HandRaisedIcon,
+  SparklesIcon,
+  ChartBarIcon,
+  BellIcon,
+  GlobeAltIcon,
+  StarIcon,
+  UserGroupIcon,
+  UserPlusIcon,
+  UserIcon,
+  FireIcon,
+  TrophyIcon,
+  MapIcon,
+  LockClosedIcon,
+  ShieldCheckIcon,
+  EyeSlashIcon,
+  TrashIcon,
+  ArrowRightIcon,
+  ChatBubbleLeftIcon,
+} from "react-native-heroicons/outline"
+import {
+  HeartIcon as HeartSolid,
+  SparklesIcon as SparklesSolid,
+  ShieldCheckIcon as ShieldSolid,
+} from "react-native-heroicons/solid"
 import { LinearGradient } from "expo-linear-gradient"
 import Animated, {
   FadeIn,
@@ -14,15 +41,17 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated"
 import AsyncStorage from "@react-native-async-storage/async-storage"
+import { Ionicons } from "@expo/vector-icons"
 
-const { height } = Dimensions.get("window")
+const { width, height } = Dimensions.get("window")
 
 const SCREENS = [
   {
     id: 1,
     type: "hero",
     headline: "Never argue about\nwhat to watch again",
-    subtext: "Swipe movies together and instantly discover what you both love. The perfect movie night starts here.",
+    subtext:
+      "Swipe movies together and instantly discover what you both love. The perfect movie night starts here.",
     micro: "Join 2M+ couples finding their perfect match",
     cta: "Get Started",
     accent: "#ec4899",
@@ -131,91 +160,252 @@ const SCREENS = [
   },
 ]
 
+// ─── Icon helpers ────────────────────────────────────────────────────────────
+
+function StepIcon({ name, size, color }: { name: string; size: number; color: string }) {
+  const p = { size, color, strokeWidth: 1.8 as number }
+  if (name === "hand-left") return <HandRaisedIcon {...p} />
+  if (name === "heart") return <HeartIcon {...p} />
+  return <SparklesIcon {...p} />
+}
+
+function FeatureIcon({ name, size, color }: { name: string; size: number; color: string }) {
+  const p = { size, color, strokeWidth: 1.8 as number }
+  if (name === "analytics") return <ChartBarIcon {...p} />
+  if (name === "notifications") return <BellIcon {...p} />
+  if (name === "globe") return <GlobeAltIcon {...p} />
+  if (name === "star") return <StarIcon {...p} />
+  return <SparklesIcon {...p} />
+}
+
+function OptionIcon({ name, size, color }: { name: string; size: number; color: string }) {
+  const p = { size, color, strokeWidth: 1.8 as number }
+  if (name === "people") return <UserGroupIcon {...p} />
+  if (name === "person-add") return <UserPlusIcon {...p} />
+  return <UserIcon {...p} />
+}
+
+function RewardIcon({ name, size, color }: { name: string; size: number; color: string }) {
+  const p = { size, color, strokeWidth: 1.8 as number }
+  if (name === "flame") return <FireIcon {...p} />
+  if (name === "trophy") return <TrophyIcon {...p} />
+  return <MapIcon {...p} />
+}
+
+function PrivacyIcon({ name, size, color }: { name: string; size: number; color: string }) {
+  const p = { size, color, strokeWidth: 1.8 as number }
+  if (name === "lock-closed") return <LockClosedIcon {...p} />
+  if (name === "shield-checkmark") return <ShieldCheckIcon {...p} />
+  if (name === "eye-off") return <EyeSlashIcon {...p} />
+  return <TrashIcon {...p} />
+}
+
+// ─── Shared button components ─────────────────────────────────────────────────
+
+function CTAButton({
+  label,
+  accent,
+  accentLight,
+  onPress,
+  onPressIn,
+  onPressOut,
+  animStyle,
+  iconLeft,
+  iconRight,
+}: {
+  label: string
+  accent: string
+  accentLight: string
+  onPress: () => void
+  onPressIn: () => void
+  onPressOut: () => void
+  animStyle: object
+  iconLeft?: React.ReactNode
+  iconRight?: React.ReactNode
+}) {
+  return (
+    <Animated.View style={[{ width: "100%" }, animStyle]}>
+      <TouchableOpacity
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        onPress={onPress}
+        activeOpacity={0.9}
+        style={{
+          width: "100%",
+          borderRadius: 20,
+          overflow: "hidden",
+          shadowColor: accent,
+          shadowOpacity: 0.5,
+          shadowRadius: 20,
+          shadowOffset: { width: 0, height: 8 },
+          elevation: 12,
+        }}
+      >
+        <LinearGradient
+          colors={[accent, accentLight]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{
+            width: "100%",
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            paddingVertical: 22,
+            gap: 10,
+          }}
+        >
+          {iconLeft}
+          <Text style={{ color: "#fff", fontSize: 17, fontWeight: "800", letterSpacing: 0.2 }}>
+            {label}
+          </Text>
+          {iconRight}
+        </LinearGradient>
+      </TouchableOpacity>
+    </Animated.View>
+  )
+}
+
+function GhostButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      style={{
+        width: "100%",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingVertical: 22,
+        borderRadius: 20,
+        borderWidth: 1.5,
+        borderColor: "rgba(255,255,255,0.14)",
+      }}
+    >
+      <Text style={{ fontSize: 17, fontWeight: "700", color: "rgba(255,255,255,0.55)" }}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  )
+}
+
+// ─── Row card — shared across howItWorks / social / streaks ──────────────────
+
+function RowCard({ children, style }: { children: React.ReactNode; style?: object }) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        padding: 18,
+        gap: 16,
+        borderRadius: 20,
+        backgroundColor: "rgba(255,255,255,0.04)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.06)",
+        ...style,
+      }}
+    >
+      {children}
+    </View>
+  )
+}
+
+function IconBox({ color, children }: { color: string; children: React.ReactNode }) {
+  return (
+    <View
+      style={{
+        width: 52,
+        height: 52,
+        borderRadius: 16,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: `${color}20`,
+        flexShrink: 0,
+      }}
+    >
+      {children}
+    </View>
+  )
+}
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
+
 export default function OnboardingScreen() {
   const router = useRouter()
   const [currentScreen, setCurrentScreen] = useState(0)
   const screen = SCREENS[currentScreen]
 
   const scale = useSharedValue(1)
-
   const animatedButtonStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }))
 
-  const handlePressIn = () => {
-    scale.value = withSpring(0.95)
-  }
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1)
-  }
+  const handlePressIn = () => { scale.value = withSpring(0.97) }
+  const handlePressOut = () => { scale.value = withSpring(1) }
 
   const completeOnboarding = async () => {
-    try {
-      await AsyncStorage.setItem("@onboarding_complete", "true")
-    } catch {}
+    try { await AsyncStorage.setItem("@onboarding_complete", "true") } catch {}
     router.replace("/(tabs)/home")
   }
 
   const handleNext = () => {
-    if (currentScreen < SCREENS.length - 1) {
-      setCurrentScreen((prev) => prev + 1)
-    } else {
-      completeOnboarding()
-    }
+    if (currentScreen < SCREENS.length - 1) setCurrentScreen((p) => p + 1)
+    else completeOnboarding()
   }
 
-  const handleSkip = () => {
-    completeOnboarding()
-  }
+  const handleSkip = () => completeOnboarding()
+  const handleBack = () => { if (currentScreen > 0) setCurrentScreen((p) => p - 1) }
 
-  const handleBack = () => {
-    if (currentScreen > 0) {
-      setCurrentScreen((prev) => prev - 1)
-    }
-  }
+  const accentLight = adjustColor(screen.accent)
 
+  // ── Per-screen content — flex:1 + justifyContent:"center" fills the gap ──
   const renderContent = () => {
     switch (screen.type) {
+
       case "hero":
         return (
-          <View className="flex-1 px-7">
-            <Animated.View entering={FadeInDown.delay(100).springify()} className="items-center justify-center mb-6" style={{ height: height * 0.25 }}>
-              <View className="w-56 h-44 relative items-center justify-center">
-                <View className="absolute left-0 top-2.5 w-[90px] h-[130px] rounded-2xl overflow-hidden shadow-lg" style={{ transform: [{ rotate: "-10deg" }] }}>
-                  <LinearGradient colors={["#1f2937", "#111827"]} className="flex-1 rounded-2xl items-center justify-center">
-                    <View className="w-12 h-[70px] rounded-lg bg-white/5 items-center justify-center">
-                      <Ionicons name="film-outline" size={32} color="#374151" />
+          <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center", gap: 28 }}>
+            <Animated.View entering={FadeInDown.delay(100).springify()} style={{ alignItems: "center" }}>
+              <View style={{ width: 230, height: 185, position: "relative", alignItems: "center", justifyContent: "center" }}>
+                {/* Left card */}
+                <View style={{ position: "absolute", left: 0, top: 8, width: 98, height: 140, borderRadius: 20, overflow: "hidden", transform: [{ rotate: "-10deg" }], shadowColor: "#000", shadowOpacity: 0.55, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 8 }}>
+                  <LinearGradient colors={["#1e2235", "#0f1120"]} style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                    <View style={{ width: 50, height: 74, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.05)", alignItems: "center", justifyContent: "center" }}>
+                      <FilmIcon size={32} color="#2d3654" strokeWidth={1.5} />
                     </View>
-                    <View className="absolute bottom-2 right-2">
-                      <Ionicons name="heart" size={18} color="#ec4899" />
-                    </View>
-                  </LinearGradient>
-                </View>
-                <View className="absolute right-0 top-2.5 w-[90px] h-[130px] rounded-2xl overflow-hidden shadow-lg" style={{ transform: [{ rotate: "10deg" }] }}>
-                  <LinearGradient colors={["#1f2937", "#111827"]} className="flex-1 rounded-2xl items-center justify-center">
-                    <View className="w-12 h-[70px] rounded-lg bg-white/5 items-center justify-center">
-                      <Ionicons name="videocam-outline" size={32} color="#374151" />
-                    </View>
-                    <View className="absolute bottom-2 right-2">
-                      <Ionicons name="heart" size={18} color="#ec4899" />
+                    <View style={{ position: "absolute", bottom: 10, right: 10 }}>
+                      <HeartSolid size={18} color="#ec4899" />
                     </View>
                   </LinearGradient>
                 </View>
-                <View className="absolute bottom-2.5 z-10">
-                  <LinearGradient colors={["#ec4899", "#f472b6"]} className="w-16 h-16 rounded-full items-center justify-center shadow-lg">
-                    <Ionicons name="heart" size={36} color="#fff" />
+                {/* Right card */}
+                <View style={{ position: "absolute", right: 0, top: 8, width: 98, height: 140, borderRadius: 20, overflow: "hidden", transform: [{ rotate: "10deg" }], shadowColor: "#000", shadowOpacity: 0.55, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 8 }}>
+                  <LinearGradient colors={["#1e2235", "#0f1120"]} style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                    <View style={{ width: 50, height: 74, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.05)", alignItems: "center", justifyContent: "center" }}>
+                      <VideoCameraIcon size={32} color="#2d3654" strokeWidth={1.5} />
+                    </View>
+                    <View style={{ position: "absolute", bottom: 10, right: 10 }}>
+                      <HeartSolid size={18} color="#ec4899" />
+                    </View>
+                  </LinearGradient>
+                </View>
+                {/* Centre heart */}
+                <View style={{ position: "absolute", bottom: 0, zIndex: 10, shadowColor: "#ec4899", shadowOpacity: 0.55, shadowRadius: 18, shadowOffset: { width: 0, height: 4 }, elevation: 12 }}>
+                  <LinearGradient colors={["#ec4899", "#f472b6"]} style={{ width: 70, height: 70, borderRadius: 35, alignItems: "center", justifyContent: "center" }}>
+                    <HeartSolid size={38} color="#fff" />
                   </LinearGradient>
                 </View>
               </View>
             </Animated.View>
 
             {"stats" in screen && screen.stats && (
-              <Animated.View entering={FadeInUp.delay(300)} className="flex-row justify-around bg-white/5 rounded-2xl p-5 mt-4">
-                {screen.stats.map((stat, index) => (
-                  <View key={index} className="items-center">
-                    <Text className="text-2xl font-black" style={{ color: screen.accent }}>{stat.value}</Text>
-                    <Text className="text-xs text-white/40 mt-1 font-medium">{stat.label}</Text>
+              <Animated.View
+                entering={FadeInUp.delay(300)}
+                style={{ flexDirection: "row", justifyContent: "space-around", backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 20, padding: 22, borderWidth: 1, borderColor: "rgba(255,255,255,0.06)" }}
+              >
+                {screen.stats.map((stat, i) => (
+                  <View key={i} style={{ alignItems: "center" }}>
+                    <Text style={{ fontSize: 26, fontWeight: "900", color: screen.accent }}>{stat.value}</Text>
+                    <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 4, fontWeight: "600", letterSpacing: 1, textTransform: "uppercase" }}>{stat.label}</Text>
                   </View>
                 ))}
               </Animated.View>
@@ -225,81 +415,81 @@ export default function OnboardingScreen() {
 
       case "howItWorks":
         return (
-          <View className="flex-1 px-7">
-            {"steps" in screen && screen.steps && (
-              <View className="gap-3.5">
-                {screen.steps.map((step, index) => (
-                  <Animated.View key={index} entering={FadeInDown.delay(200 + index * 150).springify()}>
-                    <LinearGradient colors={["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]} className="flex-row items-center p-4 gap-3.5 rounded-2xl border border-white/5">
-                      <View className="w-7 h-7 rounded-full items-center justify-center" style={{ backgroundColor: `${step.color}20` }}>
-                        <Text className="text-sm font-extrabold" style={{ color: step.color }}>{index + 1}</Text>
-                      </View>
-                      <View className="w-12 h-12 rounded-xl items-center justify-center" style={{ backgroundColor: `${step.color}15` }}>
-                        <Ionicons name={step.icon as any} size={28} color={step.color} />
-                      </View>
-                      <View className="flex-1">
-                        <Text className="text-base font-bold text-white mb-0.5">{step.title}</Text>
-                        <Text className="text-[13px] text-white/50 leading-[18px]">{step.text}</Text>
-                      </View>
-                    </LinearGradient>
-                  </Animated.View>
-                ))}
-              </View>
-            )}
+          <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center", gap: 14 }}>
+            {"steps" in screen && screen.steps && screen.steps.map((step, i) => (
+              <Animated.View key={i} entering={FadeInDown.delay(200 + i * 140).springify()}>
+                <RowCard>
+                  <View style={{ width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: `${step.color}25` }}>
+                    <Text style={{ fontSize: 13, fontWeight: "900", color: step.color }}>{i + 1}</Text>
+                  </View>
+                  <IconBox color={step.color}>
+                    <StepIcon name={step.icon} size={26} color={step.color} />
+                  </IconBox>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 16, fontWeight: "700", color: "#fff", marginBottom: 4 }}>{step.title}</Text>
+                    <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", lineHeight: 20 }}>{step.text}</Text>
+                  </View>
+                </RowCard>
+              </Animated.View>
+            ))}
           </View>
         )
 
       case "features":
         return (
-          <ScrollView className="flex-1" contentContainerClassName="px-7 pb-5" showsVerticalScrollIndicator={false}>
-            {"features" in screen && screen.features && (
-              <View className="gap-3">
-                {screen.features.map((feature, index) => (
-                  <Animated.View key={index} entering={FadeInDown.delay(150 + index * 100).springify()}>
-                    <LinearGradient colors={[`${feature.color}15`, `${feature.color}05`]} className="p-4 rounded-2xl border border-white/5">
-                      <View className="w-11 h-11 rounded-xl items-center justify-center mb-3" style={{ backgroundColor: `${feature.color}20` }}>
-                        <Ionicons name={feature.icon as any} size={24} color={feature.color} />
-                      </View>
-                      <Text className="text-base font-bold text-white mb-1">{feature.title}</Text>
-                      <Text className="text-[13px] text-white/50 leading-[18px]">{feature.text}</Text>
-                    </LinearGradient>
-                  </Animated.View>
-                ))}
-              </View>
-            )}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingHorizontal: 28, paddingBottom: 8, gap: 12 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {"features" in screen && screen.features && screen.features.map((feature, i) => (
+              <Animated.View key={i} entering={FadeInDown.delay(150 + i * 100).springify()}>
+                <RowCard style={{ backgroundColor: `${feature.color}0D` }}>
+                  <IconBox color={feature.color}>
+                    <FeatureIcon name={feature.icon} size={26} color={feature.color} />
+                  </IconBox>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff", marginBottom: 4 }}>{feature.title}</Text>
+                    <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", lineHeight: 20 }}>{feature.text}</Text>
+                  </View>
+                </RowCard>
+              </Animated.View>
+            ))}
           </ScrollView>
         )
 
       case "social":
         return (
-          <View className="flex-1 px-7">
-            <Animated.View entering={FadeInDown.delay(100)} className="items-center justify-center mb-8">
-              <View className="flex-row items-center">
-                <View className="w-16 h-16 rounded-full items-center justify-center shadow-lg" style={{ backgroundColor: "#06b6d4" }}>
-                  <Ionicons name="person" size={28} color="#fff" />
+          <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center", gap: 22 }}>
+            <Animated.View entering={FadeInDown.delay(100)} style={{ alignItems: "center", gap: 14 }}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View style={{ width: 68, height: 68, borderRadius: 34, alignItems: "center", justifyContent: "center", backgroundColor: "#06b6d4", shadowColor: "#06b6d4", shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
+                  <UserIcon size={30} color="#fff" strokeWidth={1.8} />
                 </View>
-                <View className="w-12 h-[3px] bg-white/10 rounded-sm" />
-                <View className="w-16 h-16 rounded-full items-center justify-center shadow-lg" style={{ backgroundColor: "#ec4899" }}>
-                  <Ionicons name="person" size={28} color="#fff" />
+                <View style={{ width: 48, height: 2, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 2 }} />
+                <View style={{ width: 68, height: 68, borderRadius: 34, alignItems: "center", justifyContent: "center", backgroundColor: "#ec4899", shadowColor: "#ec4899", shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
+                  <UserIcon size={30} color="#fff" strokeWidth={1.8} />
                 </View>
               </View>
-              <View className="mt-4 w-12 h-12 rounded-full bg-purple-500/30 items-center justify-center border-2 border-purple-500/50">
-                <Ionicons name="film" size={24} color="#fff" />
+              <View style={{ width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "rgba(139,92,246,0.4)", backgroundColor: "rgba(139,92,246,0.18)" }}>
+                <FilmIcon size={24} color="#fff" strokeWidth={1.8} />
               </View>
             </Animated.View>
 
             {"options" in screen && screen.options && (
-              <View className="gap-3">
-                {screen.options.map((option, index) => (
-                  <Animated.View key={index} entering={FadeInDown.delay(300 + index * 100).springify()} className="flex-row items-center bg-white/5 p-4 rounded-2xl gap-3.5 border border-white/5">
-                    <View className="w-11 h-11 rounded-xl items-center justify-center" style={{ backgroundColor: `${option.color}20` }}>
-                      <Ionicons name={option.icon as any} size={22} color={option.color} />
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-[15px] font-bold text-white mb-0.5">{option.title}</Text>
-                      <Text className="text-[13px] text-white/45">{option.text}</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" />
+              <View style={{ gap: 12 }}>
+                {screen.options.map((option, i) => (
+                  <Animated.View key={i} entering={FadeInDown.delay(300 + i * 100).springify()}>
+                    <RowCard>
+                      <IconBox color={option.color}>
+                        <OptionIcon name={option.icon} size={24} color={option.color} />
+                      </IconBox>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff", marginBottom: 4 }}>{option.title}</Text>
+                        <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>{option.text}</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.25)" />
+                    </RowCard>
                   </Animated.View>
                 ))}
               </View>
@@ -309,15 +499,15 @@ export default function OnboardingScreen() {
 
       case "genres":
         return (
-          <View className="flex-1 px-7">
+          <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center" }}>
             {"genres" in screen && screen.genres && (
-              <View className="flex-row flex-wrap gap-2.5 justify-center">
-                {screen.genres.map((genre, index) => (
-                  <Animated.View key={index} entering={FadeInDown.delay(100 + index * 50).springify()}>
-                    <LinearGradient colors={[`${genre.color}25`, `${genre.color}10`]} className="flex-row items-center px-4 py-3 gap-2 rounded-2xl border border-white/10">
-                      <Text className="text-lg">{genre.emoji}</Text>
-                      <Text className="text-sm font-bold" style={{ color: genre.color }}>{genre.name}</Text>
-                    </LinearGradient>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
+                {screen.genres.map((genre, i) => (
+                  <Animated.View key={i} entering={FadeInDown.delay(100 + i * 50).springify()}>
+                    <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 18, paddingVertical: 14, gap: 8, borderRadius: 18, backgroundColor: `${genre.color}18`, borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" }}>
+                      <Text style={{ fontSize: 20 }}>{genre.emoji}</Text>
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: genre.color }}>{genre.name}</Text>
+                    </View>
                   </Animated.View>
                 ))}
               </View>
@@ -327,37 +517,45 @@ export default function OnboardingScreen() {
 
       case "streaks":
         return (
-          <View className="flex-1 px-7">
-            <Animated.View entering={FadeInDown.delay(100)} className="items-center mb-7">
-              <View className="flex-row items-center gap-2.5">
-                {[1, 2, 3, 4, 5, 6, 7].map((day) => (
-                  <View key={day} className="items-center gap-1.5">
-                    <LinearGradient colors={day <= 4 ? ["#f97316", "#fb923c"] : ["#1f2937", "#374151"]} className="w-10 h-10 rounded-xl items-center justify-center">
-                      <Ionicons name="flame" size={18} color={day <= 4 ? "#fff" : "#4b5563"} />
-                    </LinearGradient>
-                    <Text className={`text-[11px] font-semibold ${day <= 4 ? "text-orange-500" : "text-gray-600"}`}>
-                      {["M", "T", "W", "T", "F", "S", "S"][day - 1]}
-                    </Text>
-                  </View>
-                ))}
+          <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center", gap: 24 }}>
+            <Animated.View entering={FadeInDown.delay(100)} style={{ alignItems: "center", gap: 16 }}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {[1, 2, 3, 4, 5, 6, 7].map((day) => {
+                  const active = day <= 4
+                  return (
+                    <View key={day} style={{ alignItems: "center", gap: 6 }}>
+                      <LinearGradient
+                        colors={active ? ["#f97316", "#fb923c"] : ["#1a1f35", "#1e243d"]}
+                        style={{ width: 40, height: 40, borderRadius: 14, alignItems: "center", justifyContent: "center" }}
+                      >
+                        <FireIcon size={18} color={active ? "#fff" : "#3d4560"} strokeWidth={1.8} />
+                      </LinearGradient>
+                      <Text style={{ fontSize: 11, fontWeight: "600", color: active ? "#f97316" : "#3d4560" }}>
+                        {["M", "T", "W", "T", "F", "S", "S"][day - 1]}
+                      </Text>
+                    </View>
+                  )
+                })}
               </View>
-              <View className="mt-5 items-center">
-                <Text className="text-5xl font-black text-orange-500">4</Text>
-                <Text className="text-sm font-semibold text-white/50 -mt-1">Day Streak!</Text>
+              <View style={{ alignItems: "center" }}>
+                <Text style={{ fontSize: 54, fontWeight: "900", color: "#f97316", letterSpacing: -2 }}>4</Text>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: "rgba(255,255,255,0.4)", marginTop: -6 }}>Day Streak!</Text>
               </View>
             </Animated.View>
 
             {"rewards" in screen && screen.rewards && (
-              <View className="gap-3">
-                {screen.rewards.map((reward, index) => (
-                  <Animated.View key={index} entering={FadeInDown.delay(300 + index * 100).springify()} className="flex-row items-center bg-white/5 p-4 rounded-2xl gap-3.5 border border-white/5">
-                    <View className="w-11 h-11 rounded-xl items-center justify-center" style={{ backgroundColor: `${reward.color}20` }}>
-                      <Ionicons name={reward.icon as any} size={22} color={reward.color} />
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-[15px] font-bold text-white mb-0.5">{reward.title}</Text>
-                      <Text className="text-[13px] text-white/45">{reward.text}</Text>
-                    </View>
+              <View style={{ gap: 12 }}>
+                {screen.rewards.map((reward, i) => (
+                  <Animated.View key={i} entering={FadeInDown.delay(300 + i * 100).springify()}>
+                    <RowCard>
+                      <IconBox color={reward.color}>
+                        <RewardIcon name={reward.icon} size={24} color={reward.color} />
+                      </IconBox>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff", marginBottom: 4 }}>{reward.title}</Text>
+                        <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>{reward.text}</Text>
+                      </View>
+                    </RowCard>
                   </Animated.View>
                 ))}
               </View>
@@ -367,31 +565,34 @@ export default function OnboardingScreen() {
 
       case "privacy":
         return (
-          <View className="flex-1 px-7">
-            <Animated.View entering={FadeInDown.delay(100)} className="items-center mb-7">
-              <LinearGradient colors={["#10b981", "#059669"]} className="w-[88px] h-[88px] rounded-3xl items-center justify-center shadow-lg">
-                <Ionicons name="shield-checkmark" size={48} color="#fff" />
-              </LinearGradient>
+          <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center", gap: 24 }}>
+            <Animated.View entering={FadeInDown.delay(100)} style={{ alignItems: "center" }}>
+              <View style={{ width: 96, height: 96, borderRadius: 28, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(16,185,129,0.15)", borderWidth: 1.5, borderColor: "rgba(16,185,129,0.3)", shadowColor: "#10b981", shadowOpacity: 0.3, shadowRadius: 22, shadowOffset: { width: 0, height: 8 }, elevation: 10 }}>
+                <ShieldSolid size={50} color="#10b981" />
+              </View>
             </Animated.View>
 
             {"privacyPoints" in screen && screen.privacyPoints && (
-              <View className="gap-3.5 mb-6">
-                {screen.privacyPoints.map((point, index) => (
-                  <Animated.View key={index} entering={FadeInDown.delay(250 + index * 100).springify()} className="flex-row items-center gap-3.5">
-                    <View className="w-10 h-10 rounded-xl items-center justify-center" style={{ backgroundColor: `${point.color}20` }}>
-                      <Ionicons name={point.icon as any} size={18} color={point.color} />
+              <View style={{ gap: 14 }}>
+                {screen.privacyPoints.map((point, i) => (
+                  <Animated.View key={i} entering={FadeInDown.delay(250 + i * 100).springify()}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
+                      <View style={{ width: 48, height: 48, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: `${point.color}20`, flexShrink: 0 }}>
+                        <PrivacyIcon name={point.icon} size={22} color={point.color} />
+                      </View>
+                      <Text style={{ fontSize: 15, fontWeight: "500", color: "rgba(255,255,255,0.7)", flex: 1, lineHeight: 22 }}>{point.text}</Text>
                     </View>
-                    <Text className="text-[15px] text-white/70 font-medium flex-1">{point.text}</Text>
                   </Animated.View>
                 ))}
               </View>
             )}
 
-            <Animated.View entering={FadeIn.delay(600)} className="bg-white/5 p-4 rounded-2xl">
-              <Text className="text-[13px] text-white/40 text-center leading-5">
+            <Animated.View entering={FadeIn.delay(600)} style={{ padding: 18, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)" }}>
+              <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", textAlign: "center", lineHeight: 20 }}>
                 By continuing, you agree to our{" "}
-                <Text className="text-emerald-500 font-semibold">Terms of Service</Text> and{" "}
-                <Text className="text-emerald-500 font-semibold">Privacy Policy</Text>
+                <Text style={{ color: "#10b981", fontWeight: "600" }}>Terms of Service</Text>
+                {" "}and{" "}
+                <Text style={{ color: "#10b981", fontWeight: "600" }}>Privacy Policy</Text>
               </Text>
             </Animated.View>
           </View>
@@ -399,33 +600,26 @@ export default function OnboardingScreen() {
 
       case "final":
         return (
-          <View className="flex-1 px-7">
-            <Animated.View entering={FadeInDown.delay(100)} className="items-center mb-7 relative">
-              <LinearGradient colors={["#ec4899", "#f472b6"]} className="w-[88px] h-[88px] rounded-3xl items-center justify-center shadow-lg">
-                <Ionicons name="sparkles" size={48} color="#fff" />
-              </LinearGradient>
-              <View className="absolute -top-5 left-0 right-0 h-24">
+          <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center", gap: 24 }}>
+            <Animated.View entering={FadeInDown.delay(100)} style={{ alignItems: "center" }}>
+              <View style={{ width: 96, height: 96, borderRadius: 28, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(236,72,153,0.15)", borderWidth: 1.5, borderColor: "rgba(236,72,153,0.3)", shadowColor: "#ec4899", shadowOpacity: 0.35, shadowRadius: 22, shadowOffset: { width: 0, height: 8 }, elevation: 10 }}>
+                <SparklesSolid size={50} color="#ec4899" />
+              </View>
+              {/* Confetti dots */}
+              <View style={{ position: "absolute", top: -20, left: 0, right: 0, height: 100, overflow: "hidden" }}>
                 {[...Array(6)].map((_, i) => (
-                  <View
-                    key={i}
-                    className="absolute w-2 h-2 rounded-full"
-                    style={{
-                      backgroundColor: ["#ec4899", "#8B5CF6", "#06b6d4", "#f97316", "#10b981", "#eab308"][i],
-                      left: 20 + (i * 50),
-                      top: Math.random() * 60,
-                    }}
-                  />
+                  <View key={i} style={{ position: "absolute", width: 8, height: 8, borderRadius: 4, backgroundColor: ["#ec4899", "#8B5CF6", "#06b6d4", "#f97316", "#10b981", "#eab308"][i], left: 20 + i * 48, top: [12, 28, 8, 36, 20, 32][i] }} />
                 ))}
               </View>
             </Animated.View>
 
             {"testimonials" in screen && screen.testimonials && (
-              <View className="gap-3.5">
-                {screen.testimonials.map((testimonial, index) => (
-                  <Animated.View key={index} entering={FadeInDown.delay(300 + index * 150).springify()} className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                    <Ionicons name="chatbubble-outline" size={16} color="rgba(255,255,255,0.3)" />
-                    <Text className="text-[15px] text-white/70 italic leading-[22px] mt-2">"{testimonial.text}"</Text>
-                    <Text className="text-[13px] text-white/40 font-semibold mt-2">— {testimonial.author}</Text>
+              <View style={{ gap: 14 }}>
+                {screen.testimonials.map((testimonial, i) => (
+                  <Animated.View key={i} entering={FadeInDown.delay(300 + i * 150).springify()} style={{ padding: 20, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)" }}>
+                    <ChatBubbleLeftIcon size={18} color="rgba(255,255,255,0.25)" strokeWidth={1.8} />
+                    <Text style={{ fontSize: 15, fontStyle: "italic", lineHeight: 23, marginTop: 10, color: "rgba(255,255,255,0.65)" }}>"{testimonial.text}"</Text>
+                    <Text style={{ fontSize: 13, fontWeight: "600", marginTop: 10, color: "rgba(255,255,255,0.35)" }}>— {testimonial.author}</Text>
                   </Animated.View>
                 ))}
               </View>
@@ -438,148 +632,132 @@ export default function OnboardingScreen() {
     }
   }
 
+  const isFinal = screen.type === "final"
+
   return (
-    // Dark background on the wrapping View prevents any white flash during navigation
-    <View style={{ flex: 1, backgroundColor: "#0a0c12" }}>
-      <LinearGradient colors={["#0a0c12", "#161929"]} style={{ flex: 1 }}>
-        {/* Header */}
-        <View className="flex-row justify-between items-center px-5 pt-[60px] h-[100px]">
+    <View style={{ flex: 1, backgroundColor: "#080b14" }}>
+      <LinearGradient colors={["#080b14", "#0f1525"]} style={{ flex: 1 }}>
+
+        {/* ── Header ── */}
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingTop: 60, height: 108 }}>
           {currentScreen > 0 ? (
             <Animated.View entering={FadeIn}>
-              <TouchableOpacity onPress={handleBack} className="w-11 h-11 rounded-full bg-white/10 items-center justify-center">
-                <Ionicons name="chevron-back" size={24} color="rgba(255,255,255,0.6)" />
+              <TouchableOpacity
+                onPress={handleBack}
+                style={{ width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.10)" }}
+              >
+                <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.55)" />
               </TouchableOpacity>
             </Animated.View>
           ) : (
-            <View className="w-11" />
+            <View style={{ width: 44 }} />
           )}
+
           {currentScreen < SCREENS.length - 1 && (
             <Animated.View entering={FadeIn.delay(600)}>
-              <TouchableOpacity onPress={handleSkip} className="px-4 py-2 rounded-2xl bg-white/10">
-                <Text className="text-white/50 text-sm font-semibold">Skip</Text>
+              <TouchableOpacity
+                onPress={handleSkip}
+                style={{ paddingHorizontal: 18, paddingVertical: 10, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: "600", color: "rgba(255,255,255,0.4)" }}>Skip</Text>
               </TouchableOpacity>
             </Animated.View>
           )}
         </View>
 
-        {/* Content */}
+        {/* ── Animated slide — fills all space between header and bottom bar ── */}
         <Animated.View
           key={currentScreen}
-          entering={SlideInRight.duration(400).springify()}
-          exiting={SlideOutLeft.duration(300)}
-          className="flex-1 pt-2.5"
+          entering={SlideInRight.duration(380).springify()}
+          exiting={SlideOutLeft.duration(280)}
+          style={{ flex: 1 }}
         >
-          <View className="px-7 mb-6">
-            <Animated.Text entering={FadeInUp.delay(100).springify()} className="text-[32px] font-black leading-10 tracking-tight text-white mb-3">
+          {/* Fixed headline block */}
+          <View style={{ paddingHorizontal: 28, paddingTop: 4, paddingBottom: 2 }}>
+            <Animated.Text
+              entering={FadeInUp.delay(100).springify()}
+              style={{ fontSize: 34, fontWeight: "900", lineHeight: 42, letterSpacing: -0.5, color: "#fff", marginBottom: 10 }}
+            >
               {screen.headline}
             </Animated.Text>
 
             {"subtext" in screen && screen.subtext && (
-              <Animated.Text entering={FadeInDown.delay(200).springify()} className="text-base text-white/55 leading-6 mb-2">
+              <Animated.Text
+                entering={FadeInDown.delay(200).springify()}
+                style={{ fontSize: 15, lineHeight: 24, color: "rgba(255,255,255,0.5)" }}
+              >
                 {screen.subtext}
               </Animated.Text>
             )}
 
             {"micro" in screen && screen.micro && (
-              <Animated.View entering={FadeIn.delay(400)} className="flex-row items-center gap-1.5 mt-2">
-                <Ionicons name="people" size={14} color={screen.accent} />
-                <Text className="text-[13px] font-semibold" style={{ color: screen.accent }}>{screen.micro}</Text>
+              <Animated.View entering={FadeIn.delay(400)} style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12 }}>
+                <UserGroupIcon size={14} color={screen.accent} strokeWidth={2} />
+                <Text style={{ fontSize: 13, fontWeight: "600", color: screen.accent }}>{screen.micro}</Text>
               </Animated.View>
             )}
           </View>
 
+          {/* Content — flex:1 fills remaining vertical space and centers items */}
           {renderContent()}
         </Animated.View>
 
-        {/* Bottom Area */}
-        <View className="px-7 pb-10 gap-5">
-          <View className="items-center gap-2">
-            <View className="w-full h-1 bg-white/10 rounded-sm overflow-hidden">
-              <View className="h-full rounded-sm" style={{ width: `${((currentScreen + 1) / SCREENS.length) * 100}%`, backgroundColor: screen.accent }} />
+        {/* ── Bottom bar — always anchored to bottom ── */}
+        <View style={{ paddingHorizontal: 28, paddingBottom: 48, gap: 14 }}>
+          {/* Progress */}
+          <View style={{ gap: 8 }}>
+            <View style={{ width: "100%", height: 3, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" }}>
+              <View style={{ height: "100%", borderRadius: 2, width: `${((currentScreen + 1) / SCREENS.length) * 100}%`, backgroundColor: screen.accent }} />
             </View>
-            <Text className="text-xs text-white/30 font-medium">{currentScreen + 1} of {SCREENS.length}</Text>
+            <Text style={{ fontSize: 11, fontWeight: "500", color: "rgba(255,255,255,0.25)", textAlign: "center" }}>
+              {currentScreen + 1} of {SCREENS.length}
+            </Text>
           </View>
 
-          {screen.type === "final" ? (
-            <View className="gap-3">
-              <Animated.View style={animatedButtonStyle}>
-                <TouchableOpacity
-                  onPressIn={handlePressIn}
-                  onPressOut={handlePressOut}
-                  onPress={handleNext}
-                  style={{ borderRadius: 50, overflow: "hidden" }}
-                >
-                  <LinearGradient
-                    colors={["#ec4899", "#f472b6"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      paddingVertical: 18,
-                      paddingHorizontal: 32,
-                      borderRadius: 50,
-                    }}
-                  >
-                    <Ionicons name="people" size={20} color="#fff" style={{ marginRight: 8 }} />
-                    <Text className="text-white text-[17px] font-extrabold tracking-wide">{"ctaPrimary" in screen ? screen.ctaPrimary : ""}</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </Animated.View>
-              <TouchableOpacity
-                onPress={completeOnboarding}
-                style={{
-                  alignItems: "center",
-                  paddingVertical: 16,
-                  borderRadius: 50,
-                  borderWidth: 1.5,
-                  borderColor: "rgba(255,255,255,0.15)",
-                }}
-              >
-                <Text className="text-white/60 text-base font-bold">{"ctaSecondary" in screen ? screen.ctaSecondary : ""}</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <Animated.View style={animatedButtonStyle}>
-              <TouchableOpacity
+          {/* Buttons */}
+          {isFinal ? (
+            <View style={{ gap: 12 }}>
+              <CTAButton
+                label={"ctaPrimary" in screen ? (screen as any).ctaPrimary : ""}
+                accent={screen.accent}
+                accentLight={accentLight}
+                onPress={handleNext}
                 onPressIn={handlePressIn}
                 onPressOut={handlePressOut}
-                onPress={handleNext}
-                style={{ borderRadius: 50, overflow: "hidden" }}
-              >
-                <LinearGradient
-                  colors={[screen.accent, adjustColor(screen.accent)]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    paddingVertical: 18,
-                    paddingHorizontal: 32,
-                    borderRadius: 50,
-                  }}
-                >
-                  <Text className="text-white text-[17px] font-extrabold tracking-wide">{"cta" in screen ? screen.cta : ""}</Text>
-                  <Ionicons name="arrow-forward" size={20} color="#fff" style={{ marginLeft: 8 }} />
-                </LinearGradient>
-              </TouchableOpacity>
-            </Animated.View>
+                animStyle={animatedButtonStyle}
+                iconLeft={<UserGroupIcon size={20} color="#fff" strokeWidth={2} />}
+              />
+              <GhostButton
+                label={"ctaSecondary" in screen ? (screen as any).ctaSecondary : ""}
+                onPress={completeOnboarding}
+              />
+            </View>
+          ) : (
+            <CTAButton
+              label={"cta" in screen ? (screen as any).cta : ""}
+              accent={screen.accent}
+              accentLight={accentLight}
+              onPress={handleNext}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              animStyle={animatedButtonStyle}
+              iconRight={<ArrowRightIcon size={20} color="#fff" strokeWidth={2.5} />}
+            />
           )}
         </View>
+
       </LinearGradient>
     </View>
   )
 }
 
 function adjustColor(color: string): string {
-  const colorMap: { [key: string]: string } = {
+  const map: Record<string, string> = {
     "#ec4899": "#f472b6",
-    "#8B5CF6": "#A855F7",
+    "#8B5CF6": "#a78bfa",
     "#06b6d4": "#22d3ee",
     "#f97316": "#fb923c",
     "#10b981": "#34d399",
   }
-  return colorMap[color] || color
+  return map[color] || color
 }

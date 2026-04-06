@@ -191,19 +191,33 @@ export default function SwipeScreen() {
         <View className="flex-row items-center gap-3">
           {/* Invite button */}
           <TouchableOpacity
-            onPress={() => setInviteModalVisible(true)}
-            className="rounded-3xl overflow-hidden shadow-md shadow-pink-500/30"
-          >
-            <LinearGradient
-              colors={["#f472b6", "#ec4899"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              className="flex-row items-center px-4 py-2.5 gap-1.5"
-            >
-              <Ionicons name="people" size={18} color="#fff" />
-              <Text className="text-white font-bold text-sm">Invite</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+  onPress={() => setInviteModalVisible(true)}
+  style={{
+    borderRadius: 24,
+    overflow: "hidden",
+    shadowColor: "#ec4899",
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  }}
+>
+  <LinearGradient
+    colors={["#f472b6", "#ec4899"]}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 1 }}
+    style={{
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      gap: 6,
+    }}
+  >
+    <Ionicons name="people" size={18} color="#fff" />
+    <Text className="text-white font-bold text-sm">Invite</Text>
+  </LinearGradient>
+</TouchableOpacity>
 
           {/* Bell / notifications */}
           <TouchableOpacity
