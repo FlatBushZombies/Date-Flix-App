@@ -61,6 +61,38 @@ supabase db push
 3. Grant notification permissions when prompted
 4. Trigger a notification (e.g., get a movie match)
 
+## Splash Screen
+
+The app features a custom splash screen that displays on app launch:
+
+### Features
+
+- **Reusable Component**: `SplashScreen` component can be used anywhere in the app
+- **White Background**: Clean white background design
+- **Centered Icon**: Displays `assets/images/splash-icon.png` at center
+- **Shake Animation**: Icon shakes periodically during display
+- **Auto-hide**: Automatically fades out after 2 seconds
+- **Configurable**: Duration and completion callback can be customized
+
+### Usage
+
+```tsx
+import { SplashScreen } from '@/components/SplashScreen'
+
+// Basic usage
+<SplashScreen />
+
+// With custom duration and callback
+<SplashScreen 
+  duration={3000} 
+  onAnimationComplete={() => console.log('Splash complete!')} 
+/>
+```
+
+### Integration
+
+The splash screen is automatically shown when the app opens and covers the entire screen until the animation completes, then reveals the main app interface.
+
 ## Account Deletion
 
 The app includes a permanent account deletion feature that completely removes all user data.

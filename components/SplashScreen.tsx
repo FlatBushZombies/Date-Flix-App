@@ -10,7 +10,7 @@ export function SplashScreen({ onAnimationComplete, duration = 2000 }: SplashScr
   const shakeAnim = useRef(new Animated.Value(0)).current
   const fadeAnim = useRef(new Animated.Value(1)).current
 
-  const { width, height } = Dimensions.get('window')
+  const { width } = Dimensions.get('window')
 
   useEffect(() => {
     // Shake animation sequence
