@@ -1,5 +1,6 @@
 "use client"
 
+import { MessageBanner } from "@/components/MessageBanner"
 import type { Invitation, SupabaseUser, SwipeSession } from "@/types"
 import { permanentlyDeleteAccount } from "@/utils/account"
 import {
@@ -31,6 +32,10 @@ export default function ProfileScreen() {
   const [inviteCode, setInviteCode] = useState("")
   const [loading, setLoading] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
+  const [bannerVisible, setBannerVisible] = useState(false)
+  const [bannerType, setBannerType] = useState<"success" | "error" | "info">("info")
+  const [bannerTitle, setBannerTitle] = useState("")
+  const [bannerMessage, setBannerMessage] = useState("")
 
   useEffect(() => {
     if (user) {
@@ -57,6 +62,13 @@ export default function ProfileScreen() {
     }
   }
 
+  const showBanner = (type: "success" | "error" | "info", title: string, message: string) => {
+    setBannerType(type)
+    setBannerTitle(title)
+    setBannerMessage(message)
+    setBannerVisible(true)
+  }
+
   const handleCreateInvite = async () => {
     if (!user) return
     setLoading(true)
@@ -74,11 +86,11 @@ export default function ProfileScreen() {
           title: "Join me on Movie Circle",
         })
 
-        Alert.alert("Invitation Created!", `Share code: ${invitation.invite_code}`)
+        showBanner("success", "Invitation Created!", `Share code: ${invitation.invite_code}`)
         loadUserData()
       }
     } catch (error) {
-      Alert.alert("Error", "Failed to create invitation")
+      showBanner("error", "Error", "Failed to create invitation")
     } finally {
       setLoading(false)
     }
@@ -94,13 +106,13 @@ export default function ProfileScreen() {
       if (result.success) {
         setShowJoinModal(false)
         setInviteCode("")
-        Alert.alert("Success!", "You can now start swiping together!")
+        showBanner("success", "Success!", "You can now start swiping together!")
         loadUserData()
       } else {
-        Alert.alert("Error", result.error || "Failed to join")
+        showBanner("error", "Error", result.error || "Failed to join")
       }
     } catch (error) {
-      Alert.alert("Error", "Failed to join with code")
+      showBanner("error", "Error", "Failed to join with code")
     } finally {
       setLoading(false)
     }
@@ -163,11 +175,7 @@ export default function ProfileScreen() {
                       }
                     } catch (error) {
                       console.error("Account deletion error:", error)
-                      Alert.alert(
-                        "Error",
-                        "Failed to delete account. Please try again or contact support.",
-                        [{ text: "OK" }]
-                      )
+                      showBanner("error", "Error", "Failed to delete account. Please try again or contact support.")
                     } finally {
                       setDeletingAccount(false)
                     }
@@ -182,6 +190,13 @@ export default function ProfileScreen() {
   }
   return (
     <ScrollView className="flex-1 bg-white">
+      <MessageBanner
+        visible={bannerVisible}
+        type={bannerType}
+        title={bannerTitle}
+        message={bannerMessage}
+        onDismiss={() => setBannerVisible(false)}
+      />
       {/* Header */}
       <View className="items-center px-6 pt-14 pb-6">
         <Text className="text-2xl font-semibold text-gray-900">Movie Circle</Text>

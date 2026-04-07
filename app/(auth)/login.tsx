@@ -1,36 +1,55 @@
+import { MessageBanner } from "@/components/MessageBanner"
+import { IMAGES } from "@/constants"
+import { googleOAuth } from "@/lib/auth"
+import { useOAuth } from "@clerk/clerk-expo"
+import { LinearGradient } from "expo-linear-gradient"
+import { router } from "expo-router"
 import React from "react"
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Image,
-  Alert,
-  Dimensions,
+    Dimensions,
+    Image,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native"
-import { LinearGradient } from "expo-linear-gradient"
-import { useOAuth } from "@clerk/clerk-expo"
-import { router } from "expo-router"
-import { googleOAuth } from "@/lib/auth"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
-import { IMAGES } from "@/constants"
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window")
 
 export default function LoginScreen() {
   const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" })
   const insets = useSafeAreaInsets()
+  const [bannerVisible, setBannerVisible] = React.useState(false)
+  const [bannerType, setBannerType] = React.useState<"success" | "error" | "info">("info")
+  const [bannerTitle, setBannerTitle] = React.useState("")
+  const [bannerMessage, setBannerMessage] = React.useState("")
+
+  const showBanner = (type: "success" | "error" | "info", title: string, message: string) => {
+    setBannerType(type)
+    setBannerTitle(title)
+    setBannerMessage(message)
+    setBannerVisible(true)
+  }
 
   const handleGoogleSignIn = async () => {
     const result = await googleOAuth(startOAuthFlow)
     if (result.success) {
       router.replace("/(protected)/post-auth")
+      return
     }
-    Alert.alert(result.success ? "Success" : "Error", result.message)
+    showBanner("error", "Error", result.message)
   }
 
   return (
     <View className="flex-1 bg-white">
+      <MessageBanner
+        visible={bannerVisible}
+        type={bannerType}
+        title={bannerTitle}
+        message={bannerMessage}
+        onDismiss={() => setBannerVisible(false)}
+      />
 
       {/* ── FULL-BLEED HERO ── */}
       <View style={{ height: SCREEN_HEIGHT * 0.62 }}>

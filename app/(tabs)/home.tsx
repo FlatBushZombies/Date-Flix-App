@@ -1,37 +1,36 @@
 "use client"
 
+import { MessageBanner } from "@/components/MessageBanner"
+import { MovieCard } from "@/components/MovieCard"
+import { NotificationsModal } from "@/components/NotificationsModal"
+import { useNotifications } from "@/hooks/useNotifications"
+import type { Movie, SupabaseUser, SwipeSession } from "@/types"
 import {
-  View,
-  Text,
-  TouchableOpacity,
+  acceptInvitation,
+  createInvitation,
+  getActiveSwipeSessions,
+  saveSwipe,
+  syncUserWithSupabase,
+} from "@/utils/supabase-helpers"
+import { fetchTrendingMovies } from "@/utils/tmdb"
+import { useUser } from "@clerk/clerk-expo"
+import { Ionicons } from "@expo/vector-icons"
+import * as Clipboard from "expo-clipboard"
+import { LinearGradient } from "expo-linear-gradient"
+import { useRouter } from "expo-router"
+import { useEffect, useState } from "react"
+import {
   Dimensions,
   Image,
   Modal,
   Share,
+  Text,
   TextInput,
-  Alert,
+  TouchableOpacity,
+  View,
 } from "react-native"
-import { useState, useEffect } from "react"
-import { MovieCard } from "@/components/MovieCard"
-import { fetchTrendingMovies } from "@/utils/tmdb"
-import type { Movie } from "@/types"
-import { Ionicons } from "@expo/vector-icons"
 import { BellIcon } from "react-native-heroicons/outline"
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated"
-import { useRouter } from "expo-router"
-import { useUser } from "@clerk/clerk-expo"
-import {
-  saveSwipe,
-  syncUserWithSupabase,
-  createInvitation,
-  acceptInvitation,
-  getActiveSwipeSessions,
-} from "@/utils/supabase-helpers"
-import { LinearGradient } from "expo-linear-gradient"
-import * as Clipboard from "expo-clipboard"
-import type { SwipeSession, SupabaseUser } from "@/types"
-import { useNotifications } from "@/hooks/useNotifications"
-import { NotificationsModal } from "@/components/NotificationsModal"
 
 const { width, height } = Dimensions.get("window")
 
@@ -51,6 +50,10 @@ export default function SwipeScreen() {
   const [isCreatingInvite, setIsCreatingInvite] = useState(false)
   const [isJoining, setIsJoining] = useState(false)
   const [activeTab, setActiveTab] = useState<"create" | "join">("create")
+  const [bannerVisible, setBannerVisible] = useState(false)
+  const [bannerType, setBannerType] = useState<"success" | "error" | "info">("info")
+  const [bannerTitle, setBannerTitle] = useState("")
+  const [bannerMessage, setBannerMessage] = useState("")
   const [activeSessions, setActiveSessions] = useState<
     (SwipeSession & { user1: SupabaseUser; user2: SupabaseUser })[]
   >([])
@@ -112,9 +115,16 @@ export default function SwipeScreen() {
     }
   }
 
+  const showBanner = (type: "success" | "error" | "info", title: string, message: string) => {
+    setBannerType(type)
+    setBannerTitle(title)
+    setBannerMessage(message)
+    setBannerVisible(true)
+  }
+
   const handleCopyCode = async () => {
     await Clipboard.setStringAsync(inviteCode)
-    Alert.alert("Copied!", "Invite code copied to clipboard")
+    showBanner("success", "Copied!", "Invite code copied to clipboard")
   }
 
   const handleJoinSession = async () => {
@@ -122,12 +132,12 @@ export default function SwipeScreen() {
     setIsJoining(true)
     const result = await acceptInvitation(joinCode.trim().toUpperCase(), user.id)
     if (result.success) {
-      Alert.alert("Success!", "You've joined the swipe session. Start swiping to find matches!")
+      showBanner("success", "Success!", "You've joined the swipe session. Start swiping to find matches!")
       setInviteModalVisible(false)
       setJoinCode("")
       loadActiveSessions()
     } else {
-      Alert.alert("Error", result.error || "Failed to join session")
+      showBanner("error", "Error", result.error || "Failed to join session")
     }
     setIsJoining(false)
   }
@@ -164,6 +174,13 @@ export default function SwipeScreen() {
 
   return (
     <View className="flex-1 bg-cyan-50">
+      <MessageBanner
+        visible={bannerVisible}
+        type={bannerType}
+        title={bannerTitle}
+        message={bannerMessage}
+        onDismiss={() => setBannerVisible(false)}
+      />
       {/* ── Header ── */}
       <View className="pt-16 px-6 flex-row items-center justify-between">
         {/* Left: avatar + greeting */}
