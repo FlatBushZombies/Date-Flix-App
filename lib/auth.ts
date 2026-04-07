@@ -83,3 +83,25 @@ export const googleOAuth = async (startOAuthFlow: any) => {
     }
   }
 }
+
+// Account deletion
+export const deleteUserAccount = async (userObject: any) => {
+  try {
+    // Delete the user from Clerk
+    await userObject.delete()
+
+    return {
+      success: true,
+      message: "Account deleted successfully",
+    }
+  } catch (error: any) {
+    console.error("Error deleting Clerk account:", error)
+
+    const message = error?.message || "Failed to delete account"
+    return {
+      success: false,
+      code: error?.code ?? "deletion_error",
+      message,
+    }
+  }
+}

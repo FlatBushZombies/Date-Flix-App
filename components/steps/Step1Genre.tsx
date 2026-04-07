@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Genre } from '@/types/planner';
 import { GenreChip } from '@/components/GenreChip';
@@ -31,15 +31,35 @@ export function Step1Genre({ selected, onChange, onNext }: Step1GenreProps) {
 
   return (
     <View>
-      <Text className="text-xs text-primary uppercase tracking-widest mb-2 font-medium">
+      <Text
+        style={{
+          fontSize: 11,
+          color: '#FF3B5C',
+          textTransform: 'uppercase',
+          letterSpacing: 1.5,
+          marginBottom: 8,
+          fontWeight: '500',
+        }}
+      >
         Step 1 of 5
       </Text>
-      <Text className="text-2xl text-text-primary mb-2" style={{ fontFamily: 'PlayfairDisplay_600SemiBold' }}>
+
+      <Text
+        style={{
+          fontSize: 24,
+          color: '#F0EAE4',
+          marginBottom: 8,
+          fontFamily: 'PlayfairDisplay_600SemiBold',
+        }}
+      >
         What are you in the mood for?
       </Text>
-      <Text className="text-sm text-text-muted mb-6">Pick one or more genres</Text>
 
-      <View className="flex-row flex-wrap" style={{ gap: 10, marginBottom: 28 }}>
+      <Text style={{ fontSize: 13, color: '#9A8A94', marginBottom: 24 }}>
+        Pick one or more genres
+      </Text>
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 28 }}>
         {GENRES.map((g) => (
           <View key={g.value} style={{ width: '47.5%' }}>
             <GenreChip
@@ -57,14 +77,20 @@ export function Step1Genre({ selected, onChange, onNext }: Step1GenreProps) {
         onPress={onNext}
         disabled={selected.length === 0}
         activeOpacity={0.85}
-        className="w-full py-4 rounded-xl items-center"
         style={{
+          width: '100%',
+          paddingVertical: 16,
+          borderRadius: 12,
+          alignItems: 'center',
           backgroundColor: selected.length > 0 ? '#FF3B5C' : '#3a2030',
         }}
       >
         <Text
-          className="font-medium text-base"
-          style={{ color: selected.length > 0 ? '#fff' : '#6a5060' }}
+          style={{
+            fontWeight: '500',
+            fontSize: 15,
+            color: selected.length > 0 ? '#ffffff' : '#6a5060',
+          }}
         >
           Continue →
         </Text>

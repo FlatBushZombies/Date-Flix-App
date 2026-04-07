@@ -1,25 +1,26 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect } from "react"
-import { View, Text, ScrollView, Image, TouchableOpacity, Alert, Share, TextInput, Modal } from "react-native"
-import { useUser, useClerk } from "@clerk/clerk-expo"
-import { useRouter } from "expo-router"
-import { Film, Users, Heart } from "lucide-react-native"
+import type { Invitation, SupabaseUser, SwipeSession } from "@/types"
+import { permanentlyDeleteAccount } from "@/utils/account"
 import {
-  syncUserWithSupabase,
-  getUserStats,
-  createInvitation,
   acceptInvitation,
-  getUserInvitations,
+  createInvitation,
   getActiveSwipeSessions,
+  getUserInvitations,
+  getUserStats,
+  syncUserWithSupabase,
 } from "@/utils/supabase-helpers"
-import type { Invitation, SwipeSession, SupabaseUser } from "@/types"
+import { useClerk, useUser } from "@clerk/clerk-expo"
 import { Ionicons } from "@expo/vector-icons"
+import { useRouter } from "expo-router"
+import { Film, Heart, Users } from "lucide-react-native"
+import type React from "react"
+import { useEffect, useState } from "react"
+import { Alert, Image, Modal, ScrollView, Share, Text, TextInput, TouchableOpacity, View } from "react-native"
 
 export default function ProfileScreen() {
   const { user } = useUser()
-  const { signOut } = useClerk()
+  const clerk = useClerk()
   const router = useRouter()
 
   const [stats, setStats] = useState({ totalSwipes: 0, totalMatches: 0, activeSessions: 0 })
@@ -29,6 +30,7 @@ export default function ProfileScreen() {
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [inviteCode, setInviteCode] = useState("")
   const [loading, setLoading] = useState(false)
+  const [deletingAccount, setDeletingAccount] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -106,13 +108,78 @@ export default function ProfileScreen() {
 
   const handleLogout = async () => {
     try {
-      await signOut()
+      await clerk.signOut()
       router.replace("/")
     } catch (e) {
       console.error(e)
     }
   }
+  const handleDeleteAccount = async () => {
+    if (!user) return
 
+    // First confirmation
+    Alert.alert(
+      "Delete Account",
+      "Are you sure you want to permanently delete your account? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            // Second confirmation
+            Alert.alert(
+              "Final Warning",
+              "This will permanently delete all your data including matches, swipes, and profile information. Are you absolutely sure?",
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Yes, Delete Everything",
+                  style: "destructive",
+                  onPress: async () => {
+                    setDeletingAccount(true)
+                    try {
+                      const result = await permanentlyDeleteAccount(user.id, user)
+
+                      if (result.success) {
+                        Alert.alert(
+                          "Account Deleted",
+                          result.message,
+                          [
+                            {
+                              text: "OK",
+                              onPress: () => {
+                                router.replace("/")
+                              }
+                            }
+                          ]
+                        )
+                      } else {
+                        Alert.alert(
+                          "Deletion Failed",
+                          result.message,
+                          [{ text: "OK" }]
+                        )
+                      }
+                    } catch (error) {
+                      console.error("Account deletion error:", error)
+                      Alert.alert(
+                        "Error",
+                        "Failed to delete account. Please try again or contact support.",
+                        [{ text: "OK" }]
+                      )
+                    } finally {
+                      setDeletingAccount(false)
+                    }
+                  }
+                }
+              ]
+            )
+          }
+        }
+      ]
+    )
+  }
   return (
     <ScrollView className="flex-1 bg-white">
       {/* Header */}
@@ -271,6 +338,16 @@ export default function ProfileScreen() {
 
         <TouchableOpacity className="py-4" onPress={handleLogout}>
           <Text className="text-red-500 text-base">Logout</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          className="py-4"
+          onPress={handleDeleteAccount}
+          disabled={deletingAccount}
+        >
+          <Text className={`text-base ${deletingAccount ? 'text-gray-400' : 'text-red-700'}`}>
+            {deletingAccount ? 'Deleting Account...' : 'Delete Account'}
+          </Text>
         </TouchableOpacity>
       </View>
 

@@ -60,7 +60,7 @@ export default function MoviePlannerScreen() {
               className="text-2xl"
               style={{ color: '#FF3B5C', fontFamily: 'PlayfairDisplay_600SemiBold' }}
             >
-              MatchFlix
+              Duo
             </Text>
             <Text className="text-xs text-text-muted mt-1 uppercase tracking-widest">
               Movie Night Planner
@@ -107,7 +107,7 @@ export default function MoviePlannerScreen() {
               className="text-2xl"
               style={{ color: '#FF3B5C', fontFamily: 'PlayfairDisplay_600SemiBold' }}
             >
-              MatchFlix
+              Duo
             </Text>
           </View>
           <ResultsScreen plan={plan} prompt={prompt} onReset={handleReset} />
@@ -131,7 +131,7 @@ export default function MoviePlannerScreen() {
             className="text-2xl"
             style={{ color: '#FF3B5C', fontFamily: 'PlayfairDisplay_600SemiBold' }}
           >
-            MatchFlix
+            Duo
           </Text>
           <Text className="text-xs text-text-muted mt-1 uppercase tracking-widest">
             Movie Night Planner

@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { View, Text, TouchableOpacity } from 'react-native';
 import { StreamingPlatform } from '@/types/planner';
 import { STREAMING_PLATFORMS } from '@/lib/streaming';
@@ -35,24 +35,47 @@ export function Step2Streaming({
 
   return (
     <View>
-      <TouchableOpacity onPress={onBack} className="flex-row items-center mb-6">
-        <Text className="text-sm text-text-muted">← Back</Text>
+      {/* Back button */}
+      <TouchableOpacity
+        onPress={onBack}
+        activeOpacity={0.7}
+        style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24 }}
+      >
+        <Text style={{ fontSize: 13, color: '#9A8A94' }}>← Back</Text>
       </TouchableOpacity>
 
-      <Text className="text-xs text-primary uppercase tracking-widest mb-2 font-medium">
+      <Text
+        style={{
+          fontSize: 11,
+          color: '#FF3B5C',
+          textTransform: 'uppercase',
+          letterSpacing: 1.5,
+          marginBottom: 8,
+          fontWeight: '500',
+        }}
+      >
         Step 2 of 5
       </Text>
-      <Text className="text-2xl text-text-primary mb-2" style={{ fontFamily: 'PlayfairDisplay_600SemiBold' }}>
+
+      <Text
+        style={{
+          fontSize: 24,
+          color: '#F0EAE4',
+          marginBottom: 8,
+          fontFamily: 'PlayfairDisplay_600SemiBold',
+        }}
+      >
         Where will you watch?
       </Text>
-      <Text className="text-sm text-text-muted mb-6">
+
+      <Text style={{ fontSize: 13, color: '#9A8A94', marginBottom: 24 }}>
         Select your streaming services
       </Text>
 
       {/* Platform grid */}
       <View style={{ gap: 10, marginBottom: 10 }}>
         {Array.from({ length: Math.ceil(STREAMING_PLATFORMS.length / 2) }).map((_, rowIdx) => (
-          <View key={rowIdx} className="flex-row" style={{ gap: 10 }}>
+          <View key={rowIdx} style={{ flexDirection: 'row', gap: 10 }}>
             {STREAMING_PLATFORMS.slice(rowIdx * 2, rowIdx * 2 + 2).map((p) => (
               <View key={p.name} style={{ flex: 1 }}>
                 <StreamingCard
@@ -70,16 +93,18 @@ export function Step2Streaming({
       <TouchableOpacity
         onPress={toggleAny}
         activeOpacity={0.7}
-        className="w-full py-3 rounded-xl items-center border mb-7"
         style={{
+          width: '100%',
+          paddingVertical: 14,
+          borderRadius: 12,
+          alignItems: 'center',
+          borderWidth: 1,
+          marginBottom: 28,
           backgroundColor: anyStreaming ? '#1a1020' : '#151520',
           borderColor: anyStreaming ? '#8a6070' : '#2a2535',
         }}
       >
-        <Text
-          className="text-sm"
-          style={{ color: anyStreaming ? '#c8b0b8' : '#8a8070' }}
-        >
+        <Text style={{ fontSize: 13, color: anyStreaming ? '#c8b0b8' : '#8a8070' }}>
           I don't mind — show me anything
         </Text>
       </TouchableOpacity>
@@ -88,12 +113,20 @@ export function Step2Streaming({
         onPress={onNext}
         disabled={!canContinue}
         activeOpacity={0.85}
-        className="w-full py-4 rounded-xl items-center"
-        style={{ backgroundColor: canContinue ? '#FF3B5C' : '#3a2030' }}
+        style={{
+          width: '100%',
+          paddingVertical: 16,
+          borderRadius: 12,
+          alignItems: 'center',
+          backgroundColor: canContinue ? '#FF3B5C' : '#3a2030',
+        }}
       >
         <Text
-          className="font-medium text-base"
-          style={{ color: canContinue ? '#fff' : '#6a5060' }}
+          style={{
+            fontWeight: '500',
+            fontSize: 15,
+            color: canContinue ? '#ffffff' : '#6a5060',
+          }}
         >
           Continue →
         </Text>

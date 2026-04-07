@@ -25,6 +25,71 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Push Notifications
+
+This app includes push notification support for real-time updates about matches and session activity.
+
+### Database Setup
+
+Run the database migration to add push token support:
+
+```sql
+-- Run this in your Supabase SQL editor or via CLI
+ALTER TABLE users ADD COLUMN IF NOT EXISTS push_token TEXT;
+CREATE INDEX IF NOT EXISTS idx_users_push_token ON users(push_token);
+```
+
+Or use the provided migration script:
+
+```bash
+# If using Supabase CLI
+supabase db push
+```
+
+### Features
+
+- **Automatic Registration**: Push tokens are automatically registered when users sign in
+- **Real-time Notifications**: Users receive push notifications for:
+  - New movie matches
+  - Session join notifications
+- **In-App Notifications**: All notifications are also stored in-app for history
+
+### Testing Push Notifications
+
+1. Build a development client: `npx expo run:android` or `npx expo run:ios`
+2. Sign in to the app
+3. Grant notification permissions when prompted
+4. Trigger a notification (e.g., get a movie match)
+
+## Account Deletion
+
+The app includes a permanent account deletion feature that completely removes all user data.
+
+### What Gets Deleted
+
+When a user deletes their account, the following data is permanently removed:
+- User profile and authentication (Clerk)
+- All swipe history
+- All movie matches
+- All notifications (in-app and push)
+- All invitations sent/received
+- All active swipe sessions
+- All debate sessions
+
+### How to Use
+
+1. Go to Profile tab
+2. Scroll to the bottom
+3. Tap "Delete Account"
+4. Confirm through two warning dialogs
+5. Account and all data will be permanently deleted
+
+### Safety Features
+
+- **Double confirmation**: Two separate alert dialogs prevent accidental deletion
+- **Complete data removal**: All user data is deleted from both Supabase and Clerk
+- **No recovery**: Deletion is permanent and cannot be undone
+
 ## Get a fresh project
 
 When you're ready, run:

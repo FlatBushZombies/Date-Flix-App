@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase"
-import type { Movie, SupabaseUser, SupabaseMatch, Invitation, SwipeSession, AppNotification } from "@/types"
+import type { AppNotification, Invitation, Movie, SupabaseMatch, SupabaseUser, SwipeSession } from "@/types"
+import { getUserPushToken, sendPushNotification } from "@/utils/notifications"
 
 // User Management
 export const syncUserWithSupabase = async (clerkUser: any) => {
@@ -328,6 +329,18 @@ export const createNotification = async (
     console.error("[v0] Error creating notification:", error)
     return null
   }
+
+  // Send push notification if user has a push token
+  try {
+    const pushToken = await getUserPushToken(userId)
+    if (pushToken) {
+      await sendPushNotification(pushToken, payload.title, payload.body, payload.data)
+    }
+  } catch (pushError) {
+    console.error("[v0] Error sending push notification:", pushError)
+    // Don't fail the whole operation if push notification fails
+  }
+
   return data as AppNotification
 }
 
@@ -394,7 +407,7 @@ export const getUserStats = async (userId: string) => {
 
 // ==================== DEBATE SESSION FUNCTIONS ====================
 
-import type { DebateSession, AIVerdict } from "@/types"
+import type { AIVerdict, DebateSession } from "@/types"
 
 // Generate unique debate code
 const generateDebateCode = () => {
@@ -651,4 +664,97 @@ export const saveDebateVerdict = async (sessionId: string, verdict: AIVerdict) =
   }
 
   return data as DebateSession
+}
+
+// ==================== ACCOUNT DELETION ====================
+
+export const deleteUserAccount = async (userId: string) => {
+  console.log("[v0] Starting account deletion for user:", userId)
+
+  try {
+    // Delete in order to avoid foreign key constraints
+    // 1. Delete notifications (references user_id)
+    const { error: notificationsError } = await supabase
+      .from("notifications")
+      .delete()
+      .eq("user_id", userId)
+
+    if (notificationsError) {
+      console.error("[v0] Error deleting notifications:", notificationsError)
+      throw new Error("Failed to delete notifications")
+    }
+
+    // 2. Delete swipes (references user_id)
+    const { error: swipesError } = await supabase
+      .from("swipes")
+      .delete()
+      .eq("user_id", userId)
+
+    if (swipesError) {
+      console.error("[v0] Error deleting swipes:", swipesError)
+      throw new Error("Failed to delete swipes")
+    }
+
+    // 3. Delete matches (references user1_id and user2_id)
+    const { error: matchesError } = await supabase
+      .from("matches")
+      .delete()
+      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+
+    if (matchesError) {
+      console.error("[v0] Error deleting matches:", matchesError)
+      throw new Error("Failed to delete matches")
+    }
+
+    // 4. Delete invitations (references sender_id and recipient_id)
+    const { error: invitationsError } = await supabase
+      .from("invitations")
+      .delete()
+      .or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
+
+    if (invitationsError) {
+      console.error("[v0] Error deleting invitations:", invitationsError)
+      throw new Error("Failed to delete invitations")
+    }
+
+    // 5. Delete swipe sessions (references user1_id and user2_id)
+    const { error: sessionsError } = await supabase
+      .from("swipe_sessions")
+      .delete()
+      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+
+    if (sessionsError) {
+      console.error("[v0] Error deleting swipe sessions:", sessionsError)
+      throw new Error("Failed to delete swipe sessions")
+    }
+
+    // 6. Delete debate sessions (references host_id and partner_id)
+    const { error: debateError } = await supabase
+      .from("debate_sessions")
+      .delete()
+      .or(`host_id.eq.${userId},partner_id.eq.${userId}`)
+
+    if (debateError) {
+      console.error("[v0] Error deleting debate sessions:", debateError)
+      throw new Error("Failed to delete debate sessions")
+    }
+
+    // 7. Finally, delete the user record
+    const { error: userError } = await supabase
+      .from("users")
+      .delete()
+      .eq("id", userId)
+
+    if (userError) {
+      console.error("[v0] Error deleting user:", userError)
+      throw new Error("Failed to delete user record")
+    }
+
+    console.log("[v0] Successfully deleted all user data for:", userId)
+    return { success: true }
+
+  } catch (error) {
+    console.error("[v0] Account deletion failed:", error)
+    throw error
+  }
 }

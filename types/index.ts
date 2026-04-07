@@ -91,6 +91,7 @@ export interface SupabaseUser {
   first_name: string | null
   last_name: string | null
   image_url: string | null
+  push_token: string | null
   created_at: string
   updated_at: string
 }
