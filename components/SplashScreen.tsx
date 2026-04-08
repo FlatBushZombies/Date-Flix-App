@@ -1,55 +1,79 @@
 import React, { useEffect, useRef } from 'react'
-import { Animated, Dimensions, Image } from 'react-native'
+import { Animated, Dimensions, Image, Text, View } from 'react-native'
 
 interface SplashScreenProps {
   onAnimationComplete?: () => void
   duration?: number
 }
 
-export function SplashScreen({ onAnimationComplete, duration = 2000 }: SplashScreenProps) {
-  const shakeAnim = useRef(new Animated.Value(0)).current
-  const fadeAnim = useRef(new Animated.Value(1)).current
+export function SplashScreen({ onAnimationComplete, duration = 2500 }: SplashScreenProps) {
+  const floatAnim = useRef(new Animated.Value(0)).current
+  const fadeAnim = useRef(new Animated.Value(0)).current
+  const scaleAnim = useRef(new Animated.Value(0.85)).current
+  const textFadeAnim = useRef(new Animated.Value(0)).current
+  const exitFadeAnim = useRef(new Animated.Value(1)).current
 
   const { width } = Dimensions.get('window')
+  const logoSize = Math.min(width * 0.28, 110)
 
   useEffect(() => {
-    // Shake animation sequence
-    const shakeSequence = Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
-    ])
+    // Entry: fade + scale in
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 60,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+    ]).start()
 
-    // Repeat shake animation
-    const shakeLoop = Animated.loop(
+    // Text fades in slightly after logo
+    const textTimer = setTimeout(() => {
+      Animated.timing(textFadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start()
+    }, 300)
+
+    // Gentle float loop
+    const floatLoop = Animated.loop(
       Animated.sequence([
-        Animated.delay(500), // Wait before shaking
-        shakeSequence,
-        Animated.delay(1500), // Wait before next shake
+        Animated.timing(floatAnim, {
+          toValue: -8,
+          duration: 1800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 1800,
+          useNativeDriver: true,
+        }),
       ])
     )
+    floatLoop.start()
 
-    // Start shake animation
-    shakeLoop.start()
-
-    // Fade out after duration
-    const fadeOutTimer = setTimeout(() => {
-      Animated.timing(fadeAnim, {
+    // Exit
+    const exitTimer = setTimeout(() => {
+      floatLoop.stop()
+      Animated.timing(exitFadeAnim, {
         toValue: 0,
         duration: 500,
         useNativeDriver: true,
-      }).start(() => {
-        onAnimationComplete?.()
-      })
+      }).start(() => onAnimationComplete?.())
     }, duration)
 
     return () => {
-      shakeLoop.stop()
-      clearTimeout(fadeOutTimer)
+      floatLoop.stop()
+      clearTimeout(textTimer)
+      clearTimeout(exitTimer)
     }
-  }, [shakeAnim, fadeAnim, duration, onAnimationComplete])
+  }, [floatAnim, fadeAnim, scaleAnim, textFadeAnim, exitFadeAnim, duration, onAnimationComplete])
 
   return (
     <Animated.View
@@ -59,33 +83,68 @@ export function SplashScreen({ onAnimationComplete, duration = 2000 }: SplashScr
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'white',
+        backgroundColor: '#0A0A0A',
         justifyContent: 'center',
         alignItems: 'center',
-        opacity: fadeAnim,
+        opacity: exitFadeAnim,
         zIndex: 9999,
       }}
     >
+      {/* Subtle radial glow behind logo */}
+      <View
+        style={{
+          position: 'absolute',
+          width: logoSize * 3,
+          height: logoSize * 3,
+          borderRadius: logoSize * 1.5,
+          backgroundColor: 'rgba(255,255,255,0.03)',
+        }}
+      />
+
+      {/* Logo + Name group */}
       <Animated.View
         style={{
+          alignItems: 'center',
+          opacity: fadeAnim,
           transform: [
-            {
-              translateX: shakeAnim.interpolate({
-                inputRange: [-10, 10],
-                outputRange: [-10, 10],
-              }),
-            },
+            { scale: scaleAnim },
+            { translateY: floatAnim },
           ],
         }}
       >
         <Image
           source={require('@/assets/images/splash-icon.png')}
           style={{
-            width: Math.min(width * 0.4, 150),
-            height: Math.min(width * 0.4, 150),
+            width: logoSize,
+            height: logoSize,
             resizeMode: 'contain',
+            marginBottom: 20,
           }}
         />
+
+        <Animated.View style={{ opacity: textFadeAnim, alignItems: 'center' }}>
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 36,
+              fontWeight: '700',
+              letterSpacing: 6,
+              textTransform: 'uppercase',
+            }}
+          >
+            Duo
+          </Text>
+          {/* Thin divider accent */}
+          <View
+            style={{
+              marginTop: 10,
+              width: 28,
+              height: 2,
+              borderRadius: 1,
+              backgroundColor: 'rgba(255,255,255,0.25)',
+            }}
+          />
+        </Animated.View>
       </Animated.View>
     </Animated.View>
   )

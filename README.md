@@ -93,6 +93,25 @@ import { SplashScreen } from '@/components/SplashScreen'
 
 The splash screen is automatically shown when the app opens and covers the entire screen until the animation completes, then reveals the main app interface.
 
+## Session Management
+
+Users can manage and delete active swipe sessions directly from the home screen.
+
+### Features
+
+- **View Active Sessions**: See at a glance how many friends you're swiping with
+- **Delete Sessions**: Tap the trash icon on the session banner to remove a session
+- **Confirmation Dialog**: Get a confirmation prompt before deleting to prevent accidents
+- **Real-time Updates**: Session list updates immediately after deletion
+
+### How to Delete a Session
+
+1. Go to the Home tab
+2. Look for the green "Swiping with {n} friends" banner
+3. Tap the red trash icon on the right side of the banner
+4. Confirm the deletion in the popup dialog
+5. The session will be removed and you'll no longer swipe together
+
 ## Account Deletion
 
 The app includes a permanent account deletion feature that completely removes all user data.

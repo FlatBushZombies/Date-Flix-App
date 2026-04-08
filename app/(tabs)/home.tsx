@@ -8,9 +8,10 @@ import type { Movie, SupabaseUser, SwipeSession } from "@/types"
 import {
   acceptInvitation,
   createInvitation,
+  deleteSwipeSession,
   getActiveSwipeSessions,
   saveSwipe,
-  syncUserWithSupabase,
+  syncUserWithSupabase
 } from "@/utils/supabase-helpers"
 import { fetchTrendingMovies } from "@/utils/tmdb"
 import { useUser } from "@clerk/clerk-expo"
@@ -20,6 +21,7 @@ import { LinearGradient } from "expo-linear-gradient"
 import { useRouter } from "expo-router"
 import { useEffect, useState } from "react"
 import {
+  Alert,
   Dimensions,
   Image,
   Modal,
@@ -27,7 +29,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native"
 import { BellIcon } from "react-native-heroicons/outline"
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated"
@@ -140,6 +142,29 @@ export default function SwipeScreen() {
       showBanner("error", "Error", result.error || "Failed to join session")
     }
     setIsJoining(false)
+  }
+
+  const handleDeleteSession = async (sessionId: string) => {
+    Alert.alert(
+      "Delete Session",
+      "Are you sure you want to delete this session? You won't be able to swipe together anymore.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            const result = await deleteSwipeSession(sessionId)
+            if (result.success) {
+              showBanner("success", "Session Deleted", "The swipe session has been removed.")
+              loadActiveSessions()
+            } else {
+              showBanner("error", "Error", result.error || "Failed to delete session")
+            }
+          },
+        },
+      ]
+    )
   }
 
   const handleSwipe = async (direction: "left" | "right") => {
@@ -267,6 +292,12 @@ export default function SwipeScreen() {
             Swiping with {activeSessions.length}{" "}
             {activeSessions.length === 1 ? "friend" : "friends"}
           </Text>
+          <TouchableOpacity
+            onPress={() => handleDeleteSession(activeSessions[0].id)}
+            className="mr-3"
+          >
+            <Ionicons name="trash-outline" size={18} color="#ef4444" />
+          </TouchableOpacity>
           <View className="flex-row items-center">
             {activeSessions.slice(0, 3).map((session, index) => {
               const partner =

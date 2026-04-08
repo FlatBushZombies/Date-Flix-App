@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  StyleSheet,
   Dimensions,
   Alert,
   ActivityIndicator,
@@ -35,25 +34,101 @@ import {
   joinDebateSession,
   submitDebatePreferences,
   getDebateSessionByCode,
-  getUserDebateSessions,
   saveDebateVerdict,
   syncUserWithSupabase,
 } from "@/utils/supabase-helpers"
-import { settleDebateWithAI as callAI, isAIConfigured, getAIProviderName } from "@/utils/ai-service"
-import type { DebateSession, AIVerdict } from "@/types"
+import { settleDebateWithAI as callAI, isAIConfigured } from "@/utils/ai-service"
+import type { DebateSession } from "@/types"
 
-const { width, height } = Dimensions.get("window")
+const { height } = Dimensions.get("window")
+
+// ─── Shared sub-components ──────────────────────────────────────────────────
+
+/** Reusable screen header with back button */
+function ScreenHeader({
+  onBack,
+  title,
+  right,
+}: {
+  onBack: () => void
+  title: string
+  right?: React.ReactNode
+}) {
+  return (
+    <View className="flex-row items-center justify-between pt-16 pb-4 px-5">
+      <TouchableOpacity
+        className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center"
+        onPress={onBack}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="arrow-back" size={20} color="#374151" />
+      </TouchableOpacity>
+      <Text className="text-[17px] font-bold text-[#1a0a0f] tracking-tight">{title}</Text>
+      {right ?? <View className="w-10" />}
+    </View>
+  )
+}
+
+/** Pink-gradient primary CTA button */
+function PrimaryButton({
+  onPress,
+  disabled,
+  loading,
+  colors,
+  children,
+}: {
+  onPress: () => void
+  disabled?: boolean
+  loading?: boolean
+  colors: [string, string]
+  children: React.ReactNode
+}) {
+  return (
+    <TouchableOpacity
+      className="rounded-[18px] overflow-hidden"
+      style={
+        disabled
+          ? undefined
+          : {
+              shadowColor: "#ec4899",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.28,
+              shadowRadius: 10,
+              elevation: 5,
+            }
+      }
+      onPress={onPress}
+      disabled={disabled || loading}
+      activeOpacity={0.85}
+    >
+      <LinearGradient
+        colors={colors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          paddingVertical: 17,
+          paddingHorizontal: 24,
+          gap: 10,
+        }}
+      >
+        {loading ? <ActivityIndicator color="#fff" size="small" /> : children}
+      </LinearGradient>
+    </TouchableOpacity>
+  )
+}
+
+// ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function DebateSettlerScreen() {
   const { user } = useUser()
 
-  // Session state
   const [activeSession, setActiveSession] = useState<DebateSession | null>(null)
   const [joinCode, setJoinCode] = useState("")
   const [partnerEmail, setPartnerEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-
-  // UI state
   const [currentView, setCurrentView] = useState<"home" | "create" | "join" | "session">("home")
   const [myPreferences, setMyPreferences] = useState("")
   const [isSettling, setIsSettling] = useState(false)
@@ -65,7 +140,6 @@ export default function DebateSettlerScreen() {
   const pulseOpacity = useSharedValue(0.5)
 
   useEffect(() => {
-    // Heart pulse animation
     heartScale.value = withRepeat(
       withSequence(
         withTiming(1.2, { duration: 600, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }),
@@ -74,77 +148,49 @@ export default function DebateSettlerScreen() {
       -1,
       true
     )
-
-    // Float animation
     floatY.value = withRepeat(
-      withSequence(
-        withTiming(-8, { duration: 2000 }),
-        withTiming(0, { duration: 2000 })
-      ),
+      withSequence(withTiming(-8, { duration: 2000 }), withTiming(0, { duration: 2000 })),
       -1,
       true
     )
-
-    // Pulse glow
     pulseOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0.8, { duration: 1500 }),
-        withTiming(0.3, { duration: 1500 })
-      ),
+      withSequence(withTiming(0.8, { duration: 1500 }), withTiming(0.3, { duration: 1500 })),
       -1,
       true
     )
   }, [])
 
   useEffect(() => {
-    if (user) {
-      syncUserWithSupabase(user)
-    }
+    if (user) syncUserWithSupabase(user)
   }, [user])
 
-  const heartStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: heartScale.value }],
-  }))
+  const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }))
+  const floatStyle = useAnimatedStyle(() => ({ transform: [{ translateY: floatY.value }] }))
+  const pulseStyle = useAnimatedStyle(() => ({ opacity: pulseOpacity.value }))
 
-  const floatStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: floatY.value }],
-  }))
+  // ── Handlers ────────────────────────────────────────────────────────────────
 
-  const pulseStyle = useAnimatedStyle(() => ({
-    opacity: pulseOpacity.value,
-  }))
-
-  // Create new debate session
   const handleCreateSession = async () => {
     if (!user || !partnerEmail.trim()) {
       Alert.alert("Email Required", "Please enter your partner's email address")
       return
     }
-
-    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(partnerEmail)) {
       Alert.alert("Invalid Email", "Please enter a valid email address")
       return
     }
-
     setIsLoading(true)
-
     try {
       const session = await createDebateSession(user.id, partnerEmail)
-
       if (session) {
-        // Try to send email invite via Supabase Edge Function
         const inviteResult = await sendDebateInviteEmail(
           user.firstName || "Your partner",
           partnerEmail,
           session.code
         )
-
         setActiveSession(session)
         setCurrentView("session")
-        
-        // Show appropriate message based on email status
         if (inviteResult.sent) {
           Alert.alert(
             "Invite Sent!",
@@ -152,31 +198,29 @@ export default function DebateSettlerScreen() {
           )
         } else {
           const extraMessage =
-            inviteResult.reason === "domain_verification_required" || inviteResult.reason === "from_domain_not_verified"
+            inviteResult.reason === "domain_verification_required" ||
+            inviteResult.reason === "from_domain_not_verified"
               ? "\n\nEmail sending is still in Resend test mode. Verify a sending domain and set INVITE_FROM_EMAIL in your Supabase Edge Function secrets to send to real recipients."
               : inviteResult.reason === "missing_provider_config"
-                ? "\n\nEmail sending is not configured on the server yet."
-                : ""
-
-          // Fallback - show code for manual sharing
+              ? "\n\nEmail sending is not configured on the server yet."
+              : ""
           Alert.alert(
             "Session Created!",
             `Share this code with your partner: ${session.code}\n\nThey can enter it in the app to join your debate.${extraMessage}`,
             [
               { text: "Copy Code", onPress: () => copyToClipboard(session.code) },
-              { text: "OK" }
+              { text: "OK" },
             ]
           )
         }
       }
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to create session. Please try again.")
     } finally {
       setIsLoading(false)
     }
   }
-  
-  // Copy code to clipboard
+
   const copyToClipboard = async (code: string) => {
     try {
       const Clipboard = await import("expo-clipboard")
@@ -187,40 +231,33 @@ export default function DebateSettlerScreen() {
     }
   }
 
-  // Join existing session
   const handleJoinSession = async () => {
     if (!user || !joinCode.trim()) {
       Alert.alert("Code Required", "Please enter the invite code")
       return
     }
-
     setIsLoading(true)
-
     try {
       const result = await joinDebateSession(joinCode.trim(), user.id)
-
       if (result.success && result.session) {
         setActiveSession(result.session)
         setCurrentView("session")
       } else {
         Alert.alert("Error", result.error || "Failed to join session")
       }
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to join session. Please check the code.")
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Submit preferences
   const handleSubmitPreferences = async () => {
     if (!activeSession || !user || !myPreferences.trim()) {
       Alert.alert("Tell us more", "Please describe what kind of movie you're in the mood for")
       return
     }
-
     setIsLoading(true)
-
     try {
       const isHost = activeSession.host_id === user.id
       const updated = await submitDebatePreferences(
@@ -229,33 +266,29 @@ export default function DebateSettlerScreen() {
         myPreferences,
         isHost
       )
-
       if (updated) {
         setActiveSession(updated)
-
-        // If both ready, trigger AI settlement
-        if (updated.status === "settling" || (updated.host_preferences && updated.partner_preferences)) {
+        if (
+          updated.status === "settling" ||
+          (updated.host_preferences && updated.partner_preferences)
+        ) {
           await settleDebate(updated)
         }
       }
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to submit preferences")
     } finally {
       setIsLoading(false)
     }
   }
 
-  // AI Settlement using configured provider (Gemini, Groq, or Puter)
   const settleDebate = async (session: DebateSession) => {
     if (!session.host_preferences || !session.partner_preferences) {
       Alert.alert("Not Ready", "Both partners need to submit their preferences first.")
       return
     }
-
     setIsSettling(true)
-
     try {
-      // Check if AI is configured
       if (!isAIConfigured()) {
         Alert.alert(
           "AI Not Configured",
@@ -265,10 +298,7 @@ export default function DebateSettlerScreen() {
         setIsSettling(false)
         return
       }
-
-      // Call the AI service
       const result = await callAI(session.host_preferences, session.partner_preferences)
-
       if (result.success && result.verdict) {
         const updated = await saveDebateVerdict(session.id, result.verdict)
         if (updated) {
@@ -289,15 +319,11 @@ export default function DebateSettlerScreen() {
     }
   }
 
-  // Refresh session
   const refreshSession = async () => {
     if (!activeSession) return
-
     const updated = await getDebateSessionByCode(activeSession.code)
     if (updated) {
       setActiveSession(updated)
-
-      // Check if both preferences are in and we should settle
       if (
         updated.host_preferences &&
         updated.partner_preferences &&
@@ -309,7 +335,6 @@ export default function DebateSettlerScreen() {
     }
   }
 
-  // Poll for partner joining
   useEffect(() => {
     if (activeSession && activeSession.status === "waiting") {
       const interval = setInterval(refreshSession, 5000)
@@ -317,7 +342,6 @@ export default function DebateSettlerScreen() {
     }
   }, [activeSession])
 
-  // Reset everything
   const resetSession = () => {
     setActiveSession(null)
     setJoinCode("")
@@ -327,174 +351,249 @@ export default function DebateSettlerScreen() {
     setShowVerdictModal(false)
   }
 
-  // ===================== RENDER FUNCTIONS =====================
+  // ── Screens ──────────────────────────────────────────────────────────────────
 
-  // Home screen - choosing create or join
   const renderHomeScreen = () => (
     <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scrollContent}
+      className="flex-1 bg-[#fff9fb]"
+      contentContainerClassName="pb-12"
       showsVerticalScrollIndicator={false}
     >
-      {/* Hero Section */}
-      <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.heroSection}>
-        {/* Animated Hearts Background */}
-        <Animated.View style={[styles.pulseGlow, pulseStyle]} />
+      {/* ── Hero ── */}
+      <Animated.View
+        entering={FadeInDown.delay(100).springify()}
+        className="items-center pt-[88px] px-6 pb-6"
+      >
+        {/* Pulse glow */}
+        <Animated.View
+          style={[pulseStyle, { top: 56 }]}
+          className="absolute w-[220px] h-[220px] rounded-full bg-pink-400/[0.12]"
+        />
 
-        <Animated.View style={[styles.heroIconContainer, floatStyle]}>
+        {/* Floating icon */}
+        <Animated.View style={floatStyle} className="relative mb-7">
           <LinearGradient
             colors={["#ec4899", "#f472b6", "#fb7185"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.heroIconGradient}
+            className="w-24 h-24 rounded-full items-center justify-center"
+            style={{
+              shadowColor: "#ec4899",
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.35,
+              shadowRadius: 14,
+              elevation: 10,
+            }}
           >
             <Animated.View style={heartStyle}>
               <Ionicons name="heart" size={48} color="#fff" />
             </Animated.View>
           </LinearGradient>
-          <View style={styles.filmIconOverlay}>
-            <Ionicons name="film" size={20} color="#ec4899" />
+          {/* Film badge */}
+          <View
+            className="absolute -bottom-0.5 -right-0.5 w-[34px] h-[34px] rounded-full bg-white items-center justify-center border-[1.5px] border-pink-100"
+            style={{
+              elevation: 3,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.08,
+              shadowRadius: 4,
+            }}
+          >
+            <Ionicons name="film" size={18} color="#ec4899" />
           </View>
         </Animated.View>
 
-        <Text style={styles.heroTitle}>Date Night Debate</Text>
-        <Text style={styles.heroSubtitle}>
+        <Text className="text-[30px] font-extrabold text-[#1a0a0f] mb-2.5 text-center tracking-tight">
+          Date Night Debate
+        </Text>
+        <Text className="text-[15px] text-gray-500 text-center leading-[22px] px-4">
           Can't agree on a movie? Let AI find the perfect film for both of you
         </Text>
       </Animated.View>
 
-      {/* Couple Illustration */}
-      <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.coupleIllustration}>
-        <View style={styles.coupleAvatarContainer}>
-          <View style={styles.coupleAvatar}>
+      {/* ── Couple illustration ── */}
+      <Animated.View
+        entering={FadeInDown.delay(200).springify()}
+        className="items-center py-5"
+      >
+        <View className="flex-row items-center mb-2.5">
+          {/* Left avatar */}
+          <View
+            className="w-[54px] h-[54px] rounded-full overflow-hidden border-[2.5px] border-white"
+            style={{
+              elevation: 4,
+              shadowColor: "#ec4899",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.15,
+              shadowRadius: 6,
+            }}
+          >
             {user?.imageUrl ? (
-              <Image source={{ uri: user.imageUrl }} style={styles.avatarImage} />
+              <Image source={{ uri: user.imageUrl }} className="w-full h-full" />
             ) : (
-              <LinearGradient colors={["#8B5CF6", "#7C3AED"]} style={styles.avatarPlaceholder}>
+              <LinearGradient
+                colors={["#8B5CF6", "#7C3AED"]}
+                className="flex-1 items-center justify-center"
+              >
                 <Ionicons name="person" size={24} color="#fff" />
               </LinearGradient>
             )}
           </View>
-          <View style={styles.heartConnector}>
-            <Ionicons name="heart" size={16} color="#ec4899" />
+
+          {/* Heart connector */}
+          <View
+            className="w-7 h-7 rounded-full bg-white items-center justify-center -mx-2.5 z-10 border border-pink-100"
+            style={{
+              elevation: 3,
+              shadowColor: "#ec4899",
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.2,
+              shadowRadius: 3,
+            }}
+          >
+            <Ionicons name="heart" size={14} color="#ec4899" />
           </View>
-          <View style={styles.coupleAvatar}>
-            <LinearGradient colors={["#ec4899", "#f472b6"]} style={styles.avatarPlaceholder}>
+
+          {/* Right avatar */}
+          <View
+            className="w-[54px] h-[54px] rounded-full overflow-hidden border-[2.5px] border-white"
+            style={{
+              elevation: 4,
+              shadowColor: "#ec4899",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.15,
+              shadowRadius: 6,
+            }}
+          >
+            <LinearGradient
+              colors={["#ec4899", "#f472b6"]}
+              className="flex-1 items-center justify-center"
+            >
               <Ionicons name="person" size={24} color="#fff" />
             </LinearGradient>
           </View>
         </View>
-        <Text style={styles.coupleText}>You + Your Person</Text>
+        <Text className="text-[13px] font-semibold text-pink-500">You + Your Person</Text>
       </Animated.View>
 
-      {/* Action Buttons */}
-      <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.actionsContainer}>
-        {/* Create Session */}
-        <TouchableOpacity style={styles.primaryButton} onPress={() => setCurrentView("create")}>
-          <LinearGradient
-            colors={["#ec4899", "#db2777"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.primaryButtonGradient}
-          >
-            <Ionicons name="mail" size={22} color="#fff" />
-            <Text style={styles.primaryButtonText}>Invite Your Partner</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+      {/* ── Action buttons ── */}
+      <Animated.View entering={FadeInDown.delay(300).springify()} className="px-6 pt-2">
+        <PrimaryButton onPress={() => setCurrentView("create")} colors={["#ec4899", "#db2777"]}>
+          <Ionicons name="mail" size={20} color="#fff" />
+          <Text className="text-white text-[16px] font-bold">Invite Your Partner</Text>
+        </PrimaryButton>
 
-        <View style={styles.dividerContainer}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>or</Text>
-          <View style={styles.dividerLine} />
+        {/* Divider */}
+        <View className="flex-row items-center my-5">
+          <View className="flex-1 h-[0.5px] bg-gray-200" />
+          <Text className="mx-3.5 text-[13px] font-medium text-gray-400">or</Text>
+          <View className="flex-1 h-[0.5px] bg-gray-200" />
         </View>
 
-        {/* Join Session */}
-        <TouchableOpacity style={styles.secondaryButton} onPress={() => setCurrentView("join")}>
-          <Ionicons name="enter-outline" size={22} color="#ec4899" />
-          <Text style={styles.secondaryButtonText}>I Have a Code</Text>
+        <TouchableOpacity
+          className="flex-row items-center justify-center py-[17px] bg-white rounded-[18px] border-[1.5px] border-pink-300 gap-x-2.5"
+          onPress={() => setCurrentView("join")}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="enter-outline" size={20} color="#ec4899" />
+          <Text className="text-pink-500 text-[16px] font-bold">I Have a Code</Text>
         </TouchableOpacity>
       </Animated.View>
 
-      {/* How It Works */}
-      <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.stepsSection}>
-        <Text style={styles.sectionTitle}>How It Works</Text>
+      {/* ── How it works ── */}
+      <Animated.View entering={FadeInDown.delay(400).springify()} className="px-6 pt-9">
+        <Text className="text-[18px] font-extrabold text-[#1a0a0f] mb-4 tracking-tight">
+          How It Works
+        </Text>
 
         {[
           {
             icon: "mail-outline",
             title: "Send an Invite",
             desc: "Enter your partner's email to invite them",
+            gradientColors: ["#fce7f3", "#fdf2f8"] as [string, string],
+            iconColor: "#ec4899",
           },
           {
             icon: "chatbubble-ellipses-outline",
             title: "Share Your Mood",
             desc: "Both describe what you're feeling tonight",
+            gradientColors: ["#f3e8ff", "#faf5ff"] as [string, string],
+            iconColor: "#8B5CF6",
           },
           {
             icon: "sparkles",
             title: "AI Magic",
             desc: "Our AI finds a movie you'll both love",
+            gradientColors: ["#e0f2fe", "#f0f9ff"] as [string, string],
+            iconColor: "#0ea5e9",
           },
         ].map((step, index) => (
-          <View key={index} style={styles.stepItem}>
-            <View style={styles.stepIconContainer}>
-              <LinearGradient
-                colors={["#fce7f3", "#fbcfe8"]}
-                style={styles.stepIconBg}
-              >
-                <Ionicons name={step.icon as any} size={22} color="#ec4899" />
-              </LinearGradient>
+          <View
+            key={index}
+            className="flex-row items-center bg-white rounded-2xl mb-2.5 px-4 py-3.5 gap-x-3.5 border border-pink-50"
+            style={{
+              elevation: 1,
+              shadowColor: "#ec4899",
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.06,
+              shadowRadius: 6,
+            }}
+          >
+            <LinearGradient
+              colors={step.gradientColors}
+              className="w-11 h-11 rounded-[13px] items-center justify-center shrink-0"
+            >
+              <Ionicons name={step.icon as any} size={20} color={step.iconColor} />
+            </LinearGradient>
+            <View className="flex-1">
+              <Text className="text-[14px] font-bold text-[#1a0a0f] mb-0.5">{step.title}</Text>
+              <Text className="text-[13px] text-gray-400 leading-[18px]">{step.desc}</Text>
             </View>
-            <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>{step.title}</Text>
-              <Text style={styles.stepDesc}>{step.desc}</Text>
+            <View className="w-6 h-6 rounded-full bg-pink-100 items-center justify-center shrink-0">
+              <Text className="text-[12px] font-bold text-pink-500">{index + 1}</Text>
             </View>
-            <Text style={styles.stepNumber}>{index + 1}</Text>
           </View>
         ))}
       </Animated.View>
     </ScrollView>
   )
 
-  // Create session screen
   const renderCreateScreen = () => (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
+      className="flex-1 bg-[#fff9fb]"
     >
       <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.scrollContent}
+        className="flex-1"
+        contentContainerClassName="pb-12"
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.screenHeader}>
-          <TouchableOpacity style={styles.backButton} onPress={() => setCurrentView("home")}>
-            <Ionicons name="arrow-back" size={24} color="#374151" />
-          </TouchableOpacity>
-          <Text style={styles.screenTitle}>Invite Your Partner</Text>
-          <View style={{ width: 40 }} />
-        </View>
+        <ScreenHeader onBack={() => setCurrentView("home")} title="Invite Your Partner" />
 
         {/* Illustration */}
-        <Animated.View entering={FadeInDown.delay(100)} style={styles.createIllustration}>
-          <LinearGradient colors={["#fce7f3", "#fff"]} style={styles.illustrationBg}>
-            <Ionicons name="mail" size={56} color="#ec4899" />
+        <Animated.View entering={FadeInDown.delay(100)} className="items-center py-8 px-6">
+          <LinearGradient
+            colors={["#fce7f3", "#fdf2f8"]}
+            className="w-[108px] h-[108px] rounded-full items-center justify-center mb-5"
+          >
+            <Ionicons name="mail" size={48} color="#ec4899" />
           </LinearGradient>
-          <Text style={styles.illustrationText}>
+          <Text className="text-[15px] text-gray-500 text-center px-6 leading-[22px]">
             We'll send them a beautiful invite email with a code to join your debate
           </Text>
         </Animated.View>
 
-        {/* Email Input */}
-        <Animated.View entering={FadeInDown.delay(200)} style={styles.inputSection}>
-          <Text style={styles.inputLabel}>Partner's Email</Text>
-          <View style={styles.inputContainer}>
-            <Ionicons name="heart-outline" size={20} color="#ec4899" style={styles.inputIcon} />
+        {/* Email input */}
+        <Animated.View entering={FadeInDown.delay(200)} className="px-6">
+          <Text className="text-[13px] font-semibold text-gray-700 mb-2">Partner's Email</Text>
+          <View className="flex-row items-center bg-white rounded-[14px] border-[1.5px] border-pink-300 px-3.5">
+            <Ionicons name="heart-outline" size={18} color="#ec4899" style={{ marginRight: 10 }} />
             <TextInput
-              style={styles.textInput}
+              className="flex-1 py-3.5 text-[15px] text-[#1a0a0f]"
               placeholder="love@example.com"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor="#c4b5c0"
               value={partnerEmail}
               onChangeText={setPartnerEmail}
               keyboardType="email-address"
@@ -504,109 +603,97 @@ export default function DebateSettlerScreen() {
           </View>
         </Animated.View>
 
-        {/* Send Button */}
-        <Animated.View entering={FadeInDown.delay(300)} style={styles.submitSection}>
-          <TouchableOpacity
-            style={[styles.primaryButton, !partnerEmail.trim() && styles.buttonDisabled]}
+        {/* Send button */}
+        <Animated.View entering={FadeInDown.delay(300)} className="px-6 pt-7">
+          <PrimaryButton
             onPress={handleCreateSession}
-            disabled={!partnerEmail.trim() || isLoading}
+            disabled={!partnerEmail.trim()}
+            loading={isLoading}
+            colors={partnerEmail.trim() ? ["#ec4899", "#db2777"] : ["#e5e7eb", "#d1d5db"]}
           >
-            <LinearGradient
-              colors={partnerEmail.trim() ? ["#ec4899", "#db2777"] : ["#d1d5db", "#9ca3af"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.primaryButtonGradient}
+            <Ionicons name="send" size={18} color={partnerEmail.trim() ? "#fff" : "#9ca3af"} />
+            <Text
+              className={`text-[16px] font-bold ${
+                partnerEmail.trim() ? "text-white" : "text-gray-400"
+              }`}
             >
-              {isLoading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="send" size={20} color="#fff" />
-                  <Text style={styles.primaryButtonText}>Send Invite</Text>
-                </>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
+              Send Invite
+            </Text>
+          </PrimaryButton>
         </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
   )
 
-  // Join session screen
   const renderJoinScreen = () => (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
+      className="flex-1 bg-[#fff9fb]"
     >
       <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.scrollContent}
+        className="flex-1"
+        contentContainerClassName="pb-12"
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.screenHeader}>
-          <TouchableOpacity style={styles.backButton} onPress={() => setCurrentView("home")}>
-            <Ionicons name="arrow-back" size={24} color="#374151" />
-          </TouchableOpacity>
-          <Text style={styles.screenTitle}>Join Debate</Text>
-          <View style={{ width: 40 }} />
-        </View>
+        <ScreenHeader onBack={() => setCurrentView("home")} title="Join Debate" />
 
         {/* Illustration */}
-        <Animated.View entering={FadeInDown.delay(100)} style={styles.createIllustration}>
-          <LinearGradient colors={["#f3e8ff", "#fff"]} style={styles.illustrationBg}>
-            <Ionicons name="ticket" size={56} color="#8B5CF6" />
+        <Animated.View entering={FadeInDown.delay(100)} className="items-center py-8 px-6">
+          <LinearGradient
+            colors={["#f3e8ff", "#faf5ff"]}
+            className="w-[108px] h-[108px] rounded-full items-center justify-center mb-5"
+          >
+            <Ionicons name="ticket" size={48} color="#8B5CF6" />
           </LinearGradient>
-          <Text style={styles.illustrationText}>
+          <Text className="text-[15px] text-gray-500 text-center px-6 leading-[22px]">
             Enter the 6-digit code from your partner's invite
           </Text>
         </Animated.View>
 
-        {/* Code Input */}
-        <Animated.View entering={FadeInDown.delay(200)} style={styles.inputSection}>
-          <Text style={styles.inputLabel}>Invite Code</Text>
-          <View style={styles.codeInputContainer}>
-            <TextInput
-              style={styles.codeInput}
-              placeholder="ABC123"
-              placeholderTextColor="#9ca3af"
-              value={joinCode}
-              onChangeText={(text) => setJoinCode(text.toUpperCase())}
-              autoCapitalize="characters"
-              maxLength={6}
-            />
-          </View>
+        {/* Code input */}
+        <Animated.View entering={FadeInDown.delay(200)} className="px-6">
+          <Text className="text-[13px] font-semibold text-gray-700 mb-2">Invite Code</Text>
+          <TextInput
+            className="bg-white rounded-2xl border-2 border-violet-200 py-[18px] px-7 text-[26px] font-extrabold text-[#1a0a0f] text-center w-full"
+            style={{ letterSpacing: 10 }}
+            placeholder="ABC123"
+            placeholderTextColor="#c4b5d4"
+            value={joinCode}
+            onChangeText={(text) => setJoinCode(text.toUpperCase())}
+            autoCapitalize="characters"
+            maxLength={6}
+          />
+          <Text className="mt-2 text-xs text-[#c4b5d4] text-center">
+            {joinCode.length}/6 characters
+          </Text>
         </Animated.View>
 
-        {/* Join Button */}
-        <Animated.View entering={FadeInDown.delay(300)} style={styles.submitSection}>
-          <TouchableOpacity
-            style={[styles.primaryButton, joinCode.length !== 6 && styles.buttonDisabled]}
+        {/* Join button */}
+        <Animated.View entering={FadeInDown.delay(300)} className="px-6 pt-7">
+          <PrimaryButton
             onPress={handleJoinSession}
-            disabled={joinCode.length !== 6 || isLoading}
+            disabled={joinCode.length !== 6}
+            loading={isLoading}
+            colors={joinCode.length === 6 ? ["#8B5CF6", "#7C3AED"] : ["#e5e7eb", "#d1d5db"]}
           >
-            <LinearGradient
-              colors={joinCode.length === 6 ? ["#8B5CF6", "#7C3AED"] : ["#d1d5db", "#9ca3af"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.primaryButtonGradient}
+            <Ionicons
+              name="enter"
+              size={18}
+              color={joinCode.length === 6 ? "#fff" : "#9ca3af"}
+            />
+            <Text
+              className={`text-[16px] font-bold ${
+                joinCode.length === 6 ? "text-white" : "text-gray-400"
+              }`}
             >
-              {isLoading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="enter" size={20} color="#fff" />
-                  <Text style={styles.primaryButtonText}>Join Debate</Text>
-                </>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
+              Join Debate
+            </Text>
+          </PrimaryButton>
         </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
   )
 
-  // Active session screen
   const renderSessionScreen = () => {
     if (!activeSession) return null
 
@@ -621,291 +708,392 @@ export default function DebateSettlerScreen() {
 
     const host = activeSession.host
     const partner = activeSession.partner
+    const hostReady =
+      (isHost && myPrefsSubmitted) || (!isHost && !!activeSession.host_preferences)
 
     return (
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.container}
+        className="flex-1 bg-[#fff9fb]"
       >
         <ScrollView
-          style={styles.container}
-          contentContainerStyle={styles.scrollContent}
+          className="flex-1"
+          contentContainerClassName="pb-12"
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
-          <View style={styles.screenHeader}>
-            <TouchableOpacity style={styles.backButton} onPress={resetSession}>
-              <Ionicons name="close" size={24} color="#374151" />
+          {/* Session header */}
+          <View className="flex-row items-center justify-between pt-16 pb-4 px-5">
+            <TouchableOpacity
+              className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center"
+              onPress={resetSession}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={20} color="#374151" />
             </TouchableOpacity>
-            <View style={styles.sessionCodeBadge}>
-              <Text style={styles.sessionCodeText}>{activeSession.code}</Text>
+
+            <View className="flex-row items-center bg-pink-50 px-3.5 py-[7px] rounded-full border border-pink-200">
+              <Ionicons name="key-outline" size={12} color="#ec4899" style={{ marginRight: 4 }} />
+              <Text
+                className="text-[13px] font-extrabold text-pink-500"
+                style={{ letterSpacing: 2.5 }}
+              >
+                {activeSession.code}
+              </Text>
             </View>
-            <TouchableOpacity style={styles.refreshButton} onPress={refreshSession}>
-              <Ionicons name="refresh" size={20} color="#6b7280" />
+
+            <TouchableOpacity
+              className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center"
+              onPress={refreshSession}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="refresh" size={18} color="#6b7280" />
             </TouchableOpacity>
           </View>
 
-          {/* Participants */}
-          <Animated.View entering={FadeInDown.delay(100)} style={styles.participantsSection}>
-            <View style={styles.participantCard}>
-              <View style={styles.participantAvatar}>
+          {/* ── Participants ── */}
+          <Animated.View
+            entering={FadeInDown.delay(100)}
+            className="flex-row items-center justify-center px-4 py-7 gap-x-2"
+          >
+            {/* Host card */}
+            <View className="flex-1 items-center gap-y-2">
+              <View className="relative">
                 {host?.image_url ? (
-                  <Image source={{ uri: host.image_url }} style={styles.avatarImage} />
+                  <Image
+                    source={{ uri: host.image_url }}
+                    className="w-[68px] h-[68px] rounded-full"
+                  />
                 ) : (
-                  <LinearGradient colors={["#8B5CF6", "#7C3AED"]} style={styles.avatarPlaceholder}>
-                    <Text style={styles.avatarInitial}>
+                  <LinearGradient
+                    colors={["#8B5CF6", "#7C3AED"]}
+                    className="w-[68px] h-[68px] rounded-full items-center justify-center"
+                  >
+                    <Text className="text-[26px] font-bold text-white">
                       {host?.first_name?.[0] || "?"}
                     </Text>
                   </LinearGradient>
                 )}
                 <View
-                  style={[
-                    styles.statusDot,
-                    { backgroundColor: isHost && myPrefsSubmitted ? "#22c55e" : "#fbbf24" },
-                  ]}
+                  className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full border-[2.5px] border-[#fff9fb]"
+                  style={{
+                    backgroundColor:
+                      isHost && myPrefsSubmitted ? "#22c55e" : "#fbbf24",
+                  }}
                 />
               </View>
-              <Text style={styles.participantName}>
+              <Text className="text-[15px] font-bold text-[#1a0a0f]">
                 {isHost ? "You" : host?.first_name || "Partner"}
               </Text>
-              <Text style={styles.participantStatus}>
-                {(isHost && myPrefsSubmitted) || (!isHost && activeSession.host_preferences)
-                  ? "Ready"
-                  : "Thinking..."}
-              </Text>
+              <View
+                className={`px-2.5 py-1 rounded-full ${
+                  hostReady ? "bg-green-100" : "bg-amber-50"
+                }`}
+              >
+                <Text
+                  className={`text-[11px] font-semibold ${
+                    hostReady ? "text-green-700" : "text-amber-700"
+                  }`}
+                >
+                  {hostReady ? "Ready ✓" : "Thinking…"}
+                </Text>
+              </View>
             </View>
 
-            <View style={styles.vsContainer}>
-              <Animated.View style={heartStyle}>
-                <Ionicons name="heart" size={28} color="#ec4899" />
+            {/* VS heart */}
+            <View className="px-1 items-center justify-center">
+              <Animated.View
+                style={heartStyle}
+                className="w-11 h-11 rounded-full bg-pink-100 items-center justify-center"
+              >
+                <Ionicons name="heart" size={24} color="#ec4899" />
               </Animated.View>
             </View>
 
-            <View style={styles.participantCard}>
+            {/* Partner card */}
+            <View className="flex-1 items-center gap-y-2">
               {partnerJoined ? (
                 <>
-                  <View style={styles.participantAvatar}>
+                  <View className="relative">
                     {partner?.image_url ? (
-                      <Image source={{ uri: partner.image_url }} style={styles.avatarImage} />
+                      <Image
+                        source={{ uri: partner.image_url }}
+                        className="w-[68px] h-[68px] rounded-full"
+                      />
                     ) : (
                       <LinearGradient
                         colors={["#ec4899", "#f472b6"]}
-                        style={styles.avatarPlaceholder}
+                        className="w-[68px] h-[68px] rounded-full items-center justify-center"
                       >
-                        <Text style={styles.avatarInitial}>
+                        <Text className="text-[26px] font-bold text-white">
                           {partner?.first_name?.[0] || "?"}
                         </Text>
                       </LinearGradient>
                     )}
                     <View
-                      style={[
-                        styles.statusDot,
-                        { backgroundColor: partnerPrefsSubmitted ? "#22c55e" : "#fbbf24" },
-                      ]}
+                      className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full border-[2.5px] border-[#fff9fb]"
+                      style={{
+                        backgroundColor: partnerPrefsSubmitted ? "#22c55e" : "#fbbf24",
+                      }}
                     />
                   </View>
-                  <Text style={styles.participantName}>
+                  <Text className="text-[15px] font-bold text-[#1a0a0f]">
                     {!isHost ? "You" : partner?.first_name || "Partner"}
                   </Text>
-                  <Text style={styles.participantStatus}>
-                    {partnerPrefsSubmitted ? "Ready" : "Thinking..."}
-                  </Text>
+                  <View
+                    className={`px-2.5 py-1 rounded-full ${
+                      partnerPrefsSubmitted ? "bg-green-100" : "bg-amber-50"
+                    }`}
+                  >
+                    <Text
+                      className={`text-[11px] font-semibold ${
+                        partnerPrefsSubmitted ? "text-green-700" : "text-amber-700"
+                      }`}
+                    >
+                      {partnerPrefsSubmitted ? "Ready ✓" : "Thinking…"}
+                    </Text>
+                  </View>
                 </>
               ) : (
                 <>
-                  <View style={styles.participantAvatar}>
-                    <View style={styles.waitingAvatar}>
-                      <ActivityIndicator color="#ec4899" />
-                    </View>
+                  <View className="w-[68px] h-[68px] rounded-full bg-pink-50 items-center justify-center border-2 border-dashed border-pink-200">
+                    <ActivityIndicator color="#ec4899" size="small" />
                   </View>
-                  <Text style={styles.participantName}>Waiting...</Text>
-                  <Text style={styles.participantStatus}>Invite sent</Text>
+                  <Text className="text-[15px] font-bold text-[#1a0a0f]">Waiting...</Text>
+                  <View className="px-2.5 py-1 rounded-full bg-amber-50">
+                    <Text className="text-[11px] font-semibold text-amber-700">Invite sent</Text>
+                  </View>
                 </>
               )}
             </View>
           </Animated.View>
 
-          {/* Status Message */}
+          {/* Waiting banner */}
           {!partnerJoined && (
-            <Animated.View entering={FadeIn} style={styles.waitingMessage}>
-              <Ionicons name="time-outline" size={20} color="#f59e0b" />
-              <Text style={styles.waitingText}>
+            <Animated.View
+              entering={FadeIn}
+              className="flex-row items-center mx-6 py-3 px-4 rounded-[14px] bg-amber-50 border border-amber-200 gap-x-2.5"
+            >
+              <Ionicons name="time-outline" size={16} color="#d97706" />
+              <Text className="flex-1 text-[13px] text-amber-900 leading-[18px]">
                 Waiting for your partner to join with code{" "}
-                <Text style={styles.codeHighlight}>{activeSession.code}</Text>
+                <Text className="font-extrabold text-amber-700">{activeSession.code}</Text>
               </Text>
             </Animated.View>
           )}
 
-          {/* Preferences Input */}
+          {/* Preferences input */}
           {partnerJoined && !myPrefsSubmitted && (
-            <Animated.View entering={FadeInDown.delay(200)} style={styles.preferencesSection}>
-              <Text style={styles.preferencesTitle}>What are you in the mood for?</Text>
-              <Text style={styles.preferencesSubtitle}>
+            <Animated.View entering={FadeInDown.delay(200)} className="px-6 pt-7">
+              <Text className="text-[19px] font-extrabold text-[#1a0a0f] mb-1.5 tracking-tight">
+                What are you in the mood for?
+              </Text>
+              <Text className="text-[13px] text-gray-400 mb-4 leading-[19px]">
                 Describe your perfect movie tonight - genre, mood, length, anything!
               </Text>
-
               <TextInput
-                style={styles.preferencesInput}
+                className="bg-white rounded-2xl border-[1.5px] border-pink-300 p-3.5 text-[15px] text-[#1a0a0f] min-h-[116px] mb-5"
+                style={{ textAlignVertical: "top", lineHeight: 22 }}
                 placeholder="e.g., Something romantic but not too cheesy, maybe with a bit of humor..."
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor="#c4b5c0"
                 value={myPreferences}
                 onChangeText={setMyPreferences}
                 multiline
                 numberOfLines={4}
-                textAlignVertical="top"
               />
-
-              <TouchableOpacity
-                style={[styles.primaryButton, !myPreferences.trim() && styles.buttonDisabled]}
+              <PrimaryButton
                 onPress={handleSubmitPreferences}
-                disabled={!myPreferences.trim() || isLoading}
+                disabled={!myPreferences.trim()}
+                loading={isLoading}
+                colors={
+                  myPreferences.trim() ? ["#ec4899", "#db2777"] : ["#e5e7eb", "#d1d5db"]
+                }
               >
-                <LinearGradient
-                  colors={myPreferences.trim() ? ["#ec4899", "#db2777"] : ["#d1d5db", "#9ca3af"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.primaryButtonGradient}
+                <Ionicons
+                  name="checkmark-circle"
+                  size={18}
+                  color={myPreferences.trim() ? "#fff" : "#9ca3af"}
+                />
+                <Text
+                  className={`text-[16px] font-bold ${
+                    myPreferences.trim() ? "text-white" : "text-gray-400"
+                  }`}
                 >
-                  {isLoading ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <>
-                      <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                      <Text style={styles.primaryButtonText}>Submit My Mood</Text>
-                    </>
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
+                  Submit My Mood
+                </Text>
+              </PrimaryButton>
             </Animated.View>
           )}
 
-          {/* Waiting for Partner Preferences */}
+          {/* Waiting for partner prefs */}
           {myPrefsSubmitted && !partnerPrefsSubmitted && (
-            <Animated.View entering={FadeIn} style={styles.waitingPrefsSection}>
-              <View style={styles.checkmark}>
-                <Ionicons name="checkmark-circle" size={48} color="#22c55e" />
+            <Animated.View entering={FadeIn} className="items-center px-6 py-[52px]">
+              <View className="w-16 h-16 rounded-full bg-green-100 items-center justify-center mb-5">
+                <Ionicons name="checkmark" size={28} color="#16a34a" />
               </View>
-              <Text style={styles.waitingPrefsTitle}>You're all set!</Text>
-              <Text style={styles.waitingPrefsText}>
+              <Text className="text-[19px] font-bold text-[#1a0a0f] mb-2">You're all set!</Text>
+              <Text className="text-[14px] text-gray-400 text-center leading-5">
                 Waiting for your partner to share their mood...
               </Text>
-              <ActivityIndicator color="#ec4899" style={{ marginTop: 16 }} />
+              <ActivityIndicator color="#ec4899" style={{ marginTop: 20 }} />
             </Animated.View>
           )}
 
-          {/* Settling Animation */}
+          {/* Settling animation */}
           {isSettling && (
-            <Animated.View entering={FadeIn} style={styles.settlingSection}>
-              <LinearGradient
-                colors={["#fce7f3", "#fff"]}
-                style={styles.settlingContainer}
-              >
+            <Animated.View entering={FadeIn} className="px-6 py-6">
+              <View className="items-center py-12 rounded-3xl bg-[#fff0f7] border border-pink-100">
                 <Animated.View style={heartStyle}>
-                  <Ionicons name="sparkles" size={48} color="#ec4899" />
+                  <Ionicons name="sparkles" size={44} color="#ec4899" />
                 </Animated.View>
-                <Text style={styles.settlingTitle}>Finding Your Perfect Movie...</Text>
-                <Text style={styles.settlingText}>
+                <Text className="text-[18px] font-bold text-[#1a0a0f] mt-[18px] mb-1.5">
+                  Finding Your Perfect Movie...
+                </Text>
+                <Text className="text-[14px] text-gray-400">
                   Our AI is analyzing both your preferences
                 </Text>
                 <ActivityIndicator color="#ec4899" style={{ marginTop: 20 }} />
-              </LinearGradient>
+              </View>
             </Animated.View>
           )}
         </ScrollView>
 
-        {/* Verdict Modal */}
+        {/* ── Verdict Modal ── */}
         <Modal
           visible={showVerdictModal}
           animationType="slide"
-          transparent={true}
+          transparent
           onRequestClose={() => setShowVerdictModal(false)}
         >
-          <View style={styles.modalOverlay}>
-            <Animated.View entering={FadeInDown.springify()} style={styles.verdictModal}>
+          <View className="flex-1 bg-black/55 justify-end">
+            <Animated.View
+              entering={FadeInDown.springify()}
+              className="bg-white rounded-t-[28px] px-6 pt-3 pb-11"
+              style={{ maxHeight: height * 0.87 }}
+            >
+              {/* Drag handle */}
+              <View className="w-9 h-1 rounded-full bg-gray-200 self-center mb-5" />
+
               <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Header */}
-                <View style={styles.verdictHeader}>
+                {/* Modal header */}
+                <View className="items-center mb-6">
                   <LinearGradient
                     colors={["#ec4899", "#8B5CF6"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    style={styles.verdictIconContainer}
+                    className="w-[68px] h-[68px] rounded-full items-center justify-center mb-3.5"
+                    style={{
+                      elevation: 6,
+                      shadowColor: "#ec4899",
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.3,
+                      shadowRadius: 10,
+                    }}
                   >
-                    <Ionicons name="heart" size={32} color="#fff" />
+                    <Ionicons name="heart" size={28} color="#fff" />
                   </LinearGradient>
-                  <Text style={styles.verdictTitle}>Perfect Match Found!</Text>
+                  <Text className="text-[22px] font-extrabold text-[#1a0a0f] tracking-tight">
+                    Perfect Match Found!
+                  </Text>
                 </View>
 
                 {activeSession.ai_verdict && (
                   <>
-                    {/* Main Recommendation */}
-                    <View style={styles.mainRecommendation}>
-                      <Text style={styles.recommendationLabel}>Tonight's Pick</Text>
-                      <Text style={styles.recommendationTitle}>
+                    {/* Main recommendation */}
+                    <LinearGradient
+                      colors={["#fdf2f8", "#fce7f3"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      className="rounded-[20px] p-6 items-center mb-5"
+                    >
+                      <Text
+                        className="text-[11px] font-bold text-pink-500 mb-2.5"
+                        style={{ textTransform: "uppercase", letterSpacing: 1.5 }}
+                      >
+                        Tonight's Pick
+                      </Text>
+                      <Text className="text-[26px] font-black text-[#1a0a0f] text-center mb-4 tracking-tight">
                         {activeSession.ai_verdict.recommendation}
                       </Text>
-                      <View style={styles.scoreContainer}>
-                        <Text style={styles.scoreLabel}>Compatibility</Text>
-                        <Text style={styles.scoreValue}>
+                      <View className="flex-row items-baseline gap-x-1.5 bg-pink-500/10 px-4 py-2 rounded-full">
+                        <Text className="text-[22px] font-extrabold text-pink-600">
                           {activeSession.ai_verdict.compatibilityScore}%
                         </Text>
+                        <Text className="text-[13px] font-medium text-pink-900">
+                          compatibility
+                        </Text>
                       </View>
-                    </View>
+                    </LinearGradient>
 
                     {/* Reasoning */}
-                    <View style={styles.reasoningSection}>
-                      <Text style={styles.reasoningText}>
+                    <View className="mb-4">
+                      <Text className="text-[15px] text-gray-600 leading-6 text-center">
                         {activeSession.ai_verdict.reasoning}
                       </Text>
                     </View>
 
-                    {/* Couple Insight */}
-                    <View style={styles.insightSection}>
-                      <Ionicons name="sparkles" size={18} color="#ec4899" />
-                      <Text style={styles.insightText}>
+                    {/* Couple insight */}
+                    <View className="flex-row items-start bg-violet-50 p-3.5 rounded-[14px] mb-6 gap-x-2.5 border border-violet-200">
+                      <View className="w-7 h-7 rounded-full bg-violet-100 items-center justify-center shrink-0 mt-0.5">
+                        <Ionicons name="sparkles" size={16} color="#7c3aed" />
+                      </View>
+                      <Text className="flex-1 text-[13px] text-violet-700 italic leading-[19px]">
                         {activeSession.ai_verdict.coupleInsight}
                       </Text>
                     </View>
 
                     {/* Alternatives */}
-                    <View style={styles.alternativesSection}>
-                      <Text style={styles.alternativesTitle}>Other Great Options</Text>
+                    <View className="mb-6">
+                      <Text className="text-[15px] font-bold text-[#1a0a0f] mb-3">
+                        Other Great Options
+                      </Text>
                       {activeSession.ai_verdict.movieSuggestions.slice(1).map((movie, index) => (
-                        <View key={index} style={styles.alternativeItem}>
-                          <Text style={styles.alternativeTitle}>{movie.title}</Text>
-                          <Text style={styles.alternativeReason}>{movie.reason}</Text>
+                        <View
+                          key={index}
+                          className="flex-row items-start bg-gray-50 p-3.5 rounded-[14px] mb-2 gap-x-3 border border-gray-100"
+                        >
+                          <View className="w-[26px] h-[26px] rounded-full bg-pink-100 items-center justify-center shrink-0 mt-0.5">
+                            <Text className="text-[12px] font-bold text-pink-500">
+                              {index + 2}
+                            </Text>
+                          </View>
+                          <View className="flex-1">
+                            <Text className="text-[14px] font-bold text-[#1a0a0f] mb-0.5">
+                              {movie.title}
+                            </Text>
+                            <Text className="text-[12px] text-gray-400 leading-[17px]">
+                              {movie.reason}
+                            </Text>
+                          </View>
                         </View>
                       ))}
                     </View>
                   </>
                 )}
 
-                {/* Actions */}
-                <View style={styles.verdictActions}>
-                  <TouchableOpacity
-                    style={styles.primaryButton}
+                {/* Verdict actions */}
+                <View className="gap-y-2.5">
+                  <PrimaryButton
                     onPress={() => {
                       setShowVerdictModal(false)
-                      // Could navigate to discover or search
                       Alert.alert(
                         "Enjoy Your Movie Night!",
                         "Head to the Discover tab to find where to watch your movie."
                       )
                     }}
+                    colors={["#ec4899", "#db2777"]}
                   >
-                    <LinearGradient
-                      colors={["#ec4899", "#db2777"]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.primaryButtonGradient}
-                    >
-                      <Ionicons name="play-circle" size={20} color="#fff" />
-                      <Text style={styles.primaryButtonText}>Let's Watch!</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
+                    <Ionicons name="play-circle" size={20} color="#fff" />
+                    <Text className="text-white text-[16px] font-bold">Let's Watch!</Text>
+                  </PrimaryButton>
 
-                  <TouchableOpacity style={styles.secondaryButton} onPress={resetSession}>
-                    <Text style={styles.secondaryButtonText}>Start New Debate</Text>
+                  <TouchableOpacity
+                    className="py-[15px] items-center justify-center rounded-[18px] border-[1.5px] border-pink-300 bg-transparent"
+                    onPress={resetSession}
+                    activeOpacity={0.7}
+                  >
+                    <Text className="text-pink-500 text-[15px] font-semibold">
+                      Start New Debate
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -916,7 +1104,6 @@ export default function DebateSettlerScreen() {
     )
   }
 
-  // Main render
   switch (currentView) {
     case "create":
       return renderCreateScreen()
@@ -928,636 +1115,3 @@ export default function DebateSettlerScreen() {
       return renderHomeScreen()
   }
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff9fb",
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-
-  // Hero Section
-  heroSection: {
-    alignItems: "center",
-    paddingTop: 80,
-    paddingHorizontal: 24,
-    paddingBottom: 32,
-  },
-  pulseGlow: {
-    position: "absolute",
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: "rgba(236, 72, 153, 0.15)",
-    top: 60,
-  },
-  heroIconContainer: {
-    position: "relative",
-    marginBottom: 24,
-  },
-  heroIconGradient: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#ec4899",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  filmIconOverlay: {
-    position: "absolute",
-    bottom: -4,
-    right: -4,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#fff",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  heroTitle: {
-    fontSize: 32,
-    fontWeight: "900",
-    color: "#1f2937",
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  heroSubtitle: {
-    fontSize: 16,
-    color: "#6b7280",
-    textAlign: "center",
-    lineHeight: 24,
-    paddingHorizontal: 20,
-  },
-
-  // Couple Illustration
-  coupleIllustration: {
-    alignItems: "center",
-    paddingVertical: 24,
-  },
-  coupleAvatarContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  coupleAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    overflow: "hidden",
-    borderWidth: 3,
-    borderColor: "#fff",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  heartConnector: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#fff",
-    justifyContent: "center",
-    alignItems: "center",
-    marginHorizontal: -8,
-    zIndex: 1,
-    shadowColor: "#ec4899",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  coupleText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#ec4899",
-  },
-
-  // Actions
-  actionsContainer: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-  },
-  primaryButton: {
-    borderRadius: 20,
-    overflow: "hidden",
-    shadowColor: "#ec4899",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  primaryButtonGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 18,
-    gap: 10,
-  },
-  primaryButtonText: {
-    color: "#fff",
-    fontSize: 17,
-    fontWeight: "700",
-  },
-  buttonDisabled: {
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  dividerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#e5e7eb",
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    color: "#9ca3af",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  secondaryButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 18,
-    backgroundColor: "#fdf2f8",
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: "#fbcfe8",
-    gap: 10,
-  },
-  secondaryButtonText: {
-    color: "#ec4899",
-    fontSize: 17,
-    fontWeight: "700",
-  },
-
-  // Steps Section
-  stepsSection: {
-    paddingHorizontal: 24,
-    paddingTop: 40,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#1f2937",
-    marginBottom: 20,
-  },
-  stepItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  stepIconContainer: {
-    marginRight: 16,
-  },
-  stepIconBg: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  stepContent: {
-    flex: 1,
-  },
-  stepTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1f2937",
-    marginBottom: 4,
-  },
-  stepDesc: {
-    fontSize: 14,
-    color: "#6b7280",
-  },
-  stepNumber: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#f3e8ff",
-  },
-
-  // Screen Header
-  screenHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#f3f4f6",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  screenTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1f2937",
-  },
-
-  // Create Screen
-  createIllustration: {
-    alignItems: "center",
-    paddingVertical: 32,
-  },
-  illustrationBg: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  illustrationText: {
-    fontSize: 16,
-    color: "#6b7280",
-    textAlign: "center",
-    paddingHorizontal: 40,
-    lineHeight: 24,
-  },
-  inputSection: {
-    paddingHorizontal: 24,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-    marginBottom: 8,
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: "#f3f4f6",
-    paddingHorizontal: 16,
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  textInput: {
-    flex: 1,
-    paddingVertical: 16,
-    fontSize: 16,
-    color: "#1f2937",
-  },
-  codeInputContainer: {
-    alignItems: "center",
-  },
-  codeInput: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: "#e9d5ff",
-    paddingVertical: 20,
-    paddingHorizontal: 32,
-    fontSize: 28,
-    fontWeight: "800",
-    letterSpacing: 8,
-    color: "#1f2937",
-    textAlign: "center",
-    width: "100%",
-  },
-  submitSection: {
-    paddingHorizontal: 24,
-    paddingTop: 32,
-  },
-
-  // Session Screen
-  sessionCodeBadge: {
-    backgroundColor: "#fdf2f8",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#fbcfe8",
-  },
-  sessionCodeText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#ec4899",
-    letterSpacing: 2,
-  },
-  refreshButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#f3f4f6",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  // Participants
-  participantsSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    paddingVertical: 32,
-    gap: 20,
-  },
-  participantCard: {
-    alignItems: "center",
-    flex: 1,
-  },
-  participantAvatar: {
-    position: "relative",
-    marginBottom: 12,
-  },
-  avatarImage: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-  },
-  avatarPlaceholder: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  avatarInitial: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  statusDot: {
-    position: "absolute",
-    bottom: 2,
-    right: 2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 3,
-    borderColor: "#fff9fb",
-  },
-  waitingAvatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "#fdf2f8",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#fbcfe8",
-    borderStyle: "dashed",
-  },
-  participantName: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1f2937",
-    marginBottom: 4,
-  },
-  participantStatus: {
-    fontSize: 13,
-    color: "#6b7280",
-  },
-  vsContainer: {
-    paddingHorizontal: 8,
-  },
-
-  // Waiting Message
-  waitingMessage: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#fef3c7",
-    marginHorizontal: 24,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 16,
-    gap: 10,
-  },
-  waitingText: {
-    fontSize: 14,
-    color: "#92400e",
-  },
-  codeHighlight: {
-    fontWeight: "800",
-    color: "#b45309",
-  },
-
-  // Preferences
-  preferencesSection: {
-    paddingHorizontal: 24,
-    paddingTop: 32,
-  },
-  preferencesTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#1f2937",
-    marginBottom: 8,
-  },
-  preferencesSubtitle: {
-    fontSize: 14,
-    color: "#6b7280",
-    marginBottom: 20,
-    lineHeight: 20,
-  },
-  preferencesInput: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: "#f3f4f6",
-    padding: 16,
-    fontSize: 16,
-    color: "#1f2937",
-    minHeight: 120,
-    marginBottom: 24,
-    textAlignVertical: "top",
-  },
-
-  // Waiting Prefs
-  waitingPrefsSection: {
-    alignItems: "center",
-    paddingHorizontal: 24,
-    paddingVertical: 48,
-  },
-  checkmark: {
-    marginBottom: 16,
-  },
-  waitingPrefsTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#1f2937",
-    marginBottom: 8,
-  },
-  waitingPrefsText: {
-    fontSize: 15,
-    color: "#6b7280",
-    textAlign: "center",
-  },
-
-  // Settling
-  settlingSection: {
-    paddingHorizontal: 24,
-    paddingVertical: 32,
-  },
-  settlingContainer: {
-    alignItems: "center",
-    paddingVertical: 48,
-    borderRadius: 24,
-  },
-  settlingTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#1f2937",
-    marginTop: 20,
-    marginBottom: 8,
-  },
-  settlingText: {
-    fontSize: 15,
-    color: "#6b7280",
-  },
-
-  // Verdict Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    justifyContent: "flex-end",
-  },
-  verdictModal: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    maxHeight: height * 0.85,
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 40,
-  },
-  verdictHeader: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  verdictIconContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  verdictTitle: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#1f2937",
-  },
-  mainRecommendation: {
-    backgroundColor: "#fdf2f8",
-    borderRadius: 20,
-    padding: 24,
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  recommendationLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#ec4899",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  recommendationTitle: {
-    fontSize: 28,
-    fontWeight: "900",
-    color: "#1f2937",
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  scoreContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  scoreLabel: {
-    fontSize: 14,
-    color: "#6b7280",
-  },
-  scoreValue: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#ec4899",
-  },
-  reasoningSection: {
-    marginBottom: 20,
-  },
-  reasoningText: {
-    fontSize: 16,
-    color: "#4b5563",
-    lineHeight: 24,
-    textAlign: "center",
-  },
-  insightSection: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    backgroundColor: "#f3e8ff",
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 24,
-    gap: 12,
-  },
-  insightText: {
-    flex: 1,
-    fontSize: 14,
-    color: "#7c3aed",
-    fontStyle: "italic",
-    lineHeight: 20,
-  },
-  alternativesSection: {
-    marginBottom: 24,
-  },
-  alternativesTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1f2937",
-    marginBottom: 16,
-  },
-  alternativeItem: {
-    backgroundColor: "#f9fafb",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  alternativeTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#1f2937",
-    marginBottom: 4,
-  },
-  alternativeReason: {
-    fontSize: 13,
-    color: "#6b7280",
-  },
-  verdictActions: {
-    gap: 12,
-  },
-})

@@ -383,6 +383,27 @@ export const getActiveSwipeSessions = async (userId: string) => {
   return data as (SwipeSession & { user1: SupabaseUser; user2: SupabaseUser })[]
 }
 
+// Delete a swipe session
+export const deleteSwipeSession = async (sessionId: string) => {
+  try {
+    const { error } = await supabase
+      .from("swipe_sessions")
+      .delete()
+      .eq("id", sessionId)
+
+    if (error) {
+      console.error("[v0] Error deleting session:", error)
+      throw new Error("Failed to delete session")
+    }
+
+    console.log("[v0] Successfully deleted swipe session:", sessionId)
+    return { success: true }
+  } catch (error) {
+    console.error("[v0] Delete session failed:", error)
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
+  }
+}
+
 // Get User Stats
 export const getUserStats = async (userId: string) => {
   const [swipesResult, matchesResult, sessionsResult] = await Promise.all([
