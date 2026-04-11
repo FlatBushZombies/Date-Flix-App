@@ -4,7 +4,6 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// Use a current stable model for production traffic.
 const GEMINI_MODEL = 'gemini-2.5-flash';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -22,7 +21,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Server-side secret only. Never ship Gemini keys in the client.
     const apiKey =
       Deno.env.get('GEMINI_API_KEY') ?? Deno.env.get('GOOGLE_API_KEY');
     if (!apiKey) {
@@ -40,14 +38,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ✅ Call Gemini REST API directly — no SDK needed in Deno
     const geminiRes = await fetch(
       `${GEMINI_API_BASE}/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          // ✅ System instruction enforces strict JSON output
           system_instruction: {
             parts: [
               {
@@ -61,10 +57,9 @@ Deno.serve(async (req) => {
               parts: [{ text: prompt }],
             },
           ],
-          // ✅ Tell Gemini to return JSON mime type directly
           generationConfig: {
             responseMimeType: 'application/json',
-            maxOutputTokens: 1024,
+            maxOutputTokens: 8192, // Fix: was 1024, too low and caused truncated JSON
             temperature: 0.4,
           },
         }),
@@ -83,18 +78,26 @@ Deno.serve(async (req) => {
 
     const geminiData = await geminiRes.json();
 
-    // ✅ Safely extract text from Gemini's response structure
-    const rawText: string | undefined =
-      geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const candidate = geminiData?.candidates?.[0];
+    const finishReason = candidate?.finishReason;
+
+    // Catch early stops before trying to parse
+    if (finishReason && finishReason !== 'STOP') {
+      if (finishReason === 'SAFETY') {
+        throw new Error('Response blocked by Gemini safety filters.');
+      }
+      if (finishReason === 'MAX_TOKENS') {
+        throw new Error(
+          'Gemini hit the token limit and returned truncated JSON. Try increasing maxOutputTokens further.'
+        );
+      }
+      throw new Error(`Gemini stopped early with reason: ${finishReason}`);
+    }
+
+    const rawText: string | undefined = candidate?.content?.parts?.[0]?.text;
 
     if (!rawText) {
-      // Check for safety blocks or empty responses
-      const finishReason = geminiData?.candidates?.[0]?.finishReason;
-      throw new Error(
-        finishReason === 'SAFETY'
-          ? 'Response blocked by Gemini safety filters'
-          : 'Empty or unexpected response from Gemini'
-      );
+      throw new Error('Empty or unexpected response from Gemini.');
     }
 
     // Strip any stray fences just in case
@@ -119,4 +122,3 @@ Deno.serve(async (req) => {
     });
   }
 });
-
