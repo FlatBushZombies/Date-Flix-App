@@ -1,9 +1,7 @@
-
-import { View, Text, TouchableOpacity } from 'react-native';
-import { Genre } from '@/types/planner';
 import { GenreChip } from '@/components/GenreChip';
+import { Text, TouchableOpacity, View } from 'react-native';
 
-const GENRES: { value: Genre; label: string; emoji: string; desc: string }[] = [
+const GENRES = [
   { value: 'romance', label: 'Romance', emoji: '💕', desc: 'Love stories' },
   { value: 'thriller', label: 'Thriller', emoji: '🔪', desc: 'Edge of your seat' },
   { value: 'comedy', label: 'Comedy', emoji: '😂', desc: 'Laugh out loud' },
@@ -14,14 +12,8 @@ const GENRES: { value: Genre; label: string; emoji: string; desc: string }[] = [
   { value: 'documentary', label: 'Documentary', emoji: '🎞️', desc: 'Real stories' },
 ];
 
-interface Step1GenreProps {
-  selected: Genre[];
-  onChange: (genres: Genre[]) => void;
-  onNext: () => void;
-}
-
-export function Step1Genre({ selected, onChange, onNext }: Step1GenreProps) {
-  const toggle = (val: Genre) => {
+export function Step1Genre({ selected, onChange, onNext }: { selected: string[]; onChange: (genres: string[]) => void; onNext: () => void }) {
+  const toggle = (val: string) => {
     if (selected.includes(val)) {
       onChange(selected.filter((g) => g !== val));
     } else {
@@ -30,71 +22,84 @@ export function Step1Genre({ selected, onChange, onNext }: Step1GenreProps) {
   };
 
   return (
-    <View>
-      <Text
+    <View style={{ padding: 20 }}>
+      
+      {/* Glass Container */}
+      <View
         style={{
+          backgroundColor: 'rgba(255,255,255,0.05)',
+          borderRadius: 28,
+          padding: 20,
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.08)',
+        }}
+      >
+        <Text style={{
           fontSize: 11,
           color: '#FF3B5C',
-          textTransform: 'uppercase',
           letterSpacing: 1.5,
           marginBottom: 8,
-          fontWeight: '500',
-        }}
-      >
-        Step 1 of 5
-      </Text>
+        }}>
+          Step 1 of 5
+        </Text>
 
-      <Text
-        style={{
-          fontSize: 24,
-          color: '#F0EAE4',
-          marginBottom: 8,
-          fontFamily: 'PlayfairDisplay_600SemiBold',
-        }}
-      >
-        What are you in the mood for?
-      </Text>
+        <Text style={{
+          fontSize: 26,
+          color: '#FFFFFF',
+          marginBottom: 6,
+        }}>
+          What are you in the mood for?
+        </Text>
 
-      <Text style={{ fontSize: 13, color: '#9A8A94', marginBottom: 24 }}>
-        Pick one or more genres
-      </Text>
+        <Text style={{
+          fontSize: 13,
+          color: '#A1A1AA',
+          marginBottom: 24,
+        }}>
+          Pick one or more genres
+        </Text>
 
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 28 }}>
-        {GENRES.map((g) => (
-          <View key={g.value} style={{ width: '47.5%' }}>
-            <GenreChip
-              label={g.label}
-              description={g.desc}
-              emoji={g.emoji}
-              selected={selected.includes(g.value)}
-              onPress={() => toggle(g.value)}
-            />
-          </View>
-        ))}
-      </View>
+        {/* Genre Grid */}
+        <View style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 12,
+          marginBottom: 28,
+        }}>
+          {GENRES.map((g) => (
+            <View key={g.value} style={{ width: '47.5%' }}>
+              <GenreChip
+                label={g.label}
+                description={g.desc}
+                emoji={g.emoji}
+                selected={selected.includes(g.value)}
+                onPress={() => toggle(g.value)}
+              />
+            </View>
+          ))}
+        </View>
 
-      <TouchableOpacity
-        onPress={onNext}
-        disabled={selected.length === 0}
-        activeOpacity={0.85}
-        style={{
-          width: '100%',
-          paddingVertical: 16,
-          borderRadius: 12,
-          alignItems: 'center',
-          backgroundColor: selected.length > 0 ? '#FF3B5C' : '#3a2030',
-        }}
-      >
-        <Text
+        {/* CTA */}
+        <TouchableOpacity
+          onPress={onNext}
+          disabled={selected.length === 0}
+          activeOpacity={0.9}
           style={{
-            fontWeight: '500',
-            fontSize: 15,
-            color: selected.length > 0 ? '#ffffff' : '#6a5060',
+            width: '100%',
+            paddingVertical: 16,
+            borderRadius: 999,
+            alignItems: 'center',
+            backgroundColor: selected.length > 0 ? '#3B82F6' : '#1f2937',
           }}
         >
-          Continue →
-        </Text>
-      </TouchableOpacity>
+          <Text style={{
+            fontSize: 15,
+            color: selected.length > 0 ? '#fff' : '#6b7280',
+          }}>
+            Continue →
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }

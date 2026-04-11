@@ -83,7 +83,7 @@ export function SplashScreen({ onAnimationComplete, duration = 2500 }: SplashScr
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: '#0A0A0A',
+        backgroundColor: '#FFFFFF',
         justifyContent: 'center',
         alignItems: 'center',
         opacity: exitFadeAnim,
@@ -97,7 +97,7 @@ export function SplashScreen({ onAnimationComplete, duration = 2500 }: SplashScr
           width: logoSize * 3,
           height: logoSize * 3,
           borderRadius: logoSize * 1.5,
-          backgroundColor: 'rgba(255,255,255,0.03)',
+          backgroundColor: 'rgba(0,0,0,0.03)',
         }}
       />
 
@@ -125,7 +125,7 @@ export function SplashScreen({ onAnimationComplete, duration = 2500 }: SplashScr
         <Animated.View style={{ opacity: textFadeAnim, alignItems: 'center' }}>
           <Text
             style={{
-              color: '#FFFFFF',
+              color: '#000000',
               fontSize: 36,
               fontWeight: '700',
               letterSpacing: 6,
@@ -141,7 +141,7 @@ export function SplashScreen({ onAnimationComplete, duration = 2500 }: SplashScr
               width: 28,
               height: 2,
               borderRadius: 1,
-              backgroundColor: 'rgba(255,255,255,0.25)',
+              backgroundColor: 'rgba(0,0,0,0.25)',
             }}
           />
         </Animated.View>
