@@ -1,7 +1,8 @@
 
-import { View, Text, TouchableOpacity } from 'react-native';
-import { Era, Avoid } from '@/types/planner';
 import { PillChip } from '@/components/PillChip';
+import { Avoid, Era } from '@/types/planner';
+import React, { useEffect, useState } from 'react';
+import { Animated, Text, TouchableOpacity, View } from 'react-native';
 
 const ERAS: { value: Era; label: string; desc: string }[] = [
   { value: 'new releases', label: 'New releases', desc: '2020s films, fresh and current' },
@@ -24,6 +25,62 @@ interface Step4PrefsProps {
   onAvoidChange: (a: Avoid[]) => void;
   onNext: () => void;
   onBack: () => void;
+}
+
+function EraItem({ eraData, isSelected, onPress }: { eraData: { value: Era; label: string; desc: string }; isSelected: boolean; onPress: () => void }) {
+  const [opacity] = useState(new Animated.Value(isSelected ? 1 : 0));
+
+  useEffect(() => {
+    Animated.timing(opacity, {
+      toValue: isSelected ? 1 : 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [isSelected]);
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      style={{
+        width: '47.5%',
+        borderRadius: 12,
+        padding: 14,
+        borderWidth: 1,
+        backgroundColor: isSelected ? '#2a0d14' : '#151520',
+        borderColor: isSelected ? '#FF3B5C' : '#2a2535',
+        position: 'relative',
+      }}
+    >
+      <Animated.View
+        style={{
+          position: 'absolute',
+          top: 8,
+          right: 8,
+          opacity,
+          backgroundColor: '#10B981',
+          borderRadius: 10,
+          width: 20,
+          height: 20,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Text style={{ color: 'white', fontSize: 12 }}>✓</Text>
+      </Animated.View>
+      <Text
+        style={{
+          fontWeight: '500',
+          fontSize: 13,
+          marginBottom: 4,
+          color: isSelected ? '#FF9FB3' : '#E0D8D0',
+        }}
+      >
+        {eraData.label}
+      </Text>
+      <Text style={{ fontSize: 11, color: '#6a6060' }}>{eraData.desc}</Text>
+    </TouchableOpacity>
+  );
 }
 
 export function Step4Prefs({
@@ -84,31 +141,12 @@ export function Step4Prefs({
       {/* Era grid */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 }}>
         {ERAS.map((e) => (
-          <TouchableOpacity
+          <EraItem
             key={e.value}
+            eraData={e}
+            isSelected={era === e.value}
             onPress={() => onEraChange(e.value)}
-            activeOpacity={0.7}
-            style={{
-              width: '47.5%',
-              borderRadius: 12,
-              padding: 14,
-              borderWidth: 1,
-              backgroundColor: era === e.value ? '#2a0d14' : '#151520',
-              borderColor: era === e.value ? '#FF3B5C' : '#2a2535',
-            }}
-          >
-            <Text
-              style={{
-                fontWeight: '500',
-                fontSize: 13,
-                marginBottom: 4,
-                color: era === e.value ? '#FF9FB3' : '#E0D8D0',
-              }}
-            >
-              {e.label}
-            </Text>
-            <Text style={{ fontSize: 11, color: '#6a6060' }}>{e.desc}</Text>
-          </TouchableOpacity>
+          />
         ))}
       </View>
 

@@ -1,6 +1,7 @@
 import { StreamingCard } from '@/components/StreamingCard';
 import { STREAMING_PLATFORMS } from '@/lib/streaming';
-import { Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Animated, Text, TouchableOpacity, View } from 'react-native';
 
 export function Step2Streaming({
   selected,
@@ -27,7 +28,17 @@ export function Step2Streaming({
     onChange([], !anyStreaming);
   };
 
-  const canContinue = selected.length > 0 || anyStreaming;
+  const [anyOpacity] = useState(new Animated.Value(anyStreaming ? 1 : 0));
+
+  useEffect(() => {
+    Animated.timing(anyOpacity, {
+      toValue: anyStreaming ? 1 : 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [anyStreaming]);
+
+  const canContinue = anyStreaming || selected.length > 0;
 
   return (
     <View style={{ padding: 20 }}>
@@ -99,8 +110,25 @@ export function Step2Streaming({
             borderWidth: 1,
             backgroundColor: anyStreaming ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.03)',
             borderColor: anyStreaming ? '#3B82F6' : 'rgba(255,255,255,0.08)',
+            position: 'relative',
           }}
         >
+          <Animated.View
+            style={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              opacity: anyOpacity,
+              backgroundColor: '#10B981',
+              borderRadius: 10,
+              width: 20,
+              height: 20,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text style={{ color: 'white', fontSize: 12 }}>✓</Text>
+          </Animated.View>
           <Text style={{
             color: anyStreaming ? '#93C5FD' : '#9CA3AF',
             fontSize: 13,
