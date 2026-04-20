@@ -1,3 +1,71 @@
+// Rate limiting utility for Supabase Edge Functions
+interface RateLimitEntry {
+  count: number
+  resetTime: number
+}
+
+class RateLimiter {
+  private limits: Map<string, RateLimitEntry> = new Map()
+  private windowMs: number
+  private maxRequests: number
+
+  constructor(windowMs: number = 60000, maxRequests: number = 10) {
+    this.windowMs = windowMs
+    this.maxRequests = maxRequests
+  }
+
+  isRateLimited(identifier: string): boolean {
+    const now = Date.now()
+    const entry = this.limits.get(identifier)
+
+    if (!entry || now > entry.resetTime) {
+      // Reset or create new entry
+      this.limits.set(identifier, {
+        count: 1,
+        resetTime: now + this.windowMs
+      })
+      return false
+    }
+
+    if (entry.count >= this.maxRequests) {
+      return true
+    }
+
+    entry.count++
+    return false
+  }
+
+  getRemainingRequests(identifier: string): number {
+    const entry = this.limits.get(identifier)
+    if (!entry || Date.now() > entry.resetTime) {
+      return this.maxRequests
+    }
+    return Math.max(0, this.maxRequests - entry.count)
+  }
+
+  getResetTime(identifier: string): number {
+    const entry = this.limits.get(identifier)
+    return entry?.resetTime || 0
+  }
+}
+
+// Global rate limiter instance
+const rateLimiter = new RateLimiter(60000, 10) // 10 requests per minute
+
+function checkRateLimit(req: Request): { allowed: boolean; remaining: number; resetTime: number } {
+  // Get client IP or user identifier
+  const clientIP = req.headers.get('CF-Connecting-IP') ||
+                   req.headers.get('X-Forwarded-For') ||
+                   req.headers.get('X-Real-IP') ||
+                   'unknown'
+
+  const allowed = !rateLimiter.isRateLimited(clientIP)
+  const remaining = rateLimiter.getRemainingRequests(clientIP)
+  const resetTime = rateLimiter.getResetTime(clientIP)
+
+  return { allowed, remaining, resetTime }
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -20,6 +88,24 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Rate limiting check
+  const rateLimitResult = checkRateLimit(req);
+  if (!rateLimitResult.allowed) {
+    return new Response(JSON.stringify({
+      error: 'Rate limit exceeded. Please try again later.',
+      retryAfter: Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)
+    }), {
+      status: 429,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json',
+        'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+        'X-RateLimit-Reset': rateLimitResult.resetTime.toString(),
+        'Retry-After': Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000).toString()
+      },
+    });
+  }
+
   try {
     const apiKey =
       Deno.env.get('GEMINI_API_KEY') ?? Deno.env.get('GOOGLE_API_KEY');
@@ -29,10 +115,43 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { prompt } = await req.json();
+    const body = await req.json();
+    const { prompt } = body;
 
+    // Enhanced input validation and sanitization
     if (!prompt || typeof prompt !== 'string') {
-      return new Response(JSON.stringify({ error: 'Missing or invalid prompt' }), {
+      return new Response(JSON.stringify({ error: 'Missing or invalid prompt parameter' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Sanitize prompt: remove potentially harmful content
+    const sanitizedPrompt = prompt
+      .trim()
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove script tags
+      .replace(/<[^>]*>/g, '') // Remove HTML tags
+      .slice(0, 10000); // Limit length
+
+    if (sanitizedPrompt.length === 0) {
+      return new Response(JSON.stringify({ error: 'Prompt is empty after sanitization' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validate prompt content (basic check for malicious patterns)
+    const maliciousPatterns = [
+      /\b(eval|exec|system|shell_exec|passthru|popen|proc_open)\b/i,
+      /\b(unlink|rmdir|chmod|chown)\b/i,
+      /\b(include|require|include_once|require_once)\b/i,
+      /javascript:/i,
+      /data:/i,
+      /vbscript:/i,
+    ];
+
+    if (maliciousPatterns.some(pattern => pattern.test(sanitizedPrompt))) {
+      return new Response(JSON.stringify({ error: 'Invalid prompt content' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -54,7 +173,7 @@ Deno.serve(async (req) => {
           contents: [
             {
               role: 'user',
-              parts: [{ text: prompt }],
+              parts: [{ text: sanitizedPrompt }],
             },
           ],
           generationConfig: {

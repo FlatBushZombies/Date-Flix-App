@@ -6,12 +6,12 @@ import { NotificationsModal } from "@/components/NotificationsModal"
 import { useNotifications } from "@/hooks/useNotifications"
 import type { Movie, SupabaseUser, SwipeSession } from "@/types"
 import {
-  acceptInvitation,
-  createInvitation,
-  deleteSwipeSession,
-  getActiveSwipeSessions,
-  saveSwipe,
-  syncUserWithSupabase
+    acceptInvitation,
+    createInvitation,
+    deleteSwipeSession,
+    getActiveSwipeSessions,
+    saveSwipe,
+    syncUserWithSupabase
 } from "@/utils/supabase-helpers"
 import { fetchTrendingMovies } from "@/utils/tmdb"
 import { useUser } from "@clerk/clerk-expo"
@@ -21,15 +21,15 @@ import { LinearGradient } from "expo-linear-gradient"
 import { useRouter } from "expo-router"
 import { useEffect, useState } from "react"
 import {
-  Alert,
-  Dimensions,
-  Image,
-  Modal,
-  Share,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Alert,
+    Dimensions,
+    Image,
+    Modal,
+    Share,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native"
 import { BellIcon } from "react-native-heroicons/outline"
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated"
@@ -179,6 +179,28 @@ export default function SwipeScreen() {
     }
     setCurrentIndex((prev) => prev + 1)
     if (currentIndex >= movies.length - 3) loadMovies()
+  }
+
+  const handleSaveMovie = async (movie: Movie) => {
+    // TODO: Implement save to watchlist functionality
+    showBanner("success", "Saved!", `${movie.title} added to your watchlist`)
+  }
+
+  const handleShareMovie = async (movie: Movie) => {
+    try {
+      const shareMessage = `Check out "${movie.title}" on Movie Circle! 🎬\n\n${movie.overview?.slice(0, 100)}...\n\n#MovieCircle #Movies`
+      await Share.share({
+        message: shareMessage,
+      })
+      showBanner("success", "Shared!", "Movie shared successfully")
+    } catch (error) {
+      showBanner("error", "Error", "Failed to share movie")
+    }
+  }
+
+  const handleTrailerPress = async (movie: Movie) => {
+    // TODO: Open trailer in a modal or external app
+    showBanner("info", "Trailer", "Trailer feature coming soon!")
   }
 
   const currentMovie = movies[currentIndex]
@@ -350,6 +372,9 @@ export default function SwipeScreen() {
               <MovieCard
                 movie={movie}
                 onSwipe={index === 1 ? handleSwipe : undefined}
+                onSave={handleSaveMovie}
+                onShare={handleShareMovie}
+                onTrailer={handleTrailerPress}
               />
             </Animated.View>
           ))}

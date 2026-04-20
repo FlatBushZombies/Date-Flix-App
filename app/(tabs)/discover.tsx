@@ -1,21 +1,21 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  SafeAreaView,
-  StatusBar,
-} from 'react-native';
-import { Genre, Vibe, Duration, Era, Avoid, Occasion, StreamingPlatform, PlannerState } from '@/types/planner';
-import { useMoviePlanner } from '@/hooks/useMoviePlanner';
-import { ProgressBar } from '@/components/ProgressBar';
 import { LoadingScreen } from '@/components/LoadingScreen';
+import { ProgressBar } from '@/components/ProgressBar';
 import { ResultsScreen } from '@/components/ResultsScreen';
 import { Step1Genre } from '@/components/steps/Step1Genre';
 import { Step2Streaming } from '@/components/steps/Step2Streaming';
 import { Step3Vibe } from '@/components/steps/Step3Vibe';
 import { Step4Prefs } from '@/components/steps/Step4Prefs';
 import { Step5Occasion } from '@/components/steps/Step5Occasion';
+import { useMoviePlanner } from '@/hooks/useMoviePlanner';
+import { Genre, PlannerState, StreamingPlatform } from '@/types/planner';
+import React, { useState } from 'react';
+import {
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  Text,
+  View,
+} from 'react-native';
 
 const TOTAL_STEPS = 5;
 
@@ -33,7 +33,7 @@ const initialState: PlannerState = {
 export default function MoviePlannerScreen() {
   const [step, setStep] = useState(1);
   const [plannerState, setPlannerState] = useState<PlannerState>(initialState);
-  const { plan, prompt, loading, loadingMessage, error, generatePlan, reset } =
+  const { plan, prompt, loading, loadingMessage, progress, error, generatePlan, reset } =
     useMoviePlanner();
 
   const update = (patch: Partial<PlannerState>) =>
@@ -66,7 +66,7 @@ export default function MoviePlannerScreen() {
               Movie Night Planner
             </Text>
           </View>
-          <LoadingScreen message={loadingMessage} />
+          <LoadingScreen message={loadingMessage} progress={progress} />
         </View>
       </SafeAreaView>
     );
@@ -145,7 +145,7 @@ export default function MoviePlannerScreen() {
         {step === 1 && (
           <Step1Genre
             selected={plannerState.genres}
-            onChange={(genres) => update({ genres })}
+            onChange={(genres) => update({ genres: genres as Genre[] })}
             onNext={() => setStep(2)}
           />
         )}
@@ -153,7 +153,7 @@ export default function MoviePlannerScreen() {
           <Step2Streaming
             selected={plannerState.streaming}
             anyStreaming={plannerState.anyStreaming}
-            onChange={(streaming, anyStreaming) => update({ streaming, anyStreaming })}
+            onChange={(streaming, anyStreaming) => update({ streaming: streaming as StreamingPlatform[], anyStreaming })}
             onNext={() => setStep(3)}
             onBack={() => setStep(1)}
           />

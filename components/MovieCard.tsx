@@ -1,21 +1,23 @@
 "use client"
 
-import { View, Text, Image, Dimensions } from "react-native"
+import type { Movie } from "@/types"
+import { getMovieCredits, getMovieVideos } from "@/utils/tmdb"
+import { Ionicons } from "@expo/vector-icons"
+import * as Haptics from "expo-haptics"
+import { LinearGradient } from "expo-linear-gradient"
+import { useEffect, useState } from "react"
+import { Dimensions, Image, Text, TouchableOpacity, View } from "react-native"
 import { Gesture, GestureDetector } from "react-native-gesture-handler"
 import Animated, {
+  Easing,
+  Extrapolate,
+  interpolate,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
-  runOnJS,
-  interpolate,
-  Extrapolate,
-  Easing,
 } from "react-native-reanimated"
-import { Ionicons } from "@expo/vector-icons"
-import { LinearGradient } from "expo-linear-gradient"
-import type { Movie } from "@/types"
-import { useEffect } from "react"
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window")
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3
@@ -25,47 +27,135 @@ const CARD_HEIGHT = SCREEN_HEIGHT * 0.75
 interface MovieCardProps {
   movie: Movie
   onSwipe?: (direction: "left" | "right") => void
+  onSave?: (movie: Movie) => void
+  onShare?: (movie: Movie) => void
+  onTrailer?: (movie: Movie) => void
 }
 
-// Derive genre tags from vote_average and other fields (placeholder logic — replace with real genre data)
+// AI-powered mood analysis based on movie data
+function analyzeMovieMood(movie: Movie): string[] {
+  const moods: string[] = []
+
+  // Rating-based moods
+  if (movie.vote_average >= 8.5) moods.push("🎯 Masterpiece")
+  else if (movie.vote_average >= 7.5) moods.push("⭐ Excellent")
+  else if (movie.vote_average >= 6.5) moods.push("👍 Good")
+
+  // Popularity-based trends
+  if (movie.popularity > 100) moods.push("🔥 Trending")
+  else if (movie.popularity > 50) moods.push("📈 Rising")
+
+  // Release year analysis
+  const year = movie.release_date ? new Date(movie.release_date).getFullYear() : null
+  if (year) {
+    if (year >= 2023) moods.push("🆕 Fresh")
+    else if (year >= 2010) moods.push("📽 Modern")
+    else if (year >= 2000) moods.push("🎬 Contemporary")
+    else if (year >= 1990) moods.push("📼 Classic")
+    else moods.push("🎞 Timeless")
+  }
+
+  // Overview-based mood detection (simple keyword analysis)
+  const overview = movie.overview?.toLowerCase() || ""
+  if (overview.includes("love") || overview.includes("romance")) moods.push("💕 Romantic")
+  if (overview.includes("action") || overview.includes("fight")) moods.push("💥 Action-Packed")
+  if (overview.includes("comedy") || overview.includes("funny")) moods.push("😂 Hilarious")
+  if (overview.includes("thriller") || overview.includes("suspense")) moods.push("🔪 Thrilling")
+  if (overview.includes("horror") || overview.includes("scary")) moods.push("👻 Spooky")
+  if (overview.includes("space") || overview.includes("sci-fi")) moods.push("🚀 Futuristic")
+
+  return moods.slice(0, 4) // Limit to 4 mood tags
+}
+
+// Enhanced genre tags with AI insights
 function getGenreTags(movie: Movie): string[] {
   const tags: string[] = []
-  if (movie.vote_average >= 8) tags.push("⭐ Top Rated")
-  if (movie.release_date) {
-    const year = new Date(movie.release_date).getFullYear()
-    if (year >= 2023) tags.push("🎬 New Release")
-    else if (year < 2000) tags.push("🎞 Classic")
+
+  // Add mood analysis
+  tags.push(...analyzeMovieMood(movie))
+
+  // Add rating if not already covered by mood
+  if (!tags.some(tag => tag.includes("⭐") || tag.includes("🎯") || tag.includes("👍"))) {
+    tags.push(`${movie.vote_average.toFixed(1)} ⭐`)
   }
-  if (movie.vote_average > 0) tags.push(`${movie.vote_average.toFixed(1)} / 10`)
+
   return tags
 }
 
-export function MovieCard({ movie, onSwipe }: MovieCardProps) {
+export function MovieCard({ movie, onSwipe, onSave, onShare, onTrailer }: MovieCardProps) {
   const translateX = useSharedValue(0)
   const translateY = useSharedValue(0)
   const isSwiped = useSharedValue(false)
   const scale = useSharedValue(1)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [cast, setCast] = useState<any[]>([])
+  const [videos, setVideos] = useState<any[]>([])
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false)
+  const [isTapDisabled, setIsTapDisabled] = useState(false)
 
   useEffect(() => {
     translateX.value = 0
     translateY.value = 0
     isSwiped.value = false
-    scale.value = withSpring(1, { damping: 18, stiffness: 200 })
+    scale.value = withSpring(1, { damping: 20, stiffness: 220 })
   }, [movie.id])
 
+  // Load additional details when card is tapped
+  const loadMovieDetails = async () => {
+    if (cast.length > 0) return // Already loaded
+
+    setIsLoadingDetails(true)
+    try {
+      const [creditsData, videosData] = await Promise.all([
+        getMovieCredits(movie.id),
+        getMovieVideos(movie.id)
+      ])
+
+      if (creditsData?.cast) {
+        setCast(creditsData.cast.slice(0, 3)) // Top 3 cast members
+      }
+
+      if (videosData?.results) {
+        const trailers = videosData.results.filter((v: any) =>
+          v.type === 'Trailer' && v.site === 'YouTube'
+        )
+        setVideos(trailers.slice(0, 1)) // First trailer
+      }
+    } catch (error) {
+      console.error('Error loading movie details:', error)
+    } finally {
+      setIsLoadingDetails(false)
+    }
+  }
+
+  const handleCardPress = async () => {
+    if (isTapDisabled) return
+
+    setIsTapDisabled(true)
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    setIsExpanded(!isExpanded)
+    if (!isExpanded) {
+      await loadMovieDetails()
+    }
+
+    // Re-enable tap after a short delay
+    setTimeout(() => setIsTapDisabled(false), 300)
+  }
+
   const panGesture = Gesture.Pan()
-    .enabled(!!onSwipe)
+    .enabled(!!onSwipe && !isExpanded) // Disable swipe when expanded
+    .maxPointers(1)
     .onBegin(() => {
-      if (isSwiped.value) return
-      scale.value = withTiming(1.02, { duration: 120, easing: Easing.out(Easing.quad) })
+      if (isSwiped.value || isExpanded) return
+      scale.value = withTiming(1.01, { duration: 100, easing: Easing.out(Easing.quad) })
     })
     .onChange((event) => {
-      if (isSwiped.value) return
+      if (isSwiped.value || isExpanded) return
       translateX.value = event.translationX
       translateY.value = event.translationY * 0.35
     })
     .onEnd((event) => {
-      if (isSwiped.value) return
+      if (isSwiped.value || isExpanded) return
 
       if (Math.abs(event.translationX) > SWIPE_THRESHOLD) {
         isSwiped.value = true
@@ -75,24 +165,32 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
 
         translateX.value = withSpring(targetX, {
           velocity: event.velocityX,
-          damping: 28,
-          stiffness: 180,
+          damping: 35,
+          stiffness: 150,
           mass: 0.8,
         })
         translateY.value = withSpring(targetY, {
           velocity: event.velocityY,
-          damping: 30,
-          stiffness: 160,
+          damping: 35,
+          stiffness: 140,
         })
-        scale.value = withTiming(0.95, { duration: 200, easing: Easing.in(Easing.quad) })
+        scale.value = withTiming(0.95, { duration: 180, easing: Easing.in(Easing.quad) })
 
         onSwipe && runOnJS(onSwipe)(direction)
       } else {
-        translateX.value = withSpring(0, { damping: 20, stiffness: 300, mass: 0.7 })
-        translateY.value = withSpring(0, { damping: 20, stiffness: 300, mass: 0.7 })
-        scale.value = withSpring(1, { damping: 18, stiffness: 250 })
+        translateX.value = withSpring(0, { damping: 25, stiffness: 280, mass: 0.7 })
+        translateY.value = withSpring(0, { damping: 25, stiffness: 280, mass: 0.7 })
+        scale.value = withSpring(1, { damping: 20, stiffness: 250 })
       }
     })
+
+  // Tap gesture for expanding details
+  const tapGesture = Gesture.Tap()
+    .onEnd(() => {
+      runOnJS(handleCardPress)()
+    })
+
+  const combinedGesture = Gesture.Race(panGesture, tapGesture)
 
   const cardStyle = useAnimatedStyle(() => {
     const rotate = interpolate(
@@ -179,13 +277,13 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
   const releaseYear = movie.release_date ? new Date(movie.release_date).getFullYear() : null
 
   return (
-    <GestureDetector gesture={panGesture}>
+    <GestureDetector gesture={combinedGesture}>
       <Animated.View
         style={[
           cardStyle,
           {
             width: CARD_WIDTH,
-            height: CARD_HEIGHT,
+            height: isExpanded ? CARD_HEIGHT * 1.5 : CARD_HEIGHT,
             borderRadius: 28,
             backgroundColor: "#111111",
             shadowColor: "#000",
@@ -199,7 +297,7 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
       >
         {/* Full-bleed poster image */}
         <Image
-          source={{ uri: `https://image.tmdb.org/t/p/w500${movie.poster_path}` }}
+          source={{ uri: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : undefined }}
           style={{ position: "absolute", width: "100%", height: "100%" }}
           resizeMode="cover"
         />
@@ -227,13 +325,46 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
           }}>
             <Ionicons name="close" size={18} color="#fff" />
           </View>
-          <View style={{
-            width: 36, height: 36, borderRadius: 18,
-            backgroundColor: "rgba(255,255,255,0.15)",
-            justifyContent: "center", alignItems: "center",
-            borderWidth: 1, borderColor: "rgba(255,255,255,0.2)"
-          }}>
-            <Ionicons name="ellipsis-horizontal" size={18} color="#fff" />
+
+          {/* Quick Actions Row */}
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <TouchableOpacity
+              onPress={() => onSave && onSave(movie)}
+              style={{
+                width: 32, height: 32, borderRadius: 16,
+                backgroundColor: "rgba(255,255,255,0.15)",
+                justifyContent: "center", alignItems: "center",
+                borderWidth: 1, borderColor: "rgba(255,255,255,0.2)"
+              }}
+            >
+              <Ionicons name="bookmark-outline" size={16} color="#fff" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => onShare && onShare(movie)}
+              style={{
+                width: 32, height: 32, borderRadius: 16,
+                backgroundColor: "rgba(255,255,255,0.15)",
+                justifyContent: "center", alignItems: "center",
+                borderWidth: 1, borderColor: "rgba(255,255,255,0.2)"
+              }}
+            >
+              <Ionicons name="share-outline" size={16} color="#fff" />
+            </TouchableOpacity>
+
+            {isExpanded && !isLoadingDetails && videos.length > 0 && (
+              <TouchableOpacity
+                onPress={() => onTrailer && onTrailer(movie)}
+                style={{
+                  width: 32, height: 32, borderRadius: 16,
+                  backgroundColor: "rgba(255,255,255,0.15)",
+                  justifyContent: "center", alignItems: "center",
+                  borderWidth: 1, borderColor: "rgba(255,255,255,0.2)"
+                }}
+              >
+                <Ionicons name="play" size={16} color="#fff" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -317,9 +448,74 @@ export function MovieCard({ movie, onSwipe }: MovieCardProps) {
               <Text style={{
                 fontSize: 13.5, color: "rgba(255,255,255,0.7)",
                 lineHeight: 19, marginBottom: 18
-              }} numberOfLines={3}>
+              }} numberOfLines={isExpanded ? 6 : 3}>
                 {movie.overview}
               </Text>
+            </>
+          )}
+
+          {/* Cast Preview (when expanded) */}
+          {isExpanded && (
+            <>
+              <Text style={{ fontSize: 10, fontWeight: "700", color: "rgba(255,255,255,0.35)", letterSpacing: 1.5, marginBottom: 7, textTransform: "uppercase" }}>
+                Cast
+              </Text>
+              {isLoadingDetails ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 }}>
+                  <Ionicons name="hourglass-outline" size={16} color="rgba(255,255,255,0.6)" />
+                  <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>Loading cast...</Text>
+                </View>
+              ) : cast.length > 0 ? (
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+                  {cast.slice(0, 3).map((actor, index) => (
+                    <View key={actor.id || index} style={{ alignItems: "center", flex: 1 }}>
+                      <View style={{
+                        width: 40, height: 40, borderRadius: 20,
+                        backgroundColor: "rgba(255,255,255,0.1)",
+                        justifyContent: "center", alignItems: "center",
+                        marginBottom: 4
+                      }}>
+                        {actor.profile_path ? (
+                          <Image
+                            source={{ uri: `https://image.tmdb.org/t/p/w185${actor.profile_path}` }}
+                            style={{ width: 40, height: 40, borderRadius: 20 }}
+                          />
+                        ) : (
+                          <Ionicons name="person" size={20} color="rgba(255,255,255,0.6)" />
+                        )}
+                      </View>
+                      <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.8)", textAlign: "center" }} numberOfLines={2}>
+                        {actor.name || 'Unknown'}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginBottom: 12 }}>
+                  Cast information not available
+                </Text>
+              )}
+            </>
+          )}
+
+          {/* AI Insights (when expanded) */}
+          {isExpanded && movie.vote_count > 0 && (
+            <>
+              <Text style={{ fontSize: 10, fontWeight: "700", color: "rgba(255,255,255,0.35)", letterSpacing: 1.5, marginBottom: 7, textTransform: "uppercase" }}>
+                AI Insights
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 }}>
+                <View style={{
+                  width: 20, height: 20, borderRadius: 10,
+                  backgroundColor: "rgba(168, 85, 247, 0.2)",
+                  justifyContent: "center", alignItems: "center"
+                }}>
+                  <Ionicons name="sparkles" size={12} color="#a855f7" />
+                </View>
+                <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.8)" }}>
+                  {movie.popularity > 50 ? "High social buzz" : "Steady interest"} • {movie.vote_count.toLocaleString()} reviews
+                </Text>
+              </View>
             </>
           )}
 

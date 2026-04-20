@@ -1,3 +1,71 @@
+// Rate limiting utility for Supabase Edge Functions
+interface RateLimitEntry {
+  count: number
+  resetTime: number
+}
+
+class RateLimiter {
+  private limits: Map<string, RateLimitEntry> = new Map()
+  private windowMs: number
+  private maxRequests: number
+
+  constructor(windowMs: number = 60000, maxRequests: number = 10) {
+    this.windowMs = windowMs
+    this.maxRequests = maxRequests
+  }
+
+  isRateLimited(identifier: string): boolean {
+    const now = Date.now()
+    const entry = this.limits.get(identifier)
+
+    if (!entry || now > entry.resetTime) {
+      // Reset or create new entry
+      this.limits.set(identifier, {
+        count: 1,
+        resetTime: now + this.windowMs
+      })
+      return false
+    }
+
+    if (entry.count >= this.maxRequests) {
+      return true
+    }
+
+    entry.count++
+    return false
+  }
+
+  getRemainingRequests(identifier: string): number {
+    const entry = this.limits.get(identifier)
+    if (!entry || Date.now() > entry.resetTime) {
+      return this.maxRequests
+    }
+    return Math.max(0, this.maxRequests - entry.count)
+  }
+
+  getResetTime(identifier: string): number {
+    const entry = this.limits.get(identifier)
+    return entry?.resetTime || 0
+  }
+}
+
+// Global rate limiter instance
+const rateLimiter = new RateLimiter(60000, 10) // 10 requests per minute
+
+function checkRateLimit(req: Request): { allowed: boolean; remaining: number; resetTime: number } {
+  // Get client IP or user identifier
+  const clientIP = req.headers.get('CF-Connecting-IP') ||
+                   req.headers.get('X-Forwarded-For') ||
+                   req.headers.get('X-Real-IP') ||
+                   'unknown'
+
+  const allowed = !rateLimiter.isRateLimited(clientIP)
+  const remaining = rateLimiter.getRemainingRequests(clientIP)
+  const resetTime = rateLimiter.getResetTime(clientIP)
+
+  return { allowed, remaining, resetTime }
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -21,6 +89,7 @@ type InviteResponse = {
     | 'domain_verification_required'
     | 'from_domain_not_verified'
     | 'provider_error'
+    | 'rate_limited'
   error?: string
   action?: string
   emailId?: string
@@ -78,6 +147,18 @@ Deno.serve(async (req) => {
     return json({ error: 'Method not allowed' }, 405)
   }
 
+  // Rate limiting check
+  const rateLimitResult = checkRateLimit(req);
+  if (!rateLimitResult.allowed) {
+    return json({
+      sent: false,
+      provider: 'resend',
+      reason: 'rate_limited',
+      error: 'Rate limit exceeded. Please try again later.',
+      retryAfter: Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)
+    }, 429)
+  }
+
   try {
     const body = (await req.json().catch(() => ({}))) as InvitePayload
     const to = typeof body.to === 'string' ? body.to.trim() : ''
@@ -88,6 +169,7 @@ Deno.serve(async (req) => {
         ? body.subject.trim()
         : `${hostName || 'Someone'} invited you to a DateFlix debate!`
 
+    // Enhanced validation and sanitization
     if (!to || !to.includes('@') || !debateCode) {
       return json({
         sent: false,
@@ -97,6 +179,24 @@ Deno.serve(async (req) => {
         action: 'Pass a real recipient email address and a debate code when invoking clever-task.',
       } satisfies InviteResponse)
     }
+
+    // Validate email format more strictly
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(to)) {
+      return json({
+        sent: false,
+        provider: 'resend',
+        reason: 'missing_fields',
+        error: 'Invalid email address format.',
+        action: 'Provide a valid email address.',
+      } satisfies InviteResponse)
+    }
+
+    // Sanitize inputs
+    const sanitizedTo = to.toLowerCase().slice(0, 254) // RFC 5321 limit
+    const sanitizedHostName = hostName.replace(/[<>'"&]/g, '').slice(0, 100)
+    const sanitizedDebateCode = debateCode.replace(/[<>'"&]/g, '').slice(0, 50)
+    const sanitizedSubject = subject.replace(/[<>'"&]/g, '').slice(0, 200)
 
     const resendKey = Deno.env.get('RESEND_API_KEY')
     const fromEmail = Deno.env.get('INVITE_FROM_EMAIL') ?? 'DateFlix <onboarding@resend.dev>'
@@ -116,16 +216,16 @@ Deno.serve(async (req) => {
       } satisfies InviteResponse)
     }
 
-    const safeHostName = escapeHtml(hostName || 'Your partner')
-    const safeDebateCode = escapeHtml(debateCode)
+    const safeHostName = escapeHtml(sanitizedHostName || 'Your partner')
+    const safeDebateCode = escapeHtml(sanitizedDebateCode)
     const safeAppUrl = appUrl ? escapeHtml(appUrl) : ''
 
     const text = [
       'Hi!',
       '',
-      `${hostName || 'Your partner'} wants to settle a movie debate with you in DateFlix.`,
+      `${sanitizedHostName || 'Your partner'} wants to settle a movie debate with you in DateFlix.`,
       '',
-      `Your invite code: ${debateCode}`,
+      `Your invite code: ${sanitizedDebateCode}`,
       appUrl ? `Open the app: ${appUrl}` : 'Open the app and go to Debate > I Have a Code',
       '',
       'Have fun!',
@@ -156,8 +256,8 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         from: fromEmail,
-        to,
-        subject,
+        to: sanitizedTo,
+        subject: sanitizedSubject,
         text,
         html,
       }),

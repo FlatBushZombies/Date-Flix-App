@@ -1,9 +1,18 @@
 import { PlannerState } from '@/types/planner';
+import { InputValidator } from '@/utils/inputValidation';
 
 export function buildMoviePlannerPrompt(state: PlannerState): string {
-  const streamingInfo = state.anyStreaming
+  // Validate and sanitize input
+  const validation = InputValidator.validatePlannerState(state);
+  if (!validation.isValid) {
+    throw new Error(`Invalid planner state: ${validation.errors.join(', ')}`);
+  }
+
+  const sanitizedState = InputValidator.sanitizePlannerState(state);
+
+  const streamingInfo = sanitizedState.anyStreaming
     ? 'any streaming platform'
-    : state.streaming.join(', ');
+    : sanitizedState.streaming.map(s => InputValidator.sanitizeString(s)).join(', ');
 
   const durLabel =
     state.duration === 'short'
@@ -17,13 +26,13 @@ export function buildMoviePlannerPrompt(state: PlannerState): string {
   return `You are a movie night curator for couples. Recommend 3 perfect movies based on their preferences.
 
 Preferences:
-- Genres: ${state.genres.join(', ')}
+- Genres: ${sanitizedState.genres.map(g => InputValidator.sanitizeString(g)).join(', ')}
 - Streaming services available: ${streamingInfo}
-- Vibe: ${state.vibe}
+- Vibe: ${sanitizedState.vibe ? InputValidator.sanitizeString(sanitizedState.vibe) : 'any'}
 - Duration: ${durLabel}
-- Era preference: ${state.era ?? 'no preference'}
-- Avoid: ${state.avoid.length ? state.avoid.join(', ') : 'nothing specific'}
-- Occasion: ${state.occasion}
+- Era preference: ${sanitizedState.era ? InputValidator.sanitizeString(sanitizedState.era) : 'no preference'}
+- Avoid: ${sanitizedState.avoid.length ? sanitizedState.avoid.map(a => InputValidator.sanitizeString(a)).join(', ') : 'nothing specific'}
+- Occasion: ${sanitizedState.occasion ? InputValidator.sanitizeString(sanitizedState.occasion) : 'any'}
 
 IMPORTANT: Only recommend movies actually available on the specified streaming services (${streamingInfo}). Each movie MUST have a streaming field that exactly matches one of: ${streamingInfo}.
 

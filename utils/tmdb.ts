@@ -1,4 +1,4 @@
-import type { Movie } from "@/types"
+import type { Movie, MovieDetails } from "@/types"
 
 const TMDB_API_KEY = process.env.EXPO_PUBLIC_TMDB_API_KEY
 const BASE_URL = "https://api.themoviedb.org/3"
@@ -55,9 +55,9 @@ export async function searchMovies(query: string): Promise<Movie[]> {
   }
 }
 
-export async function getMovieDetails(movieId: number): Promise<Movie> {
+export async function getMovieDetails(movieId: number): Promise<MovieDetails> {
   try {
-    const response = await fetch(`${BASE_URL}/movie/${movieId}?api_key=${TMDB_API_KEY}`)
+    const response = await fetch(`${BASE_URL}/movie/${movieId}?api_key=${TMDB_API_KEY}&append_to_response=credits,videos,images,recommendations,reviews`)
     const raw = await response.text()
 
     if (!raw) {
@@ -65,7 +65,7 @@ export async function getMovieDetails(movieId: number): Promise<Movie> {
     }
 
     try {
-      return JSON.parse(raw) as Movie
+      return JSON.parse(raw) as MovieDetails
     } catch (err) {
       console.error("Error parsing movie details JSON:", err, raw)
       throw err
@@ -73,6 +73,63 @@ export async function getMovieDetails(movieId: number): Promise<Movie> {
   } catch (error) {
     console.error("Error fetching movie details:", error)
     throw error
+  }
+}
+
+export async function getMovieCredits(movieId: number): Promise<any> {
+  try {
+    const response = await fetch(`${BASE_URL}/movie/${movieId}/credits?api_key=${TMDB_API_KEY}`)
+    const raw = await response.text()
+
+    if (!raw) return null
+
+    try {
+      return JSON.parse(raw)
+    } catch (err) {
+      console.error("Error parsing movie credits JSON:", err, raw)
+      return null
+    }
+  } catch (error) {
+    console.error("Error fetching movie credits:", error)
+    return null
+  }
+}
+
+export async function getMovieVideos(movieId: number): Promise<any> {
+  try {
+    const response = await fetch(`${BASE_URL}/movie/${movieId}/videos?api_key=${TMDB_API_KEY}`)
+    const raw = await response.text()
+
+    if (!raw) return null
+
+    try {
+      return JSON.parse(raw)
+    } catch (err) {
+      console.error("Error parsing movie videos JSON:", err, raw)
+      return null
+    }
+  } catch (error) {
+    console.error("Error fetching movie videos:", error)
+    return null
+  }
+}
+
+export async function getMovieImages(movieId: number): Promise<any> {
+  try {
+    const response = await fetch(`${BASE_URL}/movie/${movieId}/images?api_key=${TMDB_API_KEY}`)
+    const raw = await response.text()
+
+    if (!raw) return null
+
+    try {
+      return JSON.parse(raw)
+    } catch (err) {
+      console.error("Error parsing movie images JSON:", err, raw)
+      return null
+    }
+  } catch (error) {
+    console.error("Error fetching movie images:", error)
+    return null
   }
 }
 
