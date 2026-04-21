@@ -283,6 +283,14 @@ export default function SwipeScreen() {
             </LinearGradient>
           </TouchableOpacity>
 
+          {/* Map button */}
+          <TouchableOpacity
+            onPress={() => router.push("/map" as any)}
+            className="w-11 h-11 rounded-full bg-white justify-center items-center shadow shadow-black/10"
+          >
+            <Ionicons name="map-outline" size={22} color="#0f172a" />
+          </TouchableOpacity>
+
           {/* Bell / notifications */}
           <TouchableOpacity
             onPress={async () => {

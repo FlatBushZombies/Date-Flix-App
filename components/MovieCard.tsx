@@ -6,17 +6,17 @@ import { Ionicons } from "@expo/vector-icons"
 import * as Haptics from "expo-haptics"
 import { LinearGradient } from "expo-linear-gradient"
 import { useEffect, useState } from "react"
-import { Dimensions, Image, Text, TouchableOpacity, View } from "react-native"
+import { Dimensions, Image, ScrollView, Text, TouchableOpacity, View } from "react-native"
 import { Gesture, GestureDetector } from "react-native-gesture-handler"
 import Animated, {
-  Easing,
-  Extrapolate,
-  interpolate,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
+    Easing,
+    Extrapolate,
+    interpolate,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+    withTiming,
 } from "react-native-reanimated"
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window")
@@ -112,7 +112,7 @@ export function MovieCard({ movie, onSwipe, onSave, onShare, onTrailer }: MovieC
       ])
 
       if (creditsData?.cast) {
-        setCast(creditsData.cast.slice(0, 3)) // Top 3 cast members
+        setCast(creditsData.cast.slice(0, 5)) // Top cast members
       }
 
       if (videosData?.results) {
@@ -283,7 +283,7 @@ export function MovieCard({ movie, onSwipe, onSave, onShare, onTrailer }: MovieC
           cardStyle,
           {
             width: CARD_WIDTH,
-            height: isExpanded ? CARD_HEIGHT * 1.5 : CARD_HEIGHT,
+            height: CARD_HEIGHT,
             borderRadius: 28,
             backgroundColor: "#111111",
             shadowColor: "#000",
@@ -317,14 +317,18 @@ export function MovieCard({ movie, onSwipe, onSave, onShare, onTrailer }: MovieC
 
         {/* Top bar — close + more */}
         <View style={{ position: "absolute", top: 16, left: 16, right: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          <View style={{
+          <TouchableOpacity
+          onPress={() => isExpanded && setIsExpanded(false)}
+          activeOpacity={0.8}
+          style={{
             width: 36, height: 36, borderRadius: 18,
             backgroundColor: "rgba(255,255,255,0.15)",
             justifyContent: "center", alignItems: "center",
             borderWidth: 1, borderColor: "rgba(255,255,255,0.2)"
-          }}>
-            <Ionicons name="close" size={18} color="#fff" />
-          </View>
+          }}
+        >
+          <Ionicons name="close" size={18} color="#fff" />
+        </TouchableOpacity>
 
           {/* Quick Actions Row */}
           <View style={{ flexDirection: "row", gap: 8 }}>
@@ -397,7 +401,12 @@ export function MovieCard({ movie, onSwipe, onSave, onShare, onTrailer }: MovieC
         </Animated.View>
 
         {/* Bottom info panel */}
-        <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, paddingHorizontal: 22, paddingBottom: 24, paddingTop: 16 }}>
+        <ScrollView
+          style={{ position: "absolute", bottom: 0, left: 0, right: 0, maxHeight: CARD_HEIGHT * 0.75, paddingHorizontal: 22, paddingTop: 16 }}
+          contentContainerStyle={{ paddingBottom: 24 }}
+          showsVerticalScrollIndicator={false}
+          nestedScrollEnabled
+        >
 
           {/* Title + online dot */}
           <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10, gap: 8 }}>
@@ -560,7 +569,7 @@ export function MovieCard({ movie, onSwipe, onSave, onShare, onTrailer }: MovieC
               <Ionicons name="chatbubble-ellipses-outline" size={22} color="rgba(255,255,255,0.8)" />
             </View>
           </View>
-        </View>
+        </ScrollView>
       </Animated.View>
     </GestureDetector>
   )
