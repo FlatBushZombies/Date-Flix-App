@@ -50,9 +50,9 @@ export function Step5Occasion({
       <Text
         style={{
           fontSize: 24,
+          fontWeight: '700',
           color: '#F0EAE4',
           marginBottom: 8,
-          fontFamily: 'PlayfairDisplay_600SemiBold',
         }}
       >
         What's the occasion?

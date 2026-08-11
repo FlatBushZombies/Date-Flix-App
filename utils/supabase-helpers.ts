@@ -1,6 +1,16 @@
 import { supabase } from "@/lib/supabase"
-import type { AppNotification, Invitation, Movie, SupabaseMatch, SupabaseUser, SwipeSession } from "@/types"
+import type {
+  AppNotification,
+  Invitation,
+  Movie,
+  SessionStreak,
+  StreakEvaluation,
+  SupabaseMatch,
+  SupabaseUser,
+  SwipeSession,
+} from "@/types"
 import { getUserPushToken, sendPushNotification } from "@/utils/notifications"
+import { STREAK_MILESTONES, streakEventCopy } from "@/utils/streakCopy"
 
 // User Management
 export const syncUserWithSupabase = async (clerkUser: any) => {
@@ -73,7 +83,20 @@ export const saveSwipe = async (userId: string, movieId: number, liked: boolean,
     await checkForMatch(userId, movieId, movieData)
   }
 
-  return data
+  // Evaluate couple streaks for every active session this user is part of —
+  // a pass still counts as "showing up today", so this runs regardless of `liked`.
+  const streakEvaluations: { sessionId: string; evaluation: StreakEvaluation }[] = []
+  try {
+    const sessions = await getActiveSwipeSessions(userId)
+    for (const session of sessions) {
+      const evaluation = await refreshSessionStreak(session)
+      streakEvaluations.push({ sessionId: session.id, evaluation })
+    }
+  } catch (streakError) {
+    console.error("[v0] Error evaluating session streak:", streakError)
+  }
+
+  return { ...data, streakEvaluations }
 }
 
 // Match Detection
@@ -138,6 +161,8 @@ export const checkForMatch = async (userId: string, movieId: number, movieData: 
 }
 
 // Get User Matches
+// Returns null on fetch failure (distinct from a genuinely empty match list)
+// so callers can show a real error state instead of a false "no matches" one.
 export const getUserMatches = async (userId: string) => {
   const { data, error } = await supabase
     .from("matches")
@@ -151,7 +176,7 @@ export const getUserMatches = async (userId: string) => {
 
   if (error) {
     console.error("[v0] Error fetching matches:", error)
-    return []
+    return null
   }
 
   return data as (SupabaseMatch & { user1: SupabaseUser; user2: SupabaseUser })[]
@@ -251,6 +276,8 @@ export const acceptInvitation = async (inviteCode: string, userId: string) => {
 
 // ==================== NOTIFICATIONS ====================
 
+// Returns null on fetch failure (distinct from a genuinely empty inbox) so
+// the UI can show a real error state instead of a false "all caught up" one.
 export const getNotifications = async (userId: string, limit = 50) => {
   const { data, error } = await supabase
     .from("notifications")
@@ -261,7 +288,7 @@ export const getNotifications = async (userId: string, limit = 50) => {
 
   if (error) {
     console.error("[v0] Error fetching notifications:", error)
-    return []
+    return null
   }
 
   return data as AppNotification[]
@@ -404,9 +431,274 @@ export const deleteSwipeSession = async (sessionId: string) => {
   }
 }
 
+// ==================== STREAKS ====================
+// A streak tracks consecutive calendar days on which BOTH partners of a
+// swipe_session swiped (like or pass — showing up is what counts).
+
+const todayUTC = () => new Date().toISOString().slice(0, 10)
+
+const addDaysUTC = (dateStr: string, days: number) => {
+  const d = new Date(`${dateStr}T00:00:00.000Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+const hasSwipedOn = async (userId: string, dateStr: string) => {
+  const start = `${dateStr}T00:00:00.000Z`
+  const end = `${addDaysUTC(dateStr, 1)}T00:00:00.000Z`
+  const { count } = await supabase
+    .from("swipes")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .gte("created_at", start)
+    .lt("created_at", end)
+  return (count || 0) > 0
+}
+
+const getOrCreateSessionStreak = async (sessionId: string): Promise<SessionStreak> => {
+  const { data } = await supabase
+    .from("session_streaks")
+    .select("*")
+    .eq("session_id", sessionId)
+    .maybeSingle()
+
+  if (data) return data as SessionStreak
+
+  const { data: created, error } = await supabase
+    .from("session_streaks")
+    .insert({ session_id: sessionId })
+    .select()
+    .single()
+
+  if (error) {
+    // Row may have been created concurrently by the partner's client — re-read.
+    const { data: existing } = await supabase
+      .from("session_streaks")
+      .select("*")
+      .eq("session_id", sessionId)
+      .single()
+    return existing as SessionStreak
+  }
+
+  return created as SessionStreak
+}
+
+// Grants one free Streak Freeze per calendar month (caps at 1 — not stackable).
+// Runs before evaluation so a freeze is available the moment a new month starts,
+// even if the couple hasn't swiped yet.
+const applyMonthlyFreezeRefresh = async (streakRow: SessionStreak): Promise<SessionStreak> => {
+  const currentMonth = todayUTC().slice(0, 7)
+  const refreshedMonth = streakRow.freeze_refreshed_at?.slice(0, 7)
+  if (refreshedMonth === currentMonth) return streakRow
+
+  const { data } = await supabase
+    .from("session_streaks")
+    .update({
+      freeze_available: 1,
+      freeze_refreshed_at: todayUTC(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", streakRow.id)
+    .select()
+    .single()
+
+  return (data as SessionStreak | null) ?? { ...streakRow, freeze_available: 1, freeze_refreshed_at: todayUTC() }
+}
+
+// Client-computed, best-effort — same tradeoff as checkForMatch. A rare
+// double-fire from near-simultaneous swipes just means a duplicate
+// notification, not a correctness bug (only two users share a session).
+export const evaluateSessionStreak = async (
+  sessionId: string,
+  user1Id: string,
+  user2Id: string,
+): Promise<StreakEvaluation> => {
+  let streakRow = await getOrCreateSessionStreak(sessionId)
+  streakRow = await applyMonthlyFreezeRefresh(streakRow)
+  const today = todayUTC()
+  const yesterday = addDaysUTC(today, -1)
+
+  const [user1SwipedToday, user2SwipedToday] = await Promise.all([
+    hasSwipedOn(user1Id, today),
+    hasSwipedOn(user2Id, today),
+  ])
+
+  const bothActiveToday = user1SwipedToday && user2SwipedToday
+
+  if (bothActiveToday) {
+    if (streakRow.last_both_active_date === today) {
+      return {
+        currentStreak: streakRow.current_streak,
+        longestStreak: streakRow.longest_streak,
+        event: "none",
+        freezeAvailable: streakRow.freeze_available,
+        user1SwipedToday,
+        user2SwipedToday,
+      }
+    }
+
+    const newStreak = streakRow.last_both_active_date === yesterday ? streakRow.current_streak + 1 : 1
+    const newLongest = Math.max(streakRow.longest_streak, newStreak)
+
+    await supabase
+      .from("session_streaks")
+      .update({
+        current_streak: newStreak,
+        longest_streak: newLongest,
+        last_both_active_date: today,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", streakRow.id)
+
+    return {
+      currentStreak: newStreak,
+      longestStreak: newLongest,
+      event: (STREAK_MILESTONES as readonly number[]).includes(newStreak) ? "milestone" : "increment",
+      freezeAvailable: streakRow.freeze_available,
+      user1SwipedToday,
+      user2SwipedToday,
+    }
+  }
+
+  if (
+    streakRow.last_both_active_date &&
+    streakRow.last_both_active_date < yesterday &&
+    streakRow.current_streak > 0
+  ) {
+    // A free Streak Freeze covers the missed day instead of resetting to 0.
+    if (streakRow.freeze_available > 0) {
+      const { data } = await supabase
+        .from("session_streaks")
+        .update({
+          freeze_available: streakRow.freeze_available - 1,
+          last_both_active_date: yesterday,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", streakRow.id)
+        .select()
+        .single()
+
+      return {
+        currentStreak: streakRow.current_streak,
+        longestStreak: streakRow.longest_streak,
+        event: "frozen",
+        freezeAvailable: (data as SessionStreak | null)?.freeze_available ?? streakRow.freeze_available - 1,
+        user1SwipedToday,
+        user2SwipedToday,
+      }
+    }
+
+    const previousStreak = streakRow.current_streak
+    await supabase
+      .from("session_streaks")
+      .update({ current_streak: 0, updated_at: new Date().toISOString() })
+      .eq("id", streakRow.id)
+
+    return {
+      currentStreak: 0,
+      longestStreak: streakRow.longest_streak,
+      event: "broken",
+      previousStreak,
+      freezeAvailable: streakRow.freeze_available,
+      user1SwipedToday,
+      user2SwipedToday,
+    }
+  }
+
+  return {
+    currentStreak: streakRow.current_streak,
+    longestStreak: streakRow.longest_streak,
+    event: "none",
+    freezeAvailable: streakRow.freeze_available,
+    user1SwipedToday,
+    user2SwipedToday,
+  }
+}
+
+// Last N days of shared activity for a session, oldest first — powers the streak modal's day strip.
+export const getSessionActivityStrip = async (
+  user1Id: string,
+  user2Id: string,
+  days = 7,
+): Promise<{ date: string; bothActive: boolean }[]> => {
+  const today = todayUTC()
+  const dates = Array.from({ length: days }, (_, i) => addDaysUTC(today, -(days - 1 - i)))
+
+  return Promise.all(
+    dates.map(async (date) => {
+      const [a, b] = await Promise.all([hasSwipedOn(user1Id, date), hasSwipedOn(user2Id, date)])
+      return { date, bothActive: a && b }
+    }),
+  )
+}
+
+export const getSessionStreak = async (sessionId: string): Promise<SessionStreak | null> => {
+  const { data, error } = await supabase
+    .from("session_streaks")
+    .select("*")
+    .eq("session_id", sessionId)
+    .maybeSingle()
+
+  if (error) {
+    console.error("[v0] Error fetching session streak:", error)
+    return null
+  }
+  return data as SessionStreak | null
+}
+
+const notifyStreakEvent = async (
+  session: SwipeSession & { user1: SupabaseUser; user2: SupabaseUser },
+  evaluation: StreakEvaluation,
+) => {
+  if (evaluation.event === "none") return
+
+  const day = evaluation.event === "broken" ? evaluation.previousStreak ?? 0 : evaluation.currentStreak
+  const notificationType =
+    evaluation.event === "broken"
+      ? "streak_lost"
+      : evaluation.event === "frozen"
+        ? "streak_frozen"
+        : evaluation.event === "milestone"
+          ? "streak_milestone"
+          : "streak_increment"
+
+  const user1Name = session.user1.first_name || session.user1.username || "your partner"
+  const user2Name = session.user2.first_name || session.user2.username || "your partner"
+
+  const copyForUser1 = streakEventCopy(evaluation.event, day, user2Name)
+  const copyForUser2 = streakEventCopy(evaluation.event, day, user1Name)
+
+  await Promise.allSettled([
+    createNotification(session.user1_id, {
+      type: notificationType,
+      title: copyForUser1.title,
+      body: copyForUser1.body,
+      data: { sessionId: session.id, streak: day },
+    }),
+    createNotification(session.user2_id, {
+      type: notificationType,
+      title: copyForUser2.title,
+      body: copyForUser2.body,
+      data: { sessionId: session.id, streak: day },
+    }),
+  ])
+}
+
+// Evaluate + notify in one call — used both right after a swipe (via saveSwipe)
+// and opportunistically on app open, so an overnight-broken streak is still caught.
+export const refreshSessionStreak = async (
+  session: SwipeSession & { user1: SupabaseUser; user2: SupabaseUser },
+): Promise<StreakEvaluation> => {
+  const evaluation = await evaluateSessionStreak(session.id, session.user1_id, session.user2_id)
+  if (evaluation.event !== "none") {
+    await notifyStreakEvent(session, evaluation)
+  }
+  return evaluation
+}
+
 // Get User Stats
 export const getUserStats = async (userId: string) => {
-  const [swipesResult, matchesResult, sessionsResult] = await Promise.all([
+  const [swipesResult, matchesResult, sessionsResult, activeSessions] = await Promise.all([
     supabase.from("swipes").select("*", { count: "exact", head: true }).eq("user_id", userId),
     supabase
       .from("matches")
@@ -417,12 +709,19 @@ export const getUserStats = async (userId: string) => {
       .select("*", { count: "exact", head: true })
       .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
       .eq("is_active", true),
+    getActiveSwipeSessions(userId),
   ])
+
+  const streaks = await Promise.all(activeSessions.map((s) => getSessionStreak(s.id)))
+  const currentStreak = streaks.reduce((max, s) => Math.max(max, s?.current_streak ?? 0), 0)
+  const longestStreak = streaks.reduce((max, s) => Math.max(max, s?.longest_streak ?? 0), 0)
 
   return {
     totalSwipes: swipesResult.count || 0,
     totalMatches: matchesResult.count || 0,
     activeSessions: sessionsResult.count || 0,
+    currentStreak,
+    longestStreak,
   }
 }
 
@@ -685,6 +984,47 @@ export const saveDebateVerdict = async (sessionId: string, verdict: AIVerdict) =
   }
 
   return data as DebateSession
+}
+
+// ==================== AI USAGE (visible monthly counter, no cap enforced) ====================
+
+const currentMonthKey = () => new Date().toISOString().slice(0, 7) // "YYYY-MM"
+
+// Read-only: resolves the display count without writing, so opening the debate
+// screen never generates a write. A stale stored month just reads as 0.
+export const getAiSettlementUsage = async (userId: string): Promise<number> => {
+  const { data, error } = await supabase
+    .from("users")
+    .select("monthly_ai_settlements, ai_usage_month")
+    .eq("id", userId)
+    .single()
+
+  if (error || !data) return 0
+  return data.ai_usage_month === currentMonthKey() ? data.monthly_ai_settlements ?? 0 : 0
+}
+
+// Call once per successful AI debate settlement. Resets the counter on a new month.
+export const incrementAiSettlementUsage = async (userId: string): Promise<number> => {
+  const month = currentMonthKey()
+  const { data: user } = await supabase
+    .from("users")
+    .select("monthly_ai_settlements, ai_usage_month")
+    .eq("id", userId)
+    .single()
+
+  const nextCount = user?.ai_usage_month === month ? (user.monthly_ai_settlements ?? 0) + 1 : 1
+
+  const { error } = await supabase
+    .from("users")
+    .update({ monthly_ai_settlements: nextCount, ai_usage_month: month })
+    .eq("id", userId)
+
+  if (error) {
+    console.error("[v0] Error incrementing AI usage:", error)
+    return user?.ai_usage_month === month ? user.monthly_ai_settlements ?? 0 : 0
+  }
+
+  return nextCount
 }
 
 // ==================== ACCOUNT DELETION ====================

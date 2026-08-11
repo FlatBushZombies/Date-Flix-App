@@ -12,19 +12,27 @@ export function useNotifications(userId?: string) {
   const [items, setItems] = useState<AppNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(false)
 
   const channelName = useMemo(() => (userId ? `notifications:${userId}` : null), [userId])
 
   const refresh = async () => {
     if (!userId) return
     setLoading(true)
+    setError(false)
     try {
       const [list, count] = await Promise.all([
         getNotifications(userId),
         getUnreadNotificationCount(userId),
       ])
-      setItems(list)
-      setUnreadCount(count)
+      if (list === null) {
+        setError(true)
+      } else {
+        setItems(list)
+        setUnreadCount(count)
+      }
+    } catch {
+      setError(true)
     } finally {
       setLoading(false)
     }
@@ -94,6 +102,6 @@ export function useNotifications(userId?: string) {
     return ok
   }
 
-  return { items, unreadCount, loading, refresh, markAllRead, markRead }
+  return { items, unreadCount, loading, error, refresh, markAllRead, markRead }
 }
 

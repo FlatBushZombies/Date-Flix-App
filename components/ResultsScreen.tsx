@@ -28,8 +28,7 @@ export function ResultsScreen({ plan, prompt, onReset }: ResultsScreenProps) {
           </Text>
         </View>
         <Text
-          className="text-2xl text-text-primary text-center mb-3"
-          style={{ fontFamily: 'PlayfairDisplay_600SemiBold' }}
+          className="text-2xl font-bold text-text-primary text-center mb-3"
         >
           Your movie night is ready
         </Text>

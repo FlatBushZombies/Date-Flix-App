@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Animated, Text, TouchableOpacity } from 'react-native';
 
@@ -23,6 +24,9 @@ export function VibeChip({ label, emoji, selected, onPress }: VibeChipProps) {
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
       className={`rounded-xl py-3 px-2 items-center border relative ${
         selected
           ? 'bg-primary/10 border-primary'
@@ -43,7 +47,7 @@ export function VibeChip({ label, emoji, selected, onPress }: VibeChipProps) {
           justifyContent: 'center',
         }}
       >
-        <Text style={{ color: 'white', fontSize: 10 }}>✓</Text>
+        <Check size={11} color="white" strokeWidth={3} />
       </Animated.View>
       <Text className="text-xl mb-1">{emoji}</Text>
       <Text

@@ -1,3 +1,16 @@
+import {
+  AppleTVIcon,
+  DisneyPlusIcon,
+  HuluIcon,
+  MaxIcon,
+  monogramIcon,
+  NetflixIcon,
+  ParamountIcon,
+  PeacockIcon,
+  PrimeVideoIcon,
+  type StreamingIconProps,
+} from '@/components/icons/StreamingLogos';
+import type { ComponentType } from 'react';
 import { StreamingPlatform } from '../types/planner';
 
 export interface StreamingConfig {
@@ -5,6 +18,7 @@ export interface StreamingConfig {
   color: string;
   bgColor: string;
   icon: string;
+  IconComponent: ComponentType<StreamingIconProps>;
   subtitle: string;
   searchUrl: string;
 }
@@ -15,6 +29,7 @@ export const STREAMING_PLATFORMS: StreamingConfig[] = [
     color: '#E50914',
     bgColor: '#1a0505',
     icon: '🎬',
+    IconComponent: NetflixIcon,
     subtitle: 'Movies & Series',
     searchUrl: 'https://www.netflix.com/search?q=',
   },
@@ -23,6 +38,7 @@ export const STREAMING_PLATFORMS: StreamingConfig[] = [
     color: '#1133b4',
     bgColor: '#05091a',
     icon: '✨',
+    IconComponent: DisneyPlusIcon,
     subtitle: 'Marvel, Star Wars',
     searchUrl: 'https://www.disneyplus.com/search/',
   },
@@ -31,6 +47,7 @@ export const STREAMING_PLATFORMS: StreamingConfig[] = [
     color: '#00A8E1',
     bgColor: '#00111a',
     icon: '📦',
+    IconComponent: PrimeVideoIcon,
     subtitle: 'Amazon Originals',
     searchUrl: 'https://www.amazon.com/s?k=',
   },
@@ -39,6 +56,7 @@ export const STREAMING_PLATFORMS: StreamingConfig[] = [
     color: '#888888',
     bgColor: '#111111',
     icon: '🍎',
+    IconComponent: AppleTVIcon,
     subtitle: 'Award winners',
     searchUrl: 'https://tv.apple.com/search?term=',
   },
@@ -47,6 +65,7 @@ export const STREAMING_PLATFORMS: StreamingConfig[] = [
     color: '#5822C0',
     bgColor: '#100520',
     icon: '👑',
+    IconComponent: MaxIcon,
     subtitle: 'HBO Originals',
     searchUrl: 'https://www.max.com/search?q=',
   },
@@ -55,14 +74,25 @@ export const STREAMING_PLATFORMS: StreamingConfig[] = [
     color: '#1CE783',
     bgColor: '#021a0e',
     icon: '📺',
+    IconComponent: HuluIcon,
     subtitle: 'Next-day TV',
     searchUrl: 'https://www.hulu.com/search?q=',
+  },
+  {
+    name: 'Peacock',
+    color: '#000000',
+    bgColor: '#0a0a0a',
+    icon: '🦚',
+    IconComponent: PeacockIcon,
+    subtitle: 'NBC, Bravo',
+    searchUrl: 'https://www.peacocktv.com/search?q=',
   },
   {
     name: 'Paramount+',
     color: '#0064FF',
     bgColor: '#00051a',
     icon: '⭐',
+    IconComponent: ParamountIcon,
     subtitle: 'CBS, MTV, BET',
     searchUrl: 'https://www.paramountplus.com/search/',
   },
@@ -71,6 +101,7 @@ export const STREAMING_PLATFORMS: StreamingConfig[] = [
     color: '#FF6B35',
     bgColor: '#1a0a05',
     icon: '🎨',
+    IconComponent: monogramIcon('M'),
     subtitle: 'Arthouse & indie',
     searchUrl: 'https://mubi.com/search/',
   },

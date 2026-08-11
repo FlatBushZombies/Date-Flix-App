@@ -1,0 +1,77 @@
+// Shared design tokens — the single source of truth for color, spacing, radius,
+// type scale, and animation duration across the app.
+//
+// Two screens intentionally keep their own scoped palettes rather than pulling
+// from this file: debate.tsx's pink+violet romantic theme (the pink is sourced
+// from `color.accentPink` below to stay in sync; violet is its own token,
+// scoped to that screen) and map.tsx's dark space palette (its own file-local
+// constants — a deliberately distinct "genre journey" visual language).
+
+export const color = {
+  // Brand — Netflix red family (login, tabs, home, match brand touches)
+  brand: "#E50914",
+  brandLight: "#FF3B47",
+
+  // Secondary accent — pink, the most cross-screen-consistent non-red accent
+  // (home, match, notifications, debate all converge on this independently)
+  accentPink: "#ec4899",
+
+  // Semantic — established by the Toast/Confirm system, reused everywhere
+  success: "#10b981",
+  error: "#f43f5e",
+  info: "#06b6d4",
+  warning: "#f59e0b",
+
+  // Neutrals — light surfaces (home, match, profile, notifications, debate)
+  textPrimary: "#111827",
+  textSecondary: "#6b7280",
+  textTertiary: "#9ca3af",
+  border: "#e5e7eb",
+  surface: "#f9fafb",
+  surfaceHigh: "#f3f4f6",
+  bg: "#ffffff",
+
+  // Dark-glass surface — Toast/Confirm sheets, reusable for any future dark modal
+  surfaceDark: "#0f172a",
+  surfaceDarkBorder: "rgba(255,255,255,0.08)",
+} as const
+
+export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  "2xl": 24,
+  "3xl": 32,
+  "4xl": 48,
+  "5xl": 64,
+} as const
+
+export const radius = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  "2xl": 24,
+  "3xl": 28,
+  full: 9999,
+} as const
+
+export const fontSize = {
+  xs: 11,
+  sm: 12,
+  base: 14,
+  md: 16,
+  lg: 18,
+  xl: 20,
+  "2xl": 24,
+  "3xl": 28,
+  "4xl": 32,
+} as const
+
+export const duration = {
+  fast: 150,
+  base: 250,
+  slow: 400,
+} as const

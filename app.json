@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "DateFlix",
-    "slug": "date_flix_app",
+    "name": "Duo",
+    "slug": "duo_app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/duo-icon.png",
-    "scheme": "dateflixapp",
+    "scheme": "duoapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -52,17 +52,18 @@
     "experiments": {
       "typedRoutes": true
     },
-    "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "d376f6e8-570a-473e-975b-79bd5fbd41a5"
-      }
-    },
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/d376f6e8-570a-473e-975b-79bd5fbd41a5"
-    }
+      "url": "https://u.expo.dev/ddf44c2c-fb6b-4cd4-b2e5-bb17b7b74bfb"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ddf44c2c-fb6b-4cd4-b2e5-bb17b7b74bfb"
+      }
+    },
+    "owner": "noirsfera"
   }
 }

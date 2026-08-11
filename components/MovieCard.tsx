@@ -128,6 +128,19 @@ export function MovieCard({ movie, onSwipe, onSave, onShare, onTrailer }: MovieC
     }
   }
 
+  // Mirrors the gesture's fly-off animation so tapping the Pass/Like buttons
+  // looks the same as dragging the card off-screen.
+  const triggerSwipe = (direction: "left" | "right") => {
+    if (isSwiped.value || isExpanded) return
+    isSwiped.value = true
+    const targetX = direction === "right" ? SCREEN_WIDTH * 1.4 : -SCREEN_WIDTH * 1.4
+    translateX.value = withSpring(targetX, { damping: 35, stiffness: 150, mass: 0.8 })
+    translateY.value = withSpring(translateY.value, { damping: 35, stiffness: 140 })
+    scale.value = withTiming(0.95, { duration: 180, easing: Easing.in(Easing.quad) })
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    onSwipe && onSwipe(direction)
+  }
+
   const handleCardPress = async () => {
     if (isTapDisabled) return
 
@@ -176,6 +189,7 @@ export function MovieCard({ movie, onSwipe, onSave, onShare, onTrailer }: MovieC
         })
         scale.value = withTiming(0.95, { duration: 180, easing: Easing.in(Easing.quad) })
 
+        runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium)
         onSwipe && runOnJS(onSwipe)(direction)
       } else {
         translateX.value = withSpring(0, { damping: 25, stiffness: 280, mass: 0.7 })
@@ -320,6 +334,9 @@ export function MovieCard({ movie, onSwipe, onSave, onShare, onTrailer }: MovieC
           <TouchableOpacity
           onPress={() => isExpanded && setIsExpanded(false)}
           activeOpacity={0.8}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Close details"
           style={{
             width: 36, height: 36, borderRadius: 18,
             backgroundColor: "rgba(255,255,255,0.15)",
@@ -334,6 +351,9 @@ export function MovieCard({ movie, onSwipe, onSave, onShare, onTrailer }: MovieC
           <View style={{ flexDirection: "row", gap: 8 }}>
             <TouchableOpacity
               onPress={() => onSave && onSave(movie)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Save to watchlist"
               style={{
                 width: 32, height: 32, borderRadius: 16,
                 backgroundColor: "rgba(255,255,255,0.15)",
@@ -346,6 +366,9 @@ export function MovieCard({ movie, onSwipe, onSave, onShare, onTrailer }: MovieC
 
             <TouchableOpacity
               onPress={() => onShare && onShare(movie)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Share movie"
               style={{
                 width: 32, height: 32, borderRadius: 16,
                 backgroundColor: "rgba(255,255,255,0.15)",
@@ -359,6 +382,9 @@ export function MovieCard({ movie, onSwipe, onSave, onShare, onTrailer }: MovieC
             {isExpanded && !isLoadingDetails && videos.length > 0 && (
               <TouchableOpacity
                 onPress={() => onTrailer && onTrailer(movie)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Watch trailer"
                 style={{
                   width: 32, height: 32, borderRadius: 16,
                   backgroundColor: "rgba(255,255,255,0.15)",
@@ -533,41 +559,56 @@ export function MovieCard({ movie, onSwipe, onSave, onShare, onTrailer }: MovieC
 
             {/* Pass button */}
             <Animated.View style={passButtonStyle}>
-              <View style={{
+              <TouchableOpacity
+                onPress={() => triggerSwipe("left")}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Pass on this movie"
+                style={{
+                  width: 58, height: 58, borderRadius: 29,
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                  borderWidth: 1, borderColor: "rgba(255,255,255,0.2)",
+                  justifyContent: "center", alignItems: "center",
+                }}>
+                <Ionicons name="close" size={26} color="#ff4d6d" />
+              </TouchableOpacity>
+            </Animated.View>
+
+            {/* Like button — gold/yellow gradient (matching $ button from image) */}
+            <Animated.View style={likeButtonStyle}>
+              <TouchableOpacity
+                onPress={() => triggerSwipe("right")}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Like this movie"
+                style={{
+                  width: 70, height: 70, borderRadius: 35,
+                  backgroundColor: "#E8C547",
+                  justifyContent: "center", alignItems: "center",
+                  shadowColor: "#E8C547",
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.55,
+                  shadowRadius: 18,
+                  elevation: 12,
+                }}>
+                <Ionicons name="heart" size={32} color="#111111" />
+              </TouchableOpacity>
+            </Animated.View>
+
+            {/* Chat / info button — opens the same detail view as tapping the card */}
+            <TouchableOpacity
+              onPress={handleCardPress}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="View movie details"
+              style={{
                 width: 58, height: 58, borderRadius: 29,
                 backgroundColor: "rgba(255,255,255,0.1)",
                 borderWidth: 1, borderColor: "rgba(255,255,255,0.2)",
                 justifyContent: "center", alignItems: "center",
               }}>
-                <Ionicons name="close" size={26} color="#ff4d6d" />
-              </View>
-            </Animated.View>
-
-            {/* Like button — gold/yellow gradient (matching $ button from image) */}
-            <Animated.View style={likeButtonStyle}>
-              <View style={{
-                width: 70, height: 70, borderRadius: 35,
-                backgroundColor: "#E8C547",
-                justifyContent: "center", alignItems: "center",
-                shadowColor: "#E8C547",
-                shadowOffset: { width: 0, height: 6 },
-                shadowOpacity: 0.55,
-                shadowRadius: 18,
-                elevation: 12,
-              }}>
-                <Ionicons name="heart" size={32} color="#111111" />
-              </View>
-            </Animated.View>
-
-            {/* Chat / info button */}
-            <View style={{
-              width: 58, height: 58, borderRadius: 29,
-              backgroundColor: "rgba(255,255,255,0.1)",
-              borderWidth: 1, borderColor: "rgba(255,255,255,0.2)",
-              justifyContent: "center", alignItems: "center",
-            }}>
               <Ionicons name="chatbubble-ellipses-outline" size={22} color="rgba(255,255,255,0.8)" />
-            </View>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </Animated.View>

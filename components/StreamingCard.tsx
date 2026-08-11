@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Animated, Text, TouchableOpacity, View } from 'react-native';
 import { StreamingConfig } from '../lib/streaming';
@@ -23,6 +24,9 @@ export function StreamingCard({ config, selected, onPress }: StreamingCardProps)
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={config.name}
+      accessibilityState={{ selected }}
       className="rounded-2xl p-4 flex-row items-center border relative"
       style={{
         backgroundColor: selected ? '#1a1528' : '#151520',
@@ -43,14 +47,14 @@ export function StreamingCard({ config, selected, onPress }: StreamingCardProps)
           justifyContent: 'center',
         }}
       >
-        <Text style={{ color: 'white', fontSize: 12 }}>✓</Text>
+        <Check size={12} color="white" strokeWidth={3} />
       </Animated.View>
       {/* Icon */}
       <View
         className="w-9 h-9 rounded-lg items-center justify-center mr-3"
         style={{ backgroundColor: config.bgColor }}
       >
-        <Text className="text-lg">{config.icon}</Text>
+        <config.IconComponent size={20} />
       </View>
 
       {/* Labels */}

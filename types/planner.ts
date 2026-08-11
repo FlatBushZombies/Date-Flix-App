@@ -43,6 +43,7 @@ export type StreamingPlatform =
   | 'Apple TV+'
   | 'Max'
   | 'Hulu'
+  | 'Peacock'
   | 'Paramount+'
   | 'Mubi';
 

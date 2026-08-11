@@ -7,17 +7,17 @@ import {
   TextInput,
   ScrollView,
   Dimensions,
-  Alert,
   ActivityIndicator,
   Modal,
   Image,
   KeyboardAvoidingView,
   Platform,
 } from "react-native"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useUser } from "@clerk/clerk-expo"
-import { Ionicons } from "@expo/vector-icons"
 import { LinearGradient } from "expo-linear-gradient"
+import * as Sharing from "expo-sharing"
+import { captureRef } from "react-native-view-shot"
 import Animated, {
   FadeInDown,
   FadeIn,
@@ -29,6 +29,29 @@ import Animated, {
   Easing,
 } from "react-native-reanimated"
 import {
+  HeartIcon,
+  FilmIcon,
+  EnvelopeIcon,
+  TicketIcon,
+  ArrowLeftIcon,
+  XMarkIcon,
+  CheckCircleIcon,
+  PlayCircleIcon,
+  SparklesIcon,
+  ClockIcon,
+  KeyIcon,
+  ArrowPathIcon,
+  PaperAirplaneIcon,
+  CheckIcon,
+  ArrowRightEndOnRectangleIcon,
+} from "react-native-heroicons/solid"
+import {
+  HeartIcon as HeartOutlineIcon,
+  EnvelopeIcon as EnvelopeOutlineIcon,
+  SparklesIcon as SparklesOutlineIcon,
+  ShareIcon,
+} from "react-native-heroicons/outline"
+import {
   createDebateSession,
   sendDebateInviteEmail,
   joinDebateSession,
@@ -36,15 +59,130 @@ import {
   getDebateSessionByCode,
   saveDebateVerdict,
   syncUserWithSupabase,
+  getAiSettlementUsage,
+  incrementAiSettlementUsage,
 } from "@/utils/supabase-helpers"
 import { settleDebateWithAI as callAI, isAIConfigured } from "@/utils/ai-service"
 import type { DebateSession } from "@/types"
+import { useToast } from "@/components/Toast/ToastProvider"
+import { useConfirm } from "@/components/Confirm/ConfirmProvider"
+import { CARD_HEIGHT, CARD_WIDTH, CompatibilityCard } from "@/components/CompatibilityCard"
 
 const { height } = Dimensions.get("window")
 
-// ─── Shared sub-components ──────────────────────────────────────────────────
+// ─── Premium Avatar with double gradient ring ────────────────────────────────
+// Layers (inside → out):  avatar  →  white gap  →  gradient ring  →  soft glow
 
-/** Reusable screen header with back button */
+function PremiumAvatar({
+  imageUrl,
+  initials,
+  size = 68,
+  gradientColors,
+  ringColors,
+  statusColor,
+}: {
+  imageUrl?: string | null
+  initials?: string
+  size?: number
+  gradientColors: [string, string]
+  ringColors: [string, string, string]
+  statusColor?: string
+}) {
+  const whiteRing = size + 4    // 2 px white gap on each side
+  const gradientRing = size + 10 // 3 px gradient ring on each side
+  const glowRing = gradientRing + 8
+
+  return (
+    <View style={{ width: glowRing, height: glowRing, alignItems: "center", justifyContent: "center" }}>
+      {/* Soft ambient glow */}
+      <LinearGradient
+        colors={[ringColors[0] + "45", ringColors[2] + "10"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          position: "absolute",
+          width: glowRing,
+          height: glowRing,
+          borderRadius: glowRing / 2,
+        }}
+      />
+
+      {/* Gradient ring */}
+      <LinearGradient
+        colors={ringColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          width: gradientRing,
+          height: gradientRing,
+          borderRadius: gradientRing / 2,
+          alignItems: "center",
+          justifyContent: "center",
+          shadowColor: ringColors[1],
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.5,
+          shadowRadius: 8,
+          elevation: 8,
+        }}
+      >
+        {/* White separator gap */}
+        <View
+          style={{
+            width: whiteRing,
+            height: whiteRing,
+            borderRadius: whiteRing / 2,
+            backgroundColor: "#fff9fb",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {/* Avatar circle */}
+          <View
+            style={{
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+              overflow: "hidden",
+            }}
+          >
+            {imageUrl ? (
+              <Image source={{ uri: imageUrl }} style={{ width: "100%", height: "100%" }} />
+            ) : (
+              <LinearGradient
+                colors={gradientColors}
+                style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+              >
+                <Text style={{ fontSize: size * 0.36, fontWeight: "800", color: "#fff" }}>
+                  {initials || "?"}
+                </Text>
+              </LinearGradient>
+            )}
+          </View>
+        </View>
+      </LinearGradient>
+
+      {/* Online / ready status dot */}
+      {statusColor && (
+        <View
+          style={{
+            position: "absolute",
+            bottom: 5,
+            right: 5,
+            width: 14,
+            height: 14,
+            borderRadius: 7,
+            backgroundColor: statusColor,
+            borderWidth: 2.5,
+            borderColor: "#fff9fb",
+          }}
+        />
+      )}
+    </View>
+  )
+}
+
+// ─── Shared sub-components ────────────────────────────────────────────────────
+
 function ScreenHeader({
   onBack,
   title,
@@ -60,8 +198,11 @@ function ScreenHeader({
         className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center"
         onPress={onBack}
         activeOpacity={0.7}
+        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
       >
-        <Ionicons name="arrow-back" size={20} color="#374151" />
+        <ArrowLeftIcon size={18} color="#374151" />
       </TouchableOpacity>
       <Text className="text-[17px] font-bold text-[#1a0a0f] tracking-tight">{title}</Text>
       {right ?? <View className="w-10" />}
@@ -69,7 +210,6 @@ function ScreenHeader({
   )
 }
 
-/** Pink-gradient primary CTA button */
 function PrimaryButton({
   onPress,
   disabled,
@@ -120,10 +260,12 @@ function PrimaryButton({
   )
 }
 
-// ─── Main screen ─────────────────────────────────────────────────────────────
+// ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function DebateSettlerScreen() {
   const { user } = useUser()
+  const toast = useToast()
+  const confirm = useConfirm()
 
   const [activeSession, setActiveSession] = useState<DebateSession | null>(null)
   const [joinCode, setJoinCode] = useState("")
@@ -133,6 +275,9 @@ export default function DebateSettlerScreen() {
   const [myPreferences, setMyPreferences] = useState("")
   const [isSettling, setIsSettling] = useState(false)
   const [showVerdictModal, setShowVerdictModal] = useState(false)
+  const [isSharingCard, setIsSharingCard] = useState(false)
+  const [aiSettlementsThisMonth, setAiSettlementsThisMonth] = useState(0)
+  const compatibilityCardRef = useRef<View>(null)
 
   // Animations
   const heartScale = useSharedValue(1)
@@ -162,22 +307,23 @@ export default function DebateSettlerScreen() {
 
   useEffect(() => {
     if (user) syncUserWithSupabase(user)
+    if (user) getAiSettlementUsage(user.id).then(setAiSettlementsThisMonth)
   }, [user])
 
   const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }))
   const floatStyle = useAnimatedStyle(() => ({ transform: [{ translateY: floatY.value }] }))
   const pulseStyle = useAnimatedStyle(() => ({ opacity: pulseOpacity.value }))
 
-  // ── Handlers ────────────────────────────────────────────────────────────────
+  // ── Handlers ──────────────────────────────────────────────────────────────────
 
   const handleCreateSession = async () => {
     if (!user || !partnerEmail.trim()) {
-      Alert.alert("Email Required", "Please enter your partner's email address")
+      toast.error("Email Required", "Please enter your partner's email address")
       return
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(partnerEmail)) {
-      Alert.alert("Invalid Email", "Please enter a valid email address")
+      toast.error("Invalid Email", "Please enter a valid email address")
       return
     }
     setIsLoading(true)
@@ -192,7 +338,7 @@ export default function DebateSettlerScreen() {
         setActiveSession(session)
         setCurrentView("session")
         if (inviteResult.sent) {
-          Alert.alert(
+          toast.success(
             "Invite Sent!",
             `We've sent an invite to ${partnerEmail}. They'll receive a code to join your debate.`
           )
@@ -200,22 +346,23 @@ export default function DebateSettlerScreen() {
           const extraMessage =
             inviteResult.reason === "domain_verification_required" ||
             inviteResult.reason === "from_domain_not_verified"
-              ? "\n\nEmail sending is still in Resend test mode. Verify a sending domain and set INVITE_FROM_EMAIL in your Supabase Edge Function secrets to send to real recipients."
+              ? " Email sending is still in Resend test mode. Verify a sending domain and set INVITE_FROM_EMAIL in your Supabase Edge Function secrets to send to real recipients."
               : inviteResult.reason === "missing_provider_config"
-              ? "\n\nEmail sending is not configured on the server yet."
+              ? " Email sending is not configured on the server yet."
               : ""
-          Alert.alert(
-            "Session Created!",
-            `Share this code with your partner: ${session.code}\n\nThey can enter it in the app to join your debate.${extraMessage}`,
-            [
-              { text: "Copy Code", onPress: () => copyToClipboard(session.code) },
-              { text: "OK" },
-            ]
-          )
+          confirm.show({
+            title: "Session Created!",
+            message: `Share this code with your partner: ${session.code}. They can enter it in the app to join your debate.${extraMessage}`,
+            variant: "default",
+            buttons: [
+              { label: "Copy Code", style: "primary", onPress: () => copyToClipboard(session.code) },
+              { label: "OK", style: "cancel" },
+            ],
+          })
         }
       }
     } catch {
-      Alert.alert("Error", "Failed to create session. Please try again.")
+      toast.error("Error", "Failed to create session. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -225,15 +372,15 @@ export default function DebateSettlerScreen() {
     try {
       const Clipboard = await import("expo-clipboard")
       await Clipboard.setStringAsync(code)
-      Alert.alert("Copied!", "Code copied to clipboard")
+      toast.success("Copied!", "Code copied to clipboard")
     } catch {
-      Alert.alert("Code", code)
+      confirm.show({ title: "Your Code", message: code, variant: "default" })
     }
   }
 
   const handleJoinSession = async () => {
     if (!user || !joinCode.trim()) {
-      Alert.alert("Code Required", "Please enter the invite code")
+      toast.error("Code Required", "Please enter the invite code")
       return
     }
     setIsLoading(true)
@@ -243,10 +390,10 @@ export default function DebateSettlerScreen() {
         setActiveSession(result.session)
         setCurrentView("session")
       } else {
-        Alert.alert("Error", result.error || "Failed to join session")
+        toast.error("Error", result.error || "Failed to join session")
       }
     } catch {
-      Alert.alert("Error", "Failed to join session. Please check the code.")
+      toast.error("Error", "Failed to join session. Please check the code.")
     } finally {
       setIsLoading(false)
     }
@@ -254,7 +401,7 @@ export default function DebateSettlerScreen() {
 
   const handleSubmitPreferences = async () => {
     if (!activeSession || !user || !myPreferences.trim()) {
-      Alert.alert("Tell us more", "Please describe what kind of movie you're in the mood for")
+      toast.info("Tell Us More", "Please describe what kind of movie you're in the mood for")
       return
     }
     setIsLoading(true)
@@ -276,7 +423,7 @@ export default function DebateSettlerScreen() {
         }
       }
     } catch {
-      Alert.alert("Error", "Failed to submit preferences")
+      toast.error("Error", "Failed to submit preferences")
     } finally {
       setIsLoading(false)
     }
@@ -284,17 +431,18 @@ export default function DebateSettlerScreen() {
 
   const settleDebate = async (session: DebateSession) => {
     if (!session.host_preferences || !session.partner_preferences) {
-      Alert.alert("Not Ready", "Both partners need to submit their preferences first.")
+      toast.info("Not Ready", "Both partners need to submit their preferences first.")
       return
     }
     setIsSettling(true)
     try {
       if (!isAIConfigured()) {
-        Alert.alert(
-          "AI Not Configured",
-          "Set a Gemini API key in your Supabase Edge Function secrets as GEMINI_API_KEY, then redeploy the function. Avoid using EXPO_PUBLIC_GEMINI_API_KEY in the app.",
-          [{ text: "OK" }]
-        )
+        confirm.show({
+          title: "AI Not Configured",
+          message:
+            "Set a Gemini API key in your Supabase Edge Function secrets as GEMINI_API_KEY, then redeploy the function. Avoid using EXPO_PUBLIC_GEMINI_API_KEY in the app.",
+          variant: "warning",
+        })
         setIsSettling(false)
         return
       }
@@ -304,18 +452,47 @@ export default function DebateSettlerScreen() {
         if (updated) {
           setActiveSession(updated)
           setShowVerdictModal(true)
+          if (user) incrementAiSettlementUsage(user.id).then(setAiSettlementsThisMonth)
         }
       } else {
-        Alert.alert(
-          "AI Error",
-          result.error || "Couldn't get a recommendation. Please try again.",
-          [{ text: "Retry", onPress: () => settleDebate(session) }, { text: "Cancel" }]
-        )
+        confirm.show({
+          title: "AI Error",
+          message: result.error || "Couldn't get a recommendation. Please try again.",
+          variant: "warning",
+          buttons: [
+            { label: "Cancel", style: "cancel" },
+            { label: "Retry", style: "primary", onPress: () => settleDebate(session) },
+          ],
+        })
       }
     } catch (error: any) {
-      Alert.alert("Error", error.message || "AI couldn't settle the debate. Please try again.")
+      toast.error("Error", error.message || "AI couldn't settle the debate. Please try again.")
     } finally {
       setIsSettling(false)
+    }
+  }
+
+  const handleShareCompatibilityCard = async () => {
+    if (!compatibilityCardRef.current) return
+    setIsSharingCard(true)
+    try {
+      const uri = await captureRef(compatibilityCardRef, {
+        format: "png",
+        quality: 1,
+        result: "tmpfile",
+        width: CARD_WIDTH * 3,
+        height: CARD_HEIGHT * 3,
+      })
+      const canShare = await Sharing.isAvailableAsync()
+      if (canShare) {
+        await Sharing.shareAsync(uri, { mimeType: "image/png", dialogTitle: "Share your compatibility" })
+      } else {
+        toast.error("Sharing Unavailable", "Sharing isn't supported on this device.")
+      }
+    } catch {
+      toast.error("Error", "Failed to generate the share card. Please try again.")
+    } finally {
+      setIsSharingCard(false)
     }
   }
 
@@ -351,7 +528,7 @@ export default function DebateSettlerScreen() {
     setShowVerdictModal(false)
   }
 
-  // ── Screens ──────────────────────────────────────────────────────────────────
+  // ── Screens ───────────────────────────────────────────────────────────────────
 
   const renderHomeScreen = () => (
     <ScrollView
@@ -386,7 +563,7 @@ export default function DebateSettlerScreen() {
             }}
           >
             <Animated.View style={heartStyle}>
-              <Ionicons name="heart" size={48} color="#fff" />
+              <HeartIcon size={48} color="#fff" />
             </Animated.View>
           </LinearGradient>
           {/* Film badge */}
@@ -400,7 +577,7 @@ export default function DebateSettlerScreen() {
               shadowRadius: 4,
             }}
           >
-            <Ionicons name="film" size={18} color="#ec4899" />
+            <FilmIcon size={18} color="#ec4899" />
           </View>
         </Animated.View>
 
@@ -417,62 +594,47 @@ export default function DebateSettlerScreen() {
         entering={FadeInDown.delay(200).springify()}
         className="items-center py-5"
       >
-        <View className="flex-row items-center mb-2.5">
-          {/* Left avatar */}
-          <View
-            className="w-[54px] h-[54px] rounded-full overflow-hidden border-[2.5px] border-white"
-            style={{
-              elevation: 4,
-              shadowColor: "#ec4899",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.15,
-              shadowRadius: 6,
-            }}
-          >
-            {user?.imageUrl ? (
-              <Image source={{ uri: user.imageUrl }} className="w-full h-full" />
-            ) : (
-              <LinearGradient
-                colors={["#8B5CF6", "#7C3AED"]}
-                className="flex-1 items-center justify-center"
-              >
-                <Ionicons name="person" size={24} color="#fff" />
-              </LinearGradient>
-            )}
-          </View>
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+          {/* Left avatar — current user */}
+          <PremiumAvatar
+            imageUrl={user?.imageUrl}
+            initials={user?.firstName?.[0]}
+            size={54}
+            gradientColors={["#8B5CF6", "#7C3AED"]}
+            ringColors={["#a78bfa", "#ec4899", "#7C3AED"]}
+          />
 
           {/* Heart connector */}
           <View
-            className="w-7 h-7 rounded-full bg-white items-center justify-center -mx-2.5 z-10 border border-pink-100"
             style={{
-              elevation: 3,
+              width: 28,
+              height: 28,
+              borderRadius: 14,
+              backgroundColor: "#fff",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 10,
+              borderWidth: 1,
+              borderColor: "#fce7f3",
+              marginHorizontal: -8,
               shadowColor: "#ec4899",
               shadowOffset: { width: 0, height: 1 },
               shadowOpacity: 0.2,
               shadowRadius: 3,
+              elevation: 3,
             }}
           >
-            <Ionicons name="heart" size={14} color="#ec4899" />
+            <HeartIcon size={13} color="#ec4899" />
           </View>
 
-          {/* Right avatar */}
-          <View
-            className="w-[54px] h-[54px] rounded-full overflow-hidden border-[2.5px] border-white"
-            style={{
-              elevation: 4,
-              shadowColor: "#ec4899",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.15,
-              shadowRadius: 6,
-            }}
-          >
-            <LinearGradient
-              colors={["#ec4899", "#f472b6"]}
-              className="flex-1 items-center justify-center"
-            >
-              <Ionicons name="person" size={24} color="#fff" />
-            </LinearGradient>
-          </View>
+          {/* Right avatar — partner placeholder */}
+          <PremiumAvatar
+            imageUrl={null}
+            initials="?"
+            size={54}
+            gradientColors={["#ec4899", "#f472b6"]}
+            ringColors={["#f472b6", "#fb7185", "#ec4899"]}
+          />
         </View>
         <Text className="text-[13px] font-semibold text-pink-500">You + Your Person</Text>
       </Animated.View>
@@ -480,7 +642,7 @@ export default function DebateSettlerScreen() {
       {/* ── Action buttons ── */}
       <Animated.View entering={FadeInDown.delay(300).springify()} className="px-6 pt-2">
         <PrimaryButton onPress={() => setCurrentView("create")} colors={["#ec4899", "#db2777"]}>
-          <Ionicons name="mail" size={20} color="#fff" />
+          <EnvelopeIcon size={20} color="#fff" />
           <Text className="text-white text-[16px] font-bold">Invite Your Partner</Text>
         </PrimaryButton>
 
@@ -496,7 +658,7 @@ export default function DebateSettlerScreen() {
           onPress={() => setCurrentView("join")}
           activeOpacity={0.85}
         >
-          <Ionicons name="enter-outline" size={20} color="#ec4899" />
+          <ArrowRightEndOnRectangleIcon size={20} color="#ec4899" />
           <Text className="text-pink-500 text-[16px] font-bold">I Have a Code</Text>
         </TouchableOpacity>
       </Animated.View>
@@ -509,25 +671,22 @@ export default function DebateSettlerScreen() {
 
         {[
           {
-            icon: "mail-outline",
+            icon: <EnvelopeOutlineIcon size={20} color="#ec4899" />,
             title: "Send an Invite",
             desc: "Enter your partner's email to invite them",
             gradientColors: ["#fce7f3", "#fdf2f8"] as [string, string],
-            iconColor: "#ec4899",
           },
           {
-            icon: "chatbubble-ellipses-outline",
+            icon: <HeartOutlineIcon size={20} color="#8B5CF6" />,
             title: "Share Your Mood",
             desc: "Both describe what you're feeling tonight",
             gradientColors: ["#f3e8ff", "#faf5ff"] as [string, string],
-            iconColor: "#8B5CF6",
           },
           {
-            icon: "sparkles",
+            icon: <SparklesOutlineIcon size={20} color="#0ea5e9" />,
             title: "AI Magic",
             desc: "Our AI finds a movie you'll both love",
             gradientColors: ["#e0f2fe", "#f0f9ff"] as [string, string],
-            iconColor: "#0ea5e9",
           },
         ].map((step, index) => (
           <View
@@ -545,7 +704,7 @@ export default function DebateSettlerScreen() {
               colors={step.gradientColors}
               className="w-11 h-11 rounded-[13px] items-center justify-center shrink-0"
             >
-              <Ionicons name={step.icon as any} size={20} color={step.iconColor} />
+              {step.icon}
             </LinearGradient>
             <View className="flex-1">
               <Text className="text-[14px] font-bold text-[#1a0a0f] mb-0.5">{step.title}</Text>
@@ -578,7 +737,7 @@ export default function DebateSettlerScreen() {
             colors={["#fce7f3", "#fdf2f8"]}
             className="w-[108px] h-[108px] rounded-full items-center justify-center mb-5"
           >
-            <Ionicons name="mail" size={48} color="#ec4899" />
+            <EnvelopeIcon size={48} color="#ec4899" />
           </LinearGradient>
           <Text className="text-[15px] text-gray-500 text-center px-6 leading-[22px]">
             We'll send them a beautiful invite email with a code to join your debate
@@ -589,7 +748,7 @@ export default function DebateSettlerScreen() {
         <Animated.View entering={FadeInDown.delay(200)} className="px-6">
           <Text className="text-[13px] font-semibold text-gray-700 mb-2">Partner's Email</Text>
           <View className="flex-row items-center bg-white rounded-[14px] border-[1.5px] border-pink-300 px-3.5">
-            <Ionicons name="heart-outline" size={18} color="#ec4899" style={{ marginRight: 10 }} />
+            <HeartOutlineIcon size={18} color="#ec4899" style={{ marginRight: 10 }} />
             <TextInput
               className="flex-1 py-3.5 text-[15px] text-[#1a0a0f]"
               placeholder="love@example.com"
@@ -611,7 +770,7 @@ export default function DebateSettlerScreen() {
             loading={isLoading}
             colors={partnerEmail.trim() ? ["#ec4899", "#db2777"] : ["#e5e7eb", "#d1d5db"]}
           >
-            <Ionicons name="send" size={18} color={partnerEmail.trim() ? "#fff" : "#9ca3af"} />
+            <PaperAirplaneIcon size={18} color={partnerEmail.trim() ? "#fff" : "#9ca3af"} />
             <Text
               className={`text-[16px] font-bold ${
                 partnerEmail.trim() ? "text-white" : "text-gray-400"
@@ -643,7 +802,7 @@ export default function DebateSettlerScreen() {
             colors={["#f3e8ff", "#faf5ff"]}
             className="w-[108px] h-[108px] rounded-full items-center justify-center mb-5"
           >
-            <Ionicons name="ticket" size={48} color="#8B5CF6" />
+            <TicketIcon size={48} color="#8B5CF6" />
           </LinearGradient>
           <Text className="text-[15px] text-gray-500 text-center px-6 leading-[22px]">
             Enter the 6-digit code from your partner's invite
@@ -676,8 +835,7 @@ export default function DebateSettlerScreen() {
             loading={isLoading}
             colors={joinCode.length === 6 ? ["#8B5CF6", "#7C3AED"] : ["#e5e7eb", "#d1d5db"]}
           >
-            <Ionicons
-              name="enter"
+            <ArrowRightEndOnRectangleIcon
               size={18}
               color={joinCode.length === 6 ? "#fff" : "#9ca3af"}
             />
@@ -725,14 +883,32 @@ export default function DebateSettlerScreen() {
           <View className="flex-row items-center justify-between pt-16 pb-4 px-5">
             <TouchableOpacity
               className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center"
-              onPress={resetSession}
+              onPress={() => {
+                const hasResult = !!activeSession.ai_verdict
+                if (!hasResult) {
+                  resetSession()
+                  return
+                }
+                confirm.show({
+                  title: "Leave This Debate?",
+                  message: "This will discard tonight's result. You'll lose this verdict for good.",
+                  variant: "warning",
+                  buttons: [
+                    { label: "Cancel", style: "cancel" },
+                    { label: "Leave", style: "destructive", onPress: resetSession },
+                  ],
+                })
+              }}
               activeOpacity={0.7}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              accessibilityRole="button"
+              accessibilityLabel="Close debate session"
             >
-              <Ionicons name="close" size={20} color="#374151" />
+              <XMarkIcon size={20} color="#374151" />
             </TouchableOpacity>
 
             <View className="flex-row items-center bg-pink-50 px-3.5 py-[7px] rounded-full border border-pink-200">
-              <Ionicons name="key-outline" size={12} color="#ec4899" style={{ marginRight: 4 }} />
+              <KeyIcon size={12} color="#ec4899" style={{ marginRight: 4 }} />
               <Text
                 className="text-[13px] font-extrabold text-pink-500"
                 style={{ letterSpacing: 2.5 }}
@@ -743,44 +919,39 @@ export default function DebateSettlerScreen() {
 
             <TouchableOpacity
               className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center"
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              accessibilityRole="button"
+              accessibilityLabel="Refresh session"
               onPress={refreshSession}
               activeOpacity={0.7}
             >
-              <Ionicons name="refresh" size={18} color="#6b7280" />
+              <ArrowPathIcon size={18} color="#6b7280" />
             </TouchableOpacity>
           </View>
 
-          {/* ── Participants ── */}
+          {/* AI usage — visible, no cap enforced */}
+          <View className="flex-row items-center justify-center gap-x-1.5 -mt-1 mb-1">
+            <SparklesIcon size={11} color="#c4b5fd" />
+            <Text className="text-[11px] font-semibold text-gray-400">
+              {aiSettlementsThisMonth} AI settlement{aiSettlementsThisMonth === 1 ? "" : "s"} used this month
+            </Text>
+          </View>
+
+          {/* ── Participants with premium avatar rings ── */}
           <Animated.View
             entering={FadeInDown.delay(100)}
             className="flex-row items-center justify-center px-4 py-7 gap-x-2"
           >
             {/* Host card */}
             <View className="flex-1 items-center gap-y-2">
-              <View className="relative">
-                {host?.image_url ? (
-                  <Image
-                    source={{ uri: host.image_url }}
-                    className="w-[68px] h-[68px] rounded-full"
-                  />
-                ) : (
-                  <LinearGradient
-                    colors={["#8B5CF6", "#7C3AED"]}
-                    className="w-[68px] h-[68px] rounded-full items-center justify-center"
-                  >
-                    <Text className="text-[26px] font-bold text-white">
-                      {host?.first_name?.[0] || "?"}
-                    </Text>
-                  </LinearGradient>
-                )}
-                <View
-                  className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full border-[2.5px] border-[#fff9fb]"
-                  style={{
-                    backgroundColor:
-                      isHost && myPrefsSubmitted ? "#22c55e" : "#fbbf24",
-                  }}
-                />
-              </View>
+              <PremiumAvatar
+                imageUrl={host?.image_url}
+                initials={host?.first_name?.[0]}
+                size={68}
+                gradientColors={["#8B5CF6", "#7C3AED"]}
+                ringColors={["#a78bfa", "#8B5CF6", "#6d28d9"]}
+                statusColor={hostReady ? "#22c55e" : "#fbbf24"}
+              />
               <Text className="text-[15px] font-bold text-[#1a0a0f]">
                 {isHost ? "You" : host?.first_name || "Partner"}
               </Text>
@@ -805,7 +976,7 @@ export default function DebateSettlerScreen() {
                 style={heartStyle}
                 className="w-11 h-11 rounded-full bg-pink-100 items-center justify-center"
               >
-                <Ionicons name="heart" size={24} color="#ec4899" />
+                <HeartIcon size={24} color="#ec4899" />
               </Animated.View>
             </View>
 
@@ -813,29 +984,14 @@ export default function DebateSettlerScreen() {
             <View className="flex-1 items-center gap-y-2">
               {partnerJoined ? (
                 <>
-                  <View className="relative">
-                    {partner?.image_url ? (
-                      <Image
-                        source={{ uri: partner.image_url }}
-                        className="w-[68px] h-[68px] rounded-full"
-                      />
-                    ) : (
-                      <LinearGradient
-                        colors={["#ec4899", "#f472b6"]}
-                        className="w-[68px] h-[68px] rounded-full items-center justify-center"
-                      >
-                        <Text className="text-[26px] font-bold text-white">
-                          {partner?.first_name?.[0] || "?"}
-                        </Text>
-                      </LinearGradient>
-                    )}
-                    <View
-                      className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full border-[2.5px] border-[#fff9fb]"
-                      style={{
-                        backgroundColor: partnerPrefsSubmitted ? "#22c55e" : "#fbbf24",
-                      }}
-                    />
-                  </View>
+                  <PremiumAvatar
+                    imageUrl={partner?.image_url}
+                    initials={partner?.first_name?.[0]}
+                    size={68}
+                    gradientColors={["#ec4899", "#f472b6"]}
+                    ringColors={["#f9a8d4", "#ec4899", "#db2777"]}
+                    statusColor={partnerPrefsSubmitted ? "#22c55e" : "#fbbf24"}
+                  />
                   <Text className="text-[15px] font-bold text-[#1a0a0f]">
                     {!isHost ? "You" : partner?.first_name || "Partner"}
                   </Text>
@@ -855,8 +1011,40 @@ export default function DebateSettlerScreen() {
                 </>
               ) : (
                 <>
-                  <View className="w-[68px] h-[68px] rounded-full bg-pink-50 items-center justify-center border-2 border-dashed border-pink-200">
-                    <ActivityIndicator color="#ec4899" size="small" />
+                  {/* Waiting ghost avatar — dashed ring treatment */}
+                  <View
+                    style={{
+                      width: 88,
+                      height: 88,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <LinearGradient
+                      colors={["#fce7f3", "#fdf2f8"]}
+                      style={{
+                        position: "absolute",
+                        width: 88,
+                        height: 88,
+                        borderRadius: 44,
+                        opacity: 0.7,
+                      }}
+                    />
+                    <View
+                      style={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: 40,
+                        backgroundColor: "#fdf2f8",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderWidth: 2,
+                        borderColor: "#fbcfe8",
+                        borderStyle: "dashed",
+                      }}
+                    >
+                      <ActivityIndicator color="#ec4899" size="small" />
+                    </View>
                   </View>
                   <Text className="text-[15px] font-bold text-[#1a0a0f]">Waiting...</Text>
                   <View className="px-2.5 py-1 rounded-full bg-amber-50">
@@ -873,7 +1061,7 @@ export default function DebateSettlerScreen() {
               entering={FadeIn}
               className="flex-row items-center mx-6 py-3 px-4 rounded-[14px] bg-amber-50 border border-amber-200 gap-x-2.5"
             >
-              <Ionicons name="time-outline" size={16} color="#d97706" />
+              <ClockIcon size={16} color="#d97706" />
               <Text className="flex-1 text-[13px] text-amber-900 leading-[18px]">
                 Waiting for your partner to join with code{" "}
                 <Text className="font-extrabold text-amber-700">{activeSession.code}</Text>
@@ -908,8 +1096,7 @@ export default function DebateSettlerScreen() {
                   myPreferences.trim() ? ["#ec4899", "#db2777"] : ["#e5e7eb", "#d1d5db"]
                 }
               >
-                <Ionicons
-                  name="checkmark-circle"
+                <CheckCircleIcon
                   size={18}
                   color={myPreferences.trim() ? "#fff" : "#9ca3af"}
                 />
@@ -928,7 +1115,7 @@ export default function DebateSettlerScreen() {
           {myPrefsSubmitted && !partnerPrefsSubmitted && (
             <Animated.View entering={FadeIn} className="items-center px-6 py-[52px]">
               <View className="w-16 h-16 rounded-full bg-green-100 items-center justify-center mb-5">
-                <Ionicons name="checkmark" size={28} color="#16a34a" />
+                <CheckIcon size={28} color="#16a34a" />
               </View>
               <Text className="text-[19px] font-bold text-[#1a0a0f] mb-2">You're all set!</Text>
               <Text className="text-[14px] text-gray-400 text-center leading-5">
@@ -943,7 +1130,7 @@ export default function DebateSettlerScreen() {
             <Animated.View entering={FadeIn} className="px-6 py-6">
               <View className="items-center py-12 rounded-3xl bg-[#fff0f7] border border-pink-100">
                 <Animated.View style={heartStyle}>
-                  <Ionicons name="sparkles" size={44} color="#ec4899" />
+                  <SparklesIcon size={44} color="#ec4899" />
                 </Animated.View>
                 <Text className="text-[18px] font-bold text-[#1a0a0f] mt-[18px] mb-1.5">
                   Finding Your Perfect Movie...
@@ -964,12 +1151,19 @@ export default function DebateSettlerScreen() {
           transparent
           onRequestClose={() => setShowVerdictModal(false)}
         >
-          <View className="flex-1 bg-black/55 justify-end">
-            <Animated.View
-              entering={FadeInDown.springify()}
-              className="bg-white rounded-t-[28px] px-6 pt-3 pb-11"
-              style={{ maxHeight: height * 0.87 }}
-            >
+          <TouchableOpacity
+            className="flex-1 bg-black/55 justify-end"
+            activeOpacity={1}
+            onPress={() => setShowVerdictModal(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          >
+            <TouchableOpacity activeOpacity={1}>
+              <Animated.View
+                entering={FadeInDown.springify()}
+                className="bg-white rounded-t-[28px] px-6 pt-3 pb-11"
+                style={{ maxHeight: height * 0.87 }}
+              >
               {/* Drag handle */}
               <View className="w-9 h-1 rounded-full bg-gray-200 self-center mb-5" />
 
@@ -989,7 +1183,7 @@ export default function DebateSettlerScreen() {
                       shadowRadius: 10,
                     }}
                   >
-                    <Ionicons name="heart" size={28} color="#fff" />
+                    <HeartIcon size={28} color="#fff" />
                   </LinearGradient>
                   <Text className="text-[22px] font-extrabold text-[#1a0a0f] tracking-tight">
                     Perfect Match Found!
@@ -1034,7 +1228,7 @@ export default function DebateSettlerScreen() {
                     {/* Couple insight */}
                     <View className="flex-row items-start bg-violet-50 p-3.5 rounded-[14px] mb-6 gap-x-2.5 border border-violet-200">
                       <View className="w-7 h-7 rounded-full bg-violet-100 items-center justify-center shrink-0 mt-0.5">
-                        <Ionicons name="sparkles" size={16} color="#7c3aed" />
+                        <SparklesIcon size={16} color="#7c3aed" />
                       </View>
                       <Text className="flex-1 text-[13px] text-violet-700 italic leading-[19px]">
                         {activeSession.ai_verdict.coupleInsight}
@@ -1046,26 +1240,28 @@ export default function DebateSettlerScreen() {
                       <Text className="text-[15px] font-bold text-[#1a0a0f] mb-3">
                         Other Great Options
                       </Text>
-                      {activeSession.ai_verdict.movieSuggestions.slice(1).map((movie, index) => (
-                        <View
-                          key={index}
-                          className="flex-row items-start bg-gray-50 p-3.5 rounded-[14px] mb-2 gap-x-3 border border-gray-100"
-                        >
-                          <View className="w-[26px] h-[26px] rounded-full bg-pink-100 items-center justify-center shrink-0 mt-0.5">
-                            <Text className="text-[12px] font-bold text-pink-500">
-                              {index + 2}
-                            </Text>
+                      {activeSession.ai_verdict.movieSuggestions
+                        .slice(1)
+                        .map((movie: any, index: number) => (
+                          <View
+                            key={index}
+                            className="flex-row items-start bg-gray-50 p-3.5 rounded-[14px] mb-2 gap-x-3 border border-gray-100"
+                          >
+                            <View className="w-[26px] h-[26px] rounded-full bg-pink-100 items-center justify-center shrink-0 mt-0.5">
+                              <Text className="text-[12px] font-bold text-pink-500">
+                                {index + 2}
+                              </Text>
+                            </View>
+                            <View className="flex-1">
+                              <Text className="text-[14px] font-bold text-[#1a0a0f] mb-0.5">
+                                {movie.title}
+                              </Text>
+                              <Text className="text-[12px] text-gray-400 leading-[17px]">
+                                {movie.reason}
+                              </Text>
+                            </View>
                           </View>
-                          <View className="flex-1">
-                            <Text className="text-[14px] font-bold text-[#1a0a0f] mb-0.5">
-                              {movie.title}
-                            </Text>
-                            <Text className="text-[12px] text-gray-400 leading-[17px]">
-                              {movie.reason}
-                            </Text>
-                          </View>
-                        </View>
-                      ))}
+                        ))}
                     </View>
                   </>
                 )}
@@ -1075,31 +1271,77 @@ export default function DebateSettlerScreen() {
                   <PrimaryButton
                     onPress={() => {
                       setShowVerdictModal(false)
-                      Alert.alert(
+                      toast.info(
                         "Enjoy Your Movie Night!",
                         "Head to the Discover tab to find where to watch your movie."
                       )
                     }}
                     colors={["#ec4899", "#db2777"]}
                   >
-                    <Ionicons name="play-circle" size={20} color="#fff" />
+                    <PlayCircleIcon size={20} color="#fff" />
                     <Text className="text-white text-[16px] font-bold">Let's Watch!</Text>
                   </PrimaryButton>
 
+                  {activeSession.ai_verdict && (
+                    <TouchableOpacity
+                      className="py-[15px] items-center justify-center rounded-[18px] border-[1.5px] border-pink-300 bg-transparent flex-row"
+                      style={{ gap: 8 }}
+                      onPress={handleShareCompatibilityCard}
+                      disabled={isSharingCard}
+                      activeOpacity={0.7}
+                    >
+                      {isSharingCard ? (
+                        <ActivityIndicator color="#ec4899" size="small" />
+                      ) : (
+                        <>
+                          <ShareIcon size={17} color="#ec4899" />
+                          <Text className="text-pink-500 text-[15px] font-semibold">
+                            Share Compatibility
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
+
                   <TouchableOpacity
-                    className="py-[15px] items-center justify-center rounded-[18px] border-[1.5px] border-pink-300 bg-transparent"
-                    onPress={resetSession}
+                    className="py-[13px] items-center justify-center"
+                    onPress={() =>
+                      confirm.show({
+                        title: "Start New Debate?",
+                        message: "This will discard tonight's result. You'll lose this verdict for good.",
+                        variant: "warning",
+                        buttons: [
+                          { label: "Cancel", style: "cancel" },
+                          { label: "Start New", style: "destructive", onPress: resetSession },
+                        ],
+                      })
+                    }
                     activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel="Start a new debate, discarding tonight's result"
                   >
-                    <Text className="text-pink-500 text-[15px] font-semibold">
+                    <Text className="text-gray-400 text-[14px] font-medium">
                       Start New Debate
                     </Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
-            </Animated.View>
-          </View>
+              </Animated.View>
+            </TouchableOpacity>
+          </TouchableOpacity>
         </Modal>
+
+        {/* Off-screen render target for the shareable compatibility card */}
+        {activeSession.ai_verdict && (
+          <View style={{ position: "absolute", top: -9999, left: -9999 }}>
+            <CompatibilityCard
+              ref={compatibilityCardRef}
+              host={activeSession.host}
+              partner={activeSession.partner}
+              verdict={activeSession.ai_verdict}
+            />
+          </View>
+        )}
       </KeyboardAvoidingView>
     )
   }

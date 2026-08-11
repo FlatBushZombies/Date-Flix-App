@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Animated, Text, TouchableOpacity } from 'react-native';
 
@@ -22,6 +23,10 @@ export function PillChip({ label, selected, onPress }: PillChipProps) {
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
+      hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
       className={`rounded-full px-4 py-2 border relative ${
         selected
           ? 'bg-primary/10 border-primary'
@@ -42,7 +47,7 @@ export function PillChip({ label, selected, onPress }: PillChipProps) {
           justifyContent: 'center',
         }}
       >
-        <Text style={{ color: 'white', fontSize: 8 }}>✓</Text>
+        <Check size={9} color="white" strokeWidth={3.5} />
       </Animated.View>
       <Text
         className={`text-sm ${

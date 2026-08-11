@@ -1,20 +1,6 @@
 import { Tabs } from "expo-router"
-import { Film, User, BookMarked, Plus } from "lucide-react-native"
+import { Film, User, BookMarked, Plus, Swords } from "lucide-react-native"
 import { View, TouchableOpacity, StyleSheet, GestureResponderEvent } from "react-native"
-import Svg, { Path } from "react-native-svg"
-
-function SwordsIcon({ color, size }: { color: string; size: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path d="M14.5 17.5L3 6V3h3l11.5 11.5" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      <Path d="M13 19l6-6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      <Path d="M16 16l4 4" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      <Path d="M19 21l2-2" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      <Path d="M9.5 6.5L3 13l4 4 1.5-1.5" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      <Path d="M3 3l18 18" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  )
-}
 
 function DiscoverButton({ onPress }: { onPress: (e: GestureResponderEvent) => void }) {
   return (
@@ -129,7 +115,7 @@ export default function TabsLayout() {
         name="debate"
         options={{
           title: "Debate",
-          tabBarIcon: ({ color, size }) => <SwordsIcon color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <Swords color={color} size={size} />,
         }}
       />
       <Tabs.Screen

@@ -132,8 +132,7 @@ export function LoadingScreen({ message, progress }: LoadingScreenProps) {
       </View>
 
       <Text
-        className="text-xl text-text-primary mb-1.5 tracking-tight"
-        style={{ fontFamily: 'PlayfairDisplay_600SemiBold' }}
+        className="text-xl font-bold text-text-primary mb-1.5 tracking-tight"
       >
         Finding your perfect match
       </Text>

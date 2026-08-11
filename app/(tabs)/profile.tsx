@@ -1,6 +1,7 @@
 "use client"
 
-import { MessageBanner } from "@/components/MessageBanner"
+import { useConfirm } from "@/components/Confirm/ConfirmProvider"
+import { useToast } from "@/components/Toast/ToastProvider"
 import type { Invitation, SupabaseUser, SwipeSession } from "@/types"
 import { permanentlyDeleteAccount } from "@/utils/account"
 import {
@@ -14,11 +15,10 @@ import {
 import { useClerk, useUser } from "@clerk/clerk-expo"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
-import { Film, Heart, Users } from "lucide-react-native"
+import { Film, Flame, Heart, Users } from "lucide-react-native"
 import type React from "react"
 import { useEffect, useState } from "react"
 import {
-  Alert,
   Image,
   Modal,
   ScrollView,
@@ -36,20 +36,12 @@ const C = {
   surface:     "#f9fafb",
   surfaceHigh: "#f3f4f6",
   border:      "#e5e7eb",
-  borderGlow:  "#06b6d420",
   cyan:        "#06b6d4",
-  cyanLight:   "#67e8f9",
   cyanDim:     "#06b6d420",
   text:        "#111827",
   textMuted:   "#6b7280",
   textSub:     "#9ca3af",
-  accent:      "#3b82f6",
   green:       "#22c55e",
-  red:         "#ef4444",
-  redDim:      "#fef2f2",
-  // aliases used below
-  gold:        "#06b6d4",
-  goldDim:     "#06b6d420",
 }
 
 const F = {
@@ -62,7 +54,13 @@ export default function ProfileScreen() {
   const clerk = useClerk()
   const router = useRouter()
 
-  const [stats, setStats] = useState({ totalSwipes: 0, totalMatches: 0, activeSessions: 0 })
+  const [stats, setStats] = useState({
+    totalSwipes: 0,
+    totalMatches: 0,
+    activeSessions: 0,
+    currentStreak: 0,
+    longestStreak: 0,
+  })
   const [invitations, setInvitations] = useState<(Invitation & { sender: SupabaseUser })[]>([])
   const [sessions, setSessions] = useState<(SwipeSession & { user1: SupabaseUser; user2: SupabaseUser })[]>([])
   const [showInviteModal, setShowInviteModal] = useState(false)
@@ -70,10 +68,8 @@ export default function ProfileScreen() {
   const [inviteCode, setInviteCode] = useState("")
   const [loading, setLoading] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
-  const [bannerVisible, setBannerVisible] = useState(false)
-  const [bannerType, setBannerType] = useState<"success" | "error" | "info">("info")
-  const [bannerTitle, setBannerTitle] = useState("")
-  const [bannerMessage, setBannerMessage] = useState("")
+  const toast = useToast()
+  const confirm = useConfirm()
 
   useEffect(() => {
     if (user) loadUserData()
@@ -96,13 +92,6 @@ export default function ProfileScreen() {
     }
   }
 
-  const showBanner = (type: "success" | "error" | "info", title: string, message: string) => {
-    setBannerType(type)
-    setBannerTitle(title)
-    setBannerMessage(message)
-    setBannerVisible(true)
-  }
-
   const handleCreateInvite = async () => {
     if (!user) return
     setLoading(true)
@@ -112,11 +101,11 @@ export default function ProfileScreen() {
         setShowInviteModal(false)
         const shareMessage = `Join me on Movie Circle! Use code: ${invitation.invite_code}\n\nOr use this link: movieapp://invite/${invitation.invite_code}`
         await Share.share({ message: shareMessage, title: "Join me on Movie Circle" })
-        showBanner("success", "Invitation Created!", `Share code: ${invitation.invite_code}`)
+        toast.success("Invitation Created!", `Share code: ${invitation.invite_code}`)
         loadUserData()
       }
     } catch {
-      showBanner("error", "Error", "Failed to create invitation")
+      toast.error("Error", "Failed to create invitation")
     } finally {
       setLoading(false)
     }
@@ -130,13 +119,13 @@ export default function ProfileScreen() {
       if (result.success) {
         setShowJoinModal(false)
         setInviteCode("")
-        showBanner("success", "Success!", "You can now start swiping together!")
+        toast.success("Success!", "You can now start swiping together!")
         loadUserData()
       } else {
-        showBanner("error", "Error", result.error || "Failed to join")
+        toast.error("Error", result.error || "Failed to join")
       }
     } catch {
-      showBanner("error", "Error", "Failed to join with code")
+      toast.error("Error", "Failed to join with code")
     } finally {
       setLoading(false)
     }
@@ -153,57 +142,53 @@ export default function ProfileScreen() {
 
   const handleDeleteAccount = async () => {
     if (!user) return
-    Alert.alert(
-      "Delete Account",
-      "Are you sure you want to permanently delete your account? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
+    confirm.show({
+      title: "Delete Account",
+      message: "Are you sure you want to permanently delete your account? This action cannot be undone.",
+      variant: "destructive",
+      buttons: [
+        { label: "Cancel", style: "cancel" },
         {
-          text: "Delete",
+          label: "Delete",
           style: "destructive",
           onPress: () => {
-            Alert.alert(
-              "Final Warning",
-              "This will permanently delete all your data including matches, swipes, and profile information. Are you absolutely sure?",
-              [
-                { text: "Cancel", style: "cancel" },
+            confirm.show({
+              title: "Final Warning",
+              message:
+                "This will permanently delete all your data including matches, swipes, and profile information. Are you absolutely sure?",
+              variant: "destructive",
+              buttons: [
+                { label: "Cancel", style: "cancel" },
                 {
-                  text: "Yes, Delete Everything",
+                  label: "Yes, Delete Everything",
                   style: "destructive",
                   onPress: async () => {
                     setDeletingAccount(true)
                     try {
                       const result = await permanentlyDeleteAccount(user.id, user)
                       if (result.success) {
-                        Alert.alert("Account Deleted", result.message, [{ text: "OK", onPress: () => router.replace("/") }])
+                        toast.success("Account Deleted", result.message)
+                        router.replace("/")
                       } else {
-                        Alert.alert("Deletion Failed", result.message, [{ text: "OK" }])
+                        confirm.show({ title: "Deletion Failed", message: result.message, variant: "warning" })
                       }
                     } catch {
-                      showBanner("error", "Error", "Failed to delete account. Please try again or contact support.")
+                      toast.error("Error", "Failed to delete account. Please try again or contact support.")
                     } finally {
                       setDeletingAccount(false)
                     }
                   },
                 },
-              ]
-            )
+              ],
+            })
           },
         },
-      ]
-    )
+      ],
+    })
   }
 
   return (
     <ScrollView style={s.root} showsVerticalScrollIndicator={false}>
-      <MessageBanner
-        visible={bannerVisible}
-        type={bannerType}
-        title={bannerTitle}
-        message={bannerMessage}
-        onDismiss={() => setBannerVisible(false)}
-      />
-
       {/* ── Header ──────────────────────────────────────────── */}
       <View style={s.header}>
         {/* Subtle decorative line accent */}
@@ -241,11 +226,11 @@ export default function ProfileScreen() {
                 <Image source={{ uri: user.imageUrl }} style={s.mainAvatar} />
               ) : (
                 <View style={[s.mainAvatar, s.mainAvatarFallback]}>
-                  <Ionicons name="person" size={36} color={C.gold} />
+                  <Ionicons name="person" size={36} color={C.cyan} />
                 </View>
               )}
             </View>
-            {/* Gold badge */}
+            {/* Cyan badge */}
             <View style={s.cineBadge}>
               <Text style={s.cineBadgeText}>🎬</Text>
             </View>
@@ -280,24 +265,30 @@ export default function ProfileScreen() {
       </View>
 
       {/* ── Stats ────────────────────────────────────────────── */}
-      <View style={s.statsRow}>
-        <StatCard value={stats.totalSwipes} label="Total Swipes" color={C.gold} />
-        <View style={s.statsDivider} />
-        <StatCard value={stats.totalMatches} label="Matches" color="#E879A0" />
-        <View style={s.statsDivider} />
-        <StatCard value={stats.activeSessions} label="Active Friends" color="#818CF8" />
+      <View style={s.statsGrid}>
+        <View style={s.statsRow}>
+          <StatCard value={stats.totalSwipes} label="Total Swipes" color={C.cyan} />
+          <View style={s.statsDivider} />
+          <StatCard value={stats.totalMatches} label="Matches" color="#E879A0" />
+        </View>
+        <View style={s.statsDividerH} />
+        <View style={s.statsRow}>
+          <StatCard value={stats.activeSessions} label="Active Friends" color="#818CF8" />
+          <View style={s.statsDivider} />
+          <StatCard value={stats.currentStreak} label="Day Streak" color="#f59e0b" icon={<Flame size={13} color="#f59e0b" />} />
+        </View>
       </View>
 
       {/* ── Swipe Together ───────────────────────────────────── */}
       <View style={s.section}>
         <SectionLabel text="Swipe Together" />
         <View style={s.inviteRow}>
-          <TouchableOpacity style={s.btnGold} onPress={() => setShowInviteModal(true)} activeOpacity={0.85}>
+          <TouchableOpacity style={s.btnCyan} onPress={() => setShowInviteModal(true)} activeOpacity={0.85}>
             <Ionicons name="person-add" size={16} color={C.bg} />
-            <Text style={s.btnGoldText}>Invite Friend</Text>
+            <Text style={s.btnCyanText}>Invite Friend</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.btnGhost} onPress={() => setShowJoinModal(true)} activeOpacity={0.85}>
-            <Ionicons name="enter" size={16} color={C.gold} />
+            <Ionicons name="enter" size={16} color={C.cyan} />
             <Text style={s.btnGhostText}>Join Code</Text>
           </TouchableOpacity>
         </View>
@@ -316,7 +307,7 @@ export default function ProfileScreen() {
                     <Image source={{ uri: partner.image_url }} style={s.sessionAvatar} />
                   ) : (
                     <View style={[s.sessionAvatar, s.sessionAvatarFallback]}>
-                      <Ionicons name="person" size={20} color={C.gold} />
+                      <Ionicons name="person" size={20} color={C.cyan} />
                     </View>
                   )}
                 </View>
@@ -339,19 +330,22 @@ export default function ProfileScreen() {
           title="Movie Match"
           description="Swipe and match movies with a friend"
           action="Start"
-          icon={<Film size={18} color={C.gold} />}
+          icon={<Film size={18} color={C.cyan} />}
+          onPress={() => router.push("/(tabs)/home")}
         />
         <ActionCard
           title="Watch Together"
           description="Create a synced movie night"
-          action="Create"
-          icon={<Users size={18} color={C.gold} />}
+          action="Soon"
+          icon={<Users size={18} color={C.textSub} />}
+          soon
         />
         <ActionCard
           title="Shared Watchlist"
           description="Save movies you both want to see"
-          action="Open"
-          icon={<Heart size={18} color={C.gold} />}
+          action="Soon"
+          icon={<Heart size={18} color={C.textSub} />}
+          soon
         />
       </View>
 
@@ -359,30 +353,37 @@ export default function ProfileScreen() {
       <View style={s.footer}>
         <View style={s.footerDivider} />
 
-        <TouchableOpacity style={s.footerRow} onPress={() => Alert.alert("Account", "Account settings coming soon")}>
+        <TouchableOpacity
+          style={s.footerRow}
+          onPress={() => toast.info("Account", "Account settings coming soon")}
+          accessibilityRole="button"
+          accessibilityLabel="Account settings"
+        >
           <Text style={s.footerText}>Account Settings</Text>
+          <Ionicons name="chevron-forward" size={16} color={C.textSub} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={s.footerRow}
+          onPress={handleLogout}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Logout"
+        >
+          <Text style={s.footerText}>Logout</Text>
           <Ionicons name="chevron-forward" size={16} color={C.textSub} />
         </TouchableOpacity>
 
         <View style={s.footerDivider} />
 
-        {/* Logout Button — prominent, outlined */}
-        <TouchableOpacity style={s.btnLogout} onPress={handleLogout} activeOpacity={0.8}>
-          <View style={s.btnInner}>
-            <Ionicons name="log-out-outline" size={18} color="#f97316" />
-            <Text style={s.btnLogoutText}>Logout</Text>
-          </View>
-          <View style={s.btnArrow}>
-            <Ionicons name="chevron-forward" size={15} color="#f97316" />
-          </View>
-        </TouchableOpacity>
-
-        {/* Delete Account Button — solid red, destructive weight */}
+        {/* Delete Account Button — solid red, the only high-contrast destructive element on this screen */}
         <TouchableOpacity
           style={[s.btnDelete, deletingAccount && s.btnDeleteDisabled]}
           onPress={handleDeleteAccount}
           disabled={deletingAccount}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Delete account permanently"
         >
           <View style={s.btnInner}>
             <Ionicons name="trash-outline" size={18} color={deletingAccount ? "#fca5a5" : "#fff"} />
@@ -405,8 +406,8 @@ export default function ProfileScreen() {
             <View style={s.modalHandle} />
             <Text style={s.modalTitle}>Invite a Friend</Text>
             <Text style={s.modalSub}>Create an invitation code to swipe together</Text>
-            <TouchableOpacity style={s.btnGoldFull} onPress={handleCreateInvite} disabled={loading} activeOpacity={0.85}>
-              <Text style={s.btnGoldText}>{loading ? "Creating…" : "Create Invite Code"}</Text>
+            <TouchableOpacity style={s.btnCyanFull} onPress={handleCreateInvite} disabled={loading} activeOpacity={0.85}>
+              <Text style={s.btnCyanText}>{loading ? "Creating…" : "Create Invite Code"}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.modalCancel} onPress={() => setShowInviteModal(false)}>
               <Text style={s.modalCancelText}>Cancel</Text>
@@ -432,12 +433,12 @@ export default function ProfileScreen() {
               maxLength={8}
             />
             <TouchableOpacity
-              style={[s.btnGoldFull, (!inviteCode.trim() || loading) && s.btnDisabled]}
+              style={[s.btnCyanFull, (!inviteCode.trim() || loading) && s.btnDisabled]}
               onPress={handleJoinWithCode}
               disabled={loading || !inviteCode.trim()}
               activeOpacity={0.85}
             >
-              <Text style={s.btnGoldText}>{loading ? "Joining…" : "Join Session"}</Text>
+              <Text style={s.btnCyanText}>{loading ? "Joining…" : "Join Session"}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={s.modalCancel}
@@ -457,16 +458,29 @@ export default function ProfileScreen() {
 function SectionLabel({ text }: { text: string }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14 }}>
-      <View style={{ width: 3, height: 14, backgroundColor: C.gold, borderRadius: 2, marginRight: 8 }} />
+      <View style={{ width: 3, height: 14, backgroundColor: C.cyan, borderRadius: 2, marginRight: 8 }} />
       <Text style={s.sectionLabel}>{text}</Text>
     </View>
   )
 }
 
-function StatCard({ value, label, color }: { value: number; label: string; color: string }) {
+function StatCard({
+  value,
+  label,
+  color,
+  icon,
+}: {
+  value: number
+  label: string
+  color: string
+  icon?: React.ReactNode
+}) {
   return (
     <View style={s.statCard}>
-      <Text style={[s.statValue, { color }]}>{value}</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+        {icon}
+        <Text style={[s.statValue, { color }]}>{value}</Text>
+      </View>
       <Text style={s.statLabel}>{label}</Text>
     </View>
   )
@@ -477,22 +491,38 @@ function ActionCard({
   description,
   action,
   icon,
+  onPress,
+  soon,
 }: {
   title: string
   description: string
   action: string
   icon: React.ReactNode
+  onPress?: () => void
+  soon?: boolean
 }) {
   return (
-    <View style={s.actionCard}>
+    <View style={[s.actionCard, soon && s.actionCardSoon]}>
       <View style={s.actionIconWrap}>{icon}</View>
       <View style={{ flex: 1, marginLeft: 14 }}>
-        <Text style={s.actionTitle}>{title}</Text>
+        <Text style={[s.actionTitle, soon && s.actionTitleSoon]}>{title}</Text>
         <Text style={s.actionDesc}>{description}</Text>
       </View>
-      <TouchableOpacity style={s.actionBtn} activeOpacity={0.75}>
-        <Text style={s.actionBtnText}>{action}</Text>
-      </TouchableOpacity>
+      {soon ? (
+        <View style={s.actionBtnSoon}>
+          <Text style={s.actionBtnSoonText}>{action}</Text>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={s.actionBtn}
+          activeOpacity={0.75}
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={`${action} ${title}`}
+        >
+          <Text style={s.actionBtnText}>{action}</Text>
+        </TouchableOpacity>
+      )}
     </View>
   )
 }
@@ -514,7 +544,7 @@ const s = StyleSheet.create({
   headerAccentLine: {
     width: 40,
     height: 2,
-    backgroundColor: C.gold,
+    backgroundColor: C.cyan,
     borderRadius: 1,
     marginBottom: 16,
     opacity: 0.7,
@@ -546,10 +576,10 @@ const s = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: C.gold,
+    backgroundColor: C.cyan,
     opacity: 0.07,
     // blur via shadow simulation
-    shadowColor: C.gold,
+    shadowColor: C.cyan,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
     shadowRadius: 40,
@@ -596,9 +626,9 @@ const s = StyleSheet.create({
     height: 84,
     borderRadius: 42,
     borderWidth: 2,
-    borderColor: C.gold,
+    borderColor: C.cyan,
     padding: 3,
-    shadowColor: C.gold,
+    shadowColor: C.cyan,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 12,
@@ -665,8 +695,7 @@ const s = StyleSheet.create({
   },
 
   // Stats
-  statsRow: {
-    flexDirection: "row",
+  statsGrid: {
     marginHorizontal: 20,
     marginBottom: 28,
     backgroundColor: C.surface,
@@ -674,6 +703,9 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
     overflow: "hidden",
+  },
+  statsRow: {
+    flexDirection: "row",
   },
   statCard: {
     flex: 1,
@@ -684,6 +716,11 @@ const s = StyleSheet.create({
     width: 1,
     backgroundColor: C.border,
     marginVertical: 16,
+  },
+  statsDividerH: {
+    height: 1,
+    backgroundColor: C.border,
+    marginHorizontal: 16,
   },
   statValue: {
     fontSize: 28,
@@ -717,21 +754,21 @@ const s = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
   },
-  btnGold: {
+  btnCyan: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: C.gold,
+    backgroundColor: C.cyan,
     borderRadius: 14,
     paddingVertical: 14,
-    shadowColor: C.gold,
+    shadowColor: C.cyan,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
   },
-  btnGoldText: {
+  btnCyanText: {
     fontSize: 14,
     fontWeight: "700",
     color: C.bg,
@@ -747,12 +784,12 @@ const s = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 14,
     borderWidth: 1.5,
-    borderColor: C.gold,
+    borderColor: C.cyan,
   },
   btnGhostText: {
     fontSize: 14,
     fontWeight: "700",
-    color: C.gold,
+    color: C.cyan,
     letterSpacing: 0.3,
   },
 
@@ -816,13 +853,16 @@ const s = StyleSheet.create({
     padding: 16,
     marginBottom: 10,
   },
+  actionCardSoon: {
+    opacity: 0.6,
+  },
   actionIconWrap: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: `${C.gold}18`,
+    backgroundColor: `${C.cyan}18`,
     borderWidth: 1,
-    borderColor: C.goldDim,
+    borderColor: C.cyanDim,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -831,6 +871,9 @@ const s = StyleSheet.create({
     fontWeight: "600",
     color: C.text,
     letterSpacing: 0.1,
+  },
+  actionTitleSoon: {
+    color: C.textMuted,
   },
   actionDesc: {
     fontSize: 12,
@@ -848,7 +891,19 @@ const s = StyleSheet.create({
   actionBtnText: {
     fontSize: 13,
     fontWeight: "600",
-    color: C.gold,
+    color: C.cyan,
+    letterSpacing: 0.2,
+  },
+  actionBtnSoon: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "transparent",
+  },
+  actionBtnSoonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: C.textSub,
     letterSpacing: 0.2,
   },
 
@@ -877,32 +932,6 @@ const s = StyleSheet.create({
     fontSize: 15,
     color: C.textMuted,
     letterSpacing: 0.1,
-  },
-
-  // Logout — outlined orange-tinted premium button
-  btnLogout: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 12,
-    marginBottom: 10,
-    paddingVertical: 15,
-    paddingHorizontal: 18,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: "#fed7aa",
-    backgroundColor: "#fff7ed",
-    shadowColor: "#f97316",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-  },
-  btnLogoutText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#f97316",
-    marginLeft: 10,
-    letterSpacing: 0.2,
   },
 
   // Delete — solid red, full weight
@@ -948,14 +977,6 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  btnArrow: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#ffedd5",
-    alignItems: "center",
-    justifyContent: "center",
-  },
 
   // Modals
   modalOverlay: {
@@ -993,13 +1014,13 @@ const s = StyleSheet.create({
     marginBottom: 28,
     lineHeight: 20,
   },
-  btnGoldFull: {
-    backgroundColor: C.gold,
+  btnCyanFull: {
+    backgroundColor: C.cyan,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
     marginBottom: 12,
-    shadowColor: C.gold,
+    shadowColor: C.cyan,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,

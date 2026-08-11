@@ -1,5 +1,6 @@
 import { StreamingCard } from '@/components/StreamingCard';
 import { STREAMING_PLATFORMS } from '@/lib/streaming';
+import { Check } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Animated, Text, TouchableOpacity, View } from 'react-native';
 
@@ -127,7 +128,7 @@ export function Step2Streaming({
               justifyContent: 'center',
             }}
           >
-            <Text style={{ color: 'white', fontSize: 12 }}>✓</Text>
+            <Check size={13} color="white" strokeWidth={3} />
           </Animated.View>
           <Text style={{
             color: anyStreaming ? '#93C5FD' : '#9CA3AF',

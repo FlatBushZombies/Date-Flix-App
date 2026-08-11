@@ -1,27 +1,30 @@
 "use client"
 
-import { MessageBanner } from "@/components/MessageBanner"
+import { useConfirm } from "@/components/Confirm/ConfirmProvider"
 import { MovieCard } from "@/components/MovieCard"
 import { NotificationsModal } from "@/components/NotificationsModal"
+import { StreakModal } from "@/components/StreakModal"
+import { useToast } from "@/components/Toast/ToastProvider"
 import { useNotifications } from "@/hooks/useNotifications"
-import type { Movie, SupabaseUser, SwipeSession } from "@/types"
+import type { StreakEvaluation, SupabaseUser, SwipeSession, Movie } from "@/types"
 import {
     acceptInvitation,
     createInvitation,
     deleteSwipeSession,
     getActiveSwipeSessions,
+    getSessionActivityStrip,
+    refreshSessionStreak,
     saveSwipe,
     syncUserWithSupabase
 } from "@/utils/supabase-helpers"
 import { fetchTrendingMovies } from "@/utils/tmdb"
+import { streakEventCopy } from "@/utils/streakCopy"
 import { useUser } from "@clerk/clerk-expo"
-import { Ionicons } from "@expo/vector-icons"
 import * as Clipboard from "expo-clipboard"
 import { LinearGradient } from "expo-linear-gradient"
 import { useRouter } from "expo-router"
 import { useEffect, useState } from "react"
 import {
-    Alert,
     Dimensions,
     Image,
     Modal,
@@ -31,8 +34,21 @@ import {
     TouchableOpacity,
     View
 } from "react-native"
-import { BellIcon } from "react-native-heroicons/outline"
-import Animated, { FadeIn, FadeInDown } from "react-native-reanimated"
+import {
+    BellIcon,
+    MapPinIcon,
+    UserPlusIcon,
+    XMarkIcon
+} from "react-native-heroicons/outline"
+import { Flame } from "lucide-react-native"
+import Animated, {
+    FadeIn,
+    FadeInDown,
+    useAnimatedStyle,
+    useSharedValue,
+    withRepeat,
+    withTiming,
+} from "react-native-reanimated"
 
 const { width, height } = Dimensions.get("window")
 
@@ -52,19 +68,31 @@ export default function SwipeScreen() {
   const [isCreatingInvite, setIsCreatingInvite] = useState(false)
   const [isJoining, setIsJoining] = useState(false)
   const [activeTab, setActiveTab] = useState<"create" | "join">("create")
-  const [bannerVisible, setBannerVisible] = useState(false)
-  const [bannerType, setBannerType] = useState<"success" | "error" | "info">("info")
-  const [bannerTitle, setBannerTitle] = useState("")
-  const [bannerMessage, setBannerMessage] = useState("")
   const [activeSessions, setActiveSessions] = useState<
     (SwipeSession & { user1: SupabaseUser; user2: SupabaseUser })[]
   >([])
   const [notificationsOpen, setNotificationsOpen] = useState(false)
 
+  // Streak state — tracks the primary (first) active session
+  const [streakInfo, setStreakInfo] = useState<{
+    currentStreak: number
+    longestStreak: number
+    partnerSwipedToday: boolean
+    freezeAvailable: number
+  } | null>(null)
+  const [streakModalOpen, setStreakModalOpen] = useState(false)
+  const [streakActivity, setStreakActivity] = useState<{ date: string; bothActive: boolean }[]>([])
+  const [streakActivityLoading, setStreakActivityLoading] = useState(false)
+
+  const toast = useToast()
+  const confirm = useConfirm()
+
   const {
     items: notifications,
     unreadCount,
     loading: notificationsLoading,
+    error: notificationsError,
+    refresh: refreshNotifications,
     markAllRead,
     markRead,
   } = useNotifications(user?.id)
@@ -97,6 +125,52 @@ export default function SwipeScreen() {
     if (!user) return
     const sessions = await getActiveSwipeSessions(user.id)
     setActiveSessions(sessions)
+    if (sessions.length > 0) {
+      // Also catches a streak that broke overnight, without needing a fresh swipe
+      const evaluation = await refreshSessionStreak(sessions[0])
+      applyStreakEvaluation(sessions[0], evaluation, true)
+    } else {
+      setStreakInfo(null)
+    }
+  }
+
+  const applyStreakEvaluation = (
+    session: SwipeSession & { user1: SupabaseUser; user2: SupabaseUser },
+    evaluation: StreakEvaluation,
+    isPrimary: boolean,
+  ) => {
+    if (!user) return
+    const isUser1 = session.user1_id === user.id
+
+    if (isPrimary) {
+      setStreakInfo({
+        currentStreak: evaluation.currentStreak,
+        longestStreak: evaluation.longestStreak,
+        partnerSwipedToday: isUser1 ? evaluation.user2SwipedToday : evaluation.user1SwipedToday,
+        freezeAvailable: evaluation.freezeAvailable,
+      })
+    }
+
+    if (evaluation.event === "none") return
+
+    const partnerName = (isUser1 ? session.user2.first_name : session.user1.first_name) || "your partner"
+    const day = evaluation.event === "broken" ? evaluation.previousStreak ?? 0 : evaluation.currentStreak
+    const copy = streakEventCopy(evaluation.event, day, partnerName)
+
+    if (evaluation.event === "broken") {
+      toast.streakBroken({ day, title: copy.title, message: copy.body })
+    } else {
+      toast.streak({ day, title: copy.title, message: copy.body, milestone: evaluation.event === "milestone" })
+    }
+  }
+
+  const openStreakModal = async () => {
+    setStreakModalOpen(true)
+    if (!activeSessions[0]) return
+    setStreakActivityLoading(true)
+    const strip = await getSessionActivityStrip(activeSessions[0].user1_id, activeSessions[0].user2_id)
+    setStreakActivity(strip)
+    setStreakActivityLoading(false)
   }
 
   const handleCreateInvite = async () => {
@@ -117,16 +191,9 @@ export default function SwipeScreen() {
     }
   }
 
-  const showBanner = (type: "success" | "error" | "info", title: string, message: string) => {
-    setBannerType(type)
-    setBannerTitle(title)
-    setBannerMessage(message)
-    setBannerVisible(true)
-  }
-
   const handleCopyCode = async () => {
     await Clipboard.setStringAsync(inviteCode)
-    showBanner("success", "Copied!", "Invite code copied to clipboard")
+    toast.success("Copied!", "Invite code copied to clipboard")
   }
 
   const handleJoinSession = async () => {
@@ -134,37 +201,38 @@ export default function SwipeScreen() {
     setIsJoining(true)
     const result = await acceptInvitation(joinCode.trim().toUpperCase(), user.id)
     if (result.success) {
-      showBanner("success", "Success!", "You've joined the swipe session. Start swiping to find matches!")
+      toast.success("Success!", "You've joined the swipe session. Start swiping to find matches!")
       setInviteModalVisible(false)
       setJoinCode("")
       loadActiveSessions()
     } else {
-      showBanner("error", "Error", result.error || "Failed to join session")
+      toast.error("Error", result.error || "Failed to join session")
     }
     setIsJoining(false)
   }
 
   const handleDeleteSession = async (sessionId: string) => {
-    Alert.alert(
-      "Delete Session",
-      "Are you sure you want to delete this session? You won't be able to swipe together anymore.",
-      [
-        { text: "Cancel", style: "cancel" },
+    confirm.show({
+      title: "Delete Session",
+      message: "Are you sure you want to delete this session? You won't be able to swipe together anymore.",
+      variant: "destructive",
+      buttons: [
+        { label: "Cancel", style: "cancel" },
         {
-          text: "Delete",
+          label: "Delete",
           style: "destructive",
           onPress: async () => {
             const result = await deleteSwipeSession(sessionId)
             if (result.success) {
-              showBanner("success", "Session Deleted", "The swipe session has been removed.")
+              toast.success("Session Deleted", "The swipe session has been removed.")
               loadActiveSessions()
             } else {
-              showBanner("error", "Error", result.error || "Failed to delete session")
+              toast.error("Error", result.error || "Failed to delete session")
             }
           },
         },
-      ]
-    )
+      ],
+    })
   }
 
   const handleSwipe = async (direction: "left" | "right") => {
@@ -172,7 +240,13 @@ export default function SwipeScreen() {
     const liked = direction === "right"
     if (user && userSynced) {
       try {
-        await saveSwipe(user.id, currentMovie.id, liked, currentMovie)
+        const result = await saveSwipe(user.id, currentMovie.id, liked, currentMovie)
+        const evaluations: { sessionId: string; evaluation: StreakEvaluation }[] =
+          result?.streakEvaluations ?? []
+        evaluations.forEach(({ sessionId, evaluation }) => {
+          const session = activeSessions.find((s) => s.id === sessionId)
+          if (session) applyStreakEvaluation(session, evaluation, activeSessions[0]?.id === sessionId)
+        })
       } catch (error) {
         console.error("[v0] Exception while saving swipe:", error)
       }
@@ -183,24 +257,24 @@ export default function SwipeScreen() {
 
   const handleSaveMovie = async (movie: Movie) => {
     // TODO: Implement save to watchlist functionality
-    showBanner("success", "Saved!", `${movie.title} added to your watchlist`)
+    toast.success("Saved!", `${movie.title} added to your watchlist`)
   }
 
   const handleShareMovie = async (movie: Movie) => {
     try {
-      const shareMessage = `Check out "${movie.title}" on Movie Circle! 🎬\n\n${movie.overview?.slice(0, 100)}...\n\n#MovieCircle #Movies`
+      const shareMessage = `Check out "${movie.title}" on Duo App! 🎬\n\n${movie.overview?.slice(0, 100)}...\n\n#MovieCircle #Movies`
       await Share.share({
         message: shareMessage,
       })
-      showBanner("success", "Shared!", "Movie shared successfully")
+      toast.success("Shared!", "Movie shared successfully")
     } catch (error) {
-      showBanner("error", "Error", "Failed to share movie")
+      toast.error("Error", "Failed to share movie")
     }
   }
 
   const handleTrailerPress = async (movie: Movie) => {
     // TODO: Open trailer in a modal or external app
-    showBanner("info", "Trailer", "Trailer feature coming soon!")
+    toast.info("Trailer", "Trailer feature coming soon!")
   }
 
   const currentMovie = movies[currentIndex]
@@ -221,13 +295,7 @@ export default function SwipeScreen() {
 
   return (
     <View className="flex-1 bg-cyan-50">
-      <MessageBanner
-        visible={bannerVisible}
-        type={bannerType}
-        title={bannerTitle}
-        message={bannerMessage}
-        onDismiss={() => setBannerVisible(false)}
-      />
+
       {/* ── Header ── */}
       <View className="pt-16 px-6 flex-row items-center justify-between">
         {/* Left: avatar + greeting */}
@@ -240,7 +308,7 @@ export default function SwipeScreen() {
                 resizeMode="cover"
               />
             ) : (
-              <Ionicons name="person" size={22} color="#0891b2" />
+              <UserPlusIcon size={22} color="#0891b2" strokeWidth={1.6} />
             )}
           </View>
           <View>
@@ -251,45 +319,46 @@ export default function SwipeScreen() {
           </View>
         </View>
 
-        {/* Right: invite + bell */}
+        {/* Right: invite + map + bell */}
         <View className="flex-row items-center gap-3">
           {/* Invite button */}
           <TouchableOpacity
             onPress={() => setInviteModalVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Invite a friend to swipe together"
             style={{
-              borderRadius: 24,
-              overflow: "hidden",
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: "#ec4899",
+              borderRadius: 14,
+              paddingHorizontal: 14,
+              paddingVertical: 10,
+              gap: 6,
               shadowColor: "#ec4899",
-              shadowOpacity: 0.35,
+              shadowOpacity: 0.28,
               shadowRadius: 8,
-              shadowOffset: { width: 0, height: 4 },
-              elevation: 6,
+              shadowOffset: { width: 0, height: 2 },
+              elevation: 5,
             }}
           >
-            <LinearGradient
-              colors={["#f472b6", "#ec4899"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                gap: 6,
-              }}
-            >
-              <Ionicons name="people" size={18} color="#fff" />
-              <Text className="text-white font-bold text-sm">Invite</Text>
-            </LinearGradient>
+            <UserPlusIcon size={18} color="#fff" strokeWidth={1.6} />
+            <Text className="text-white font-bold text-sm">Invite</Text>
           </TouchableOpacity>
 
           {/* Map button */}
           <TouchableOpacity
-            onPress={() => router.push("/map" as any)}
+            onPress={() => router.push("/map")}
             className="w-11 h-11 rounded-full bg-white justify-center items-center shadow shadow-black/10"
+            accessibilityRole="button"
+            accessibilityLabel="View genre journey map"
           >
-            <Ionicons name="map-outline" size={22} color="#0f172a" />
+            <MapPinIcon size={22} color="#0f172a" strokeWidth={1.6} />
           </TouchableOpacity>
+
+          {/* Streak badge */}
+          {streakInfo && streakInfo.currentStreak > 0 && (
+            <StreakBadge streakInfo={streakInfo} onPress={openStreakModal} />
+          )}
 
           {/* Bell / notifications */}
           <TouchableOpacity
@@ -298,6 +367,8 @@ export default function SwipeScreen() {
               await markAllRead()
             }}
             className="w-11 h-11 rounded-full bg-white justify-center items-center shadow shadow-black/10"
+            accessibilityRole="button"
+            accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
           >
             <BellIcon size={22} color="#0f172a" strokeWidth={1.8} />
             {unreadCount > 0 && (
@@ -325,8 +396,11 @@ export default function SwipeScreen() {
           <TouchableOpacity
             onPress={() => handleDeleteSession(activeSessions[0].id)}
             className="mr-3"
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityRole="button"
+            accessibilityLabel="Delete swipe session"
           >
-            <Ionicons name="trash-outline" size={18} color="#ef4444" />
+            <XMarkIcon size={18} color="#ef4444" strokeWidth={1.8} />
           </TouchableOpacity>
           <View className="flex-row items-center">
             {activeSessions.slice(0, 3).map((session, index) => {
@@ -407,8 +481,11 @@ export default function SwipeScreen() {
               <TouchableOpacity
                 onPress={() => setInviteModalVisible(false)}
                 className="absolute right-5 top-3 w-9 h-9 rounded-full bg-gray-100 justify-center items-center"
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                accessibilityRole="button"
+                accessibilityLabel="Close invite dialog"
               >
-                <Ionicons name="close" size={22} color="#6b7280" />
+                <XMarkIcon size={22} color="#6b7280" strokeWidth={1.8} />
               </TouchableOpacity>
             </View>
 
@@ -418,7 +495,7 @@ export default function SwipeScreen() {
                 colors={["#fce7f3", "#fbcfe8"]}
                 className="w-16 h-16 rounded-full justify-center items-center mb-4"
               >
-                <Ionicons name="heart-circle" size={32} color="#ec4899" />
+                <UserPlusIcon size={30} color="#ec4899" strokeWidth={1.6} />
               </LinearGradient>
               <Text className="text-2xl font-extrabold text-gray-900 mb-2">
                 Swipe Together
@@ -476,7 +553,7 @@ export default function SwipeScreen() {
                         <Text className="text-white text-base font-bold">Creating...</Text>
                       ) : (
                         <>
-                          <Ionicons name="add-circle" size={24} color="#fff" />
+                          <UserPlusIcon size={22} color="#fff" strokeWidth={1.6} />
                           <Text className="text-white text-base font-bold">
                             Generate Invite Code
                           </Text>
@@ -499,14 +576,14 @@ export default function SwipeScreen() {
                         onPress={handleCopyCode}
                         className="flex-row items-center px-5 py-3.5 rounded-2xl bg-gray-100 gap-2"
                       >
-                        <Ionicons name="copy-outline" size={20} color="#6b7280" />
+                        <XMarkIcon size={20} color="#6b7280" strokeWidth={1.6} />
                         <Text className="text-sm font-semibold text-gray-500">Copy</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={handleShareInvite}
                         className="flex-row items-center px-5 py-3.5 rounded-2xl bg-pink-500 gap-2"
                       >
-                        <Ionicons name="share-social" size={20} color="#fff" />
+                        <UserPlusIcon size={20} color="#fff" strokeWidth={1.6} />
                         <Text className="text-sm font-semibold text-white">Share</Text>
                       </TouchableOpacity>
                     </View>
@@ -558,7 +635,7 @@ export default function SwipeScreen() {
                         <Text className="text-white text-base font-bold">Joining...</Text>
                       ) : (
                         <>
-                          <Ionicons name="enter-outline" size={22} color="#fff" />
+                          <MapPinIcon size={22} color="#fff" strokeWidth={1.6} />
                           <Text className="text-white text-base font-bold">
                             Join Session
                           </Text>
@@ -578,11 +655,84 @@ export default function SwipeScreen() {
         onClose={() => setNotificationsOpen(false)}
         items={notifications}
         loading={notificationsLoading}
+        error={notificationsError}
+        onRetry={refreshNotifications}
         onMarkAllRead={() => markAllRead()}
         onPressItem={(n) => {
           if (!n.read_at) markRead(n.id)
         }}
       />
+
+      <StreakModal
+        visible={streakModalOpen}
+        onClose={() => setStreakModalOpen(false)}
+        currentStreak={streakInfo?.currentStreak ?? 0}
+        longestStreak={streakInfo?.longestStreak ?? 0}
+        freezeAvailable={streakInfo?.freezeAvailable ?? 0}
+        activityStrip={streakActivity}
+        loading={streakActivityLoading}
+      />
     </View>
+  )
+}
+
+function StreakBadge({
+  streakInfo,
+  onPress,
+}: {
+  streakInfo: { currentStreak: number; longestStreak: number; partnerSwipedToday: boolean }
+  onPress: () => void
+}) {
+  const active = streakInfo.partnerSwipedToday
+  const pulse = useSharedValue(0)
+
+  useEffect(() => {
+    pulse.value = active ? withRepeat(withTiming(1, { duration: 1200 }), -1, true) : 0
+  }, [active])
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: 0.15 + pulse.value * 0.25,
+  }))
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={`${streakInfo.currentStreak} day streak, view details`}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: active ? "#fffbeb" : "#ffffff",
+        borderRadius: 14,
+        paddingHorizontal: 10,
+        height: 44,
+        gap: 4,
+        borderWidth: 1.5,
+        borderColor: active ? "#f59e0b" : "#e5e7eb",
+      }}
+    >
+      {active && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            {
+              position: "absolute",
+              top: -4,
+              left: -4,
+              right: -4,
+              bottom: -4,
+              borderRadius: 18,
+              backgroundColor: "#f59e0b",
+            },
+            glowStyle,
+          ]}
+        />
+      )}
+      <Flame size={16} color={active ? "#f59e0b" : "#9ca3af"} strokeWidth={1.8} />
+      <Text style={{ fontSize: 13, fontWeight: "800", color: active ? "#b45309" : "#6b7280" }}>
+        {streakInfo.currentStreak}
+      </Text>
+    </TouchableOpacity>
   )
 }

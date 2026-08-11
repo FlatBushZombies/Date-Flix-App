@@ -543,7 +543,6 @@ export default function OnboardingScreen() {
                         <Text style={{ fontSize: 15, fontWeight: "700", color: T.textPrimary, marginBottom: 3 }}>{option.title}</Text>
                         <Text style={{ fontSize: 13, color: T.textSecondary }}>{option.text}</Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={16} color={T.textTertiary} />
                     </RowCard>
                   </Animated.View>
                 ))}
@@ -674,9 +673,9 @@ export default function OnboardingScreen() {
             }}>
               <Text style={{ fontSize: 13, color: T.textTertiary, textAlign: "center", lineHeight: 20 }}>
                 By continuing, you agree to our{" "}
-                <Text style={{ color: "#10b981", fontWeight: "600" }}>Terms of Service</Text>
+                <Text style={{ color: T.textSecondary, fontWeight: "600" }}>Terms of Service</Text>
                 {" "}and{" "}
-                <Text style={{ color: "#10b981", fontWeight: "600" }}>Privacy Policy</Text>
+                <Text style={{ color: T.textSecondary, fontWeight: "600" }}>Privacy Policy</Text>
               </Text>
             </Animated.View>
           </View>
@@ -753,6 +752,9 @@ export default function OnboardingScreen() {
           <Animated.View entering={FadeIn}>
             <TouchableOpacity
               onPress={handleBack}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
               style={{
                 width: 42, height: 42, borderRadius: 21,
                 alignItems: "center", justifyContent: "center",
@@ -777,6 +779,8 @@ export default function OnboardingScreen() {
           <Animated.View entering={FadeIn.delay(400)}>
             <TouchableOpacity
               onPress={handleSkip}
+              accessibilityRole="button"
+              accessibilityLabel="Skip onboarding"
               style={{
                 paddingHorizontal: 16, paddingVertical: 9,
                 borderRadius: 12,

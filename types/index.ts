@@ -94,6 +94,8 @@ export interface SupabaseUser {
   push_token: string | null
   created_at: string
   updated_at: string
+  monthly_ai_settlements?: number
+  ai_usage_month?: string | null
 }
 
 export interface SupabaseSwipe {
@@ -172,7 +174,13 @@ export interface AIVerdict {
 }
 
 // Notifications
-export type NotificationType = "session_joined" | "movie_matched"
+export type NotificationType =
+  | "session_joined"
+  | "movie_matched"
+  | "streak_increment"
+  | "streak_milestone"
+  | "streak_lost"
+  | "streak_frozen"
 
 export interface AppNotification {
   id: string
@@ -183,5 +191,31 @@ export interface AppNotification {
   data: any | null
   created_at: string
   read_at: string | null
+}
+
+// Streaks
+export interface SessionStreak {
+  id: string
+  session_id: string
+  current_streak: number
+  longest_streak: number
+  last_both_active_date: string | null
+  freeze_available: number
+  freeze_refreshed_at: string | null
+  updated_at: string
+}
+
+export type StreakEvent = "none" | "increment" | "milestone" | "broken" | "frozen"
+
+export interface StreakEvaluation {
+  currentStreak: number
+  longestStreak: number
+  event: StreakEvent
+  previousStreak?: number
+  freezeAvailable: number
+  // Named after the sessionId/user1Id/user2Id args passed to evaluateSessionStreak —
+  // callers map these to "self"/"partner" based on which id matches the current user.
+  user1SwipedToday: boolean
+  user2SwipedToday: boolean
 }
 

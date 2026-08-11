@@ -8,12 +8,14 @@ import { Step4Prefs } from '@/components/steps/Step4Prefs';
 import { Step5Occasion } from '@/components/steps/Step5Occasion';
 import { useMoviePlanner } from '@/hooks/useMoviePlanner';
 import { Genre, PlannerState, StreamingPlatform } from '@/types/planner';
+import { AlertTriangle } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   SafeAreaView,
   ScrollView,
   StatusBar,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 
@@ -52,13 +54,13 @@ export default function MoviePlannerScreen() {
   // Loading state
   if (loading) {
     return (
-      <SafeAreaView className="flex-1" style={{ backgroundColor: '#ffffff' }}>
-        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <SafeAreaView className="flex-1" style={{ backgroundColor: '#0a0a0f' }}>
+        <StatusBar barStyle="light-content" backgroundColor="#0a0a0f" />
         <View className="flex-1 px-5 pt-8">
           <View className="items-center mb-8">
             <Text
-              className="text-2xl"
-              style={{ color: '#FF3B5C', fontFamily: 'PlayfairDisplay_600SemiBold' }}
+              className="text-2xl font-bold"
+              style={{ color: '#FF3B5C' }}
             >
               Duo
             </Text>
@@ -75,23 +77,28 @@ export default function MoviePlannerScreen() {
   // Error state
   if (error) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center px-6" style={{ backgroundColor: '#ffffff' }}>
-        <Text className="text-4xl mb-4">😬</Text>
+      <SafeAreaView className="flex-1 items-center justify-center px-6" style={{ backgroundColor: '#0a0a0f' }}>
+        <View className="w-16 h-16 rounded-2xl items-center justify-center mb-4" style={{ backgroundColor: 'rgba(255,59,92,0.12)' }}>
+          <AlertTriangle size={28} color="#FF3B5C" strokeWidth={1.8} />
+        </View>
         <Text
-          className="text-xl text-text-primary text-center mb-2"
-          style={{ fontFamily: 'PlayfairDisplay_600SemiBold' }}
+          className="text-xl font-bold text-text-primary text-center mb-2"
         >
           Something went wrong
         </Text>
         <Text className="text-sm text-text-muted text-center mb-8">{error}</Text>
-        <View
+        <TouchableOpacity
+          onPress={handleReset}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Try again"
           className="w-full py-4 rounded-xl items-center"
           style={{ backgroundColor: '#FF3B5C' }}
         >
-          <Text className="text-white font-medium" onPress={handleReset}>
+          <Text className="text-white font-medium">
             Try again
           </Text>
-        </View>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }
@@ -99,13 +106,13 @@ export default function MoviePlannerScreen() {
   // Results
   if (plan) {
     return (
-      <SafeAreaView className="flex-1" style={{ backgroundColor: '#ffffff' }}>
-        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <SafeAreaView className="flex-1" style={{ backgroundColor: '#0a0a0f' }}>
+        <StatusBar barStyle="light-content" backgroundColor="#0a0a0f" />
         <ScrollView className="flex-1 px-5 pt-8" showsVerticalScrollIndicator={false}>
           <View className="items-center mb-6">
             <Text
-              className="text-2xl"
-              style={{ color: '#FF3B5C', fontFamily: 'PlayfairDisplay_600SemiBold' }}
+              className="text-2xl font-bold"
+              style={{ color: '#FF3B5C' }}
             >
               Duo
             </Text>
@@ -118,8 +125,8 @@ export default function MoviePlannerScreen() {
 
   // Planner steps
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: '#ffffff' }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+    <SafeAreaView className="flex-1" style={{ backgroundColor: '#0a0a0f' }}>
+      <StatusBar barStyle="light-content" backgroundColor="#0a0a0f" />
       <ScrollView
         className="flex-1 px-5 pt-8"
         showsVerticalScrollIndicator={false}
@@ -128,8 +135,8 @@ export default function MoviePlannerScreen() {
         {/* Header */}
         <View className="items-center mb-8">
           <Text
-            className="text-2xl"
-            style={{ color: '#FF3B5C', fontFamily: 'PlayfairDisplay_600SemiBold' }}
+            className="text-2xl font-bold"
+            style={{ color: '#FF3B5C' }}
           >
             Duo
           </Text>

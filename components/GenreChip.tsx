@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Animated, Text, TouchableOpacity } from 'react-native';
 
@@ -30,6 +31,9 @@ export function GenreChip({
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
       className={`rounded-xl p-3.5 items-center border relative ${
         selected
           ? 'bg-primary/10 border-primary'
@@ -50,7 +54,7 @@ export function GenreChip({
           justifyContent: 'center',
         }}
       >
-        <Text style={{ color: 'white', fontSize: 12 }}>✓</Text>
+        <Check size={13} color="white" strokeWidth={3} />
       </Animated.View>
       <Text className="text-2xl mb-1.5">{emoji}</Text>
       <Text

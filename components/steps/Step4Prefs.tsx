@@ -1,6 +1,7 @@
 
 import { PillChip } from '@/components/PillChip';
 import { Avoid, Era } from '@/types/planner';
+import { Check } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Animated, Text, TouchableOpacity, View } from 'react-native';
 
@@ -66,7 +67,7 @@ function EraItem({ eraData, isSelected, onPress }: { eraData: { value: Era; labe
           justifyContent: 'center',
         }}
       >
-        <Text style={{ color: 'white', fontSize: 12 }}>✓</Text>
+        <Check size={13} color="white" strokeWidth={3} />
       </Animated.View>
       <Text
         style={{
@@ -126,9 +127,9 @@ export function Step4Prefs({
       <Text
         style={{
           fontSize: 24,
+          fontWeight: '700',
           color: '#F0EAE4',
           marginBottom: 8,
-          fontFamily: 'PlayfairDisplay_600SemiBold',
         }}
       >
         Fine-tune the picks
@@ -167,16 +168,17 @@ export function Step4Prefs({
 
       <TouchableOpacity
         onPress={onNext}
+        disabled={!era}
         activeOpacity={0.85}
         style={{
           width: '100%',
           paddingVertical: 16,
           borderRadius: 12,
           alignItems: 'center',
-          backgroundColor: '#FF3B5C',
+          backgroundColor: era ? '#FF3B5C' : '#3a2030',
         }}
       >
-        <Text style={{ fontWeight: '500', fontSize: 15, color: '#ffffff' }}>
+        <Text style={{ fontWeight: '500', fontSize: 15, color: era ? '#ffffff' : '#6a5060' }}>
           Continue →
         </Text>
       </TouchableOpacity>

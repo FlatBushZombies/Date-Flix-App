@@ -1,4 +1,4 @@
-import { MessageBanner } from "@/components/MessageBanner"
+import { useToast } from "@/components/Toast/ToastProvider"
 import { IMAGES } from "@/constants"
 import { googleOAuth } from "@/lib/auth"
 import { useOAuth } from "@clerk/clerk-expo"
@@ -90,17 +90,7 @@ function LogoGlow({ width, height }: { width: number; height: number }) {
 export default function LoginScreen() {
   const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" })
   const insets = useSafeAreaInsets()
-  const [bannerVisible, setBannerVisible] = React.useState(false)
-  const [bannerType, setBannerType] = React.useState<"success" | "error" | "info">("info")
-  const [bannerTitle, setBannerTitle] = React.useState("")
-  const [bannerMessage, setBannerMessage] = React.useState("")
-
-  const showBanner = (type: "success" | "error" | "info", title: string, message: string) => {
-    setBannerType(type)
-    setBannerTitle(title)
-    setBannerMessage(message)
-    setBannerVisible(true)
-  }
+  const toast = useToast()
 
   const handleGoogleSignIn = async () => {
     const result = await googleOAuth(startOAuthFlow)
@@ -108,7 +98,7 @@ export default function LoginScreen() {
       router.replace("/(protected)/post-auth")
       return
     }
-    showBanner("error", "Error", result.message)
+    toast.error("Error", result.message)
   }
 
   // Hero is ~58% of the screen height. The wave (72px) sits at the very bottom
@@ -117,14 +107,6 @@ export default function LoginScreen() {
 
   return (
     <View className="flex-1 bg-white">
-      <MessageBanner
-        visible={bannerVisible}
-        type={bannerType}
-        title={bannerTitle}
-        message={bannerMessage}
-        onDismiss={() => setBannerVisible(false)}
-      />
-
       {/* ── HERO (dark bg + wave bottom) ── */}
       <View style={{ height: heroHeight, backgroundColor: "#0d0307" }}>
 
