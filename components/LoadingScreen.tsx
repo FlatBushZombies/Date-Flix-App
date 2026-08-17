@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Text, View } from 'react-native';
+import { Animated, Easing, Text, View } from 'react-native';
 
 interface LoadingScreenProps {
   message: string;
@@ -7,28 +7,62 @@ interface LoadingScreenProps {
 }
 
 export function LoadingScreen({ message, progress }: LoadingScreenProps) {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const pulseAnim = useRef(new Animated.Value(0)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
+  const breatheAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Slow, soft breathing scale — reads as "expensive" rather than a
+    // mechanical bounce. Asymmetric in/out easing avoids a robotic feel.
     const pulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.08, duration: 800, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1600,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0,
+          duration: 1600,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
       ])
     );
+    // Slower, constant-speed sweep for the accent arc.
     const rotate = Animated.loop(
       Animated.timing(rotateAnim, {
         toValue: 1,
-        duration: 1800,
+        duration: 2600,
+        easing: Easing.linear,
         useNativeDriver: true,
       })
     );
+    // Gentle opacity breathing on the outer halo, offset from the scale pulse.
+    const breathe = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breatheAnim, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(breatheAnim, {
+          toValue: 0,
+          duration: 2000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
     pulse.start();
     rotate.start();
+    breathe.start();
     return () => {
       pulse.stop();
       rotate.stop();
+      breathe.stop();
     };
   }, []);
 
@@ -36,23 +70,31 @@ export function LoadingScreen({ message, progress }: LoadingScreenProps) {
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
   });
+  const scale = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.1],
+  });
+  const haloOpacity = breatheAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.35, 0.9],
+  });
 
   return (
     <View className="items-center py-16">
       {/* Loader container */}
-      <View className="mb-8 relative items-center justify-center" style={{ width: 96, height: 96 }}>
+      <View className="mb-8 relative items-center justify-center" style={{ width: 104, height: 104 }}>
 
-        {/* Outer pulse ring */}
+        {/* Outer breathing halo */}
         <Animated.View
           style={{
             position: 'absolute',
-            inset: 0,
-            width: 96,
-            height: 96,
-            borderRadius: 48,
-            borderWidth: 1.5,
-            borderColor: 'rgba(255,255,255,0.07)',
-            transform: [{ scale: pulseAnim }],
+            width: 104,
+            height: 104,
+            borderRadius: 52,
+            borderWidth: 1,
+            borderColor: 'rgba(255,59,92,0.16)',
+            opacity: haloOpacity,
+            transform: [{ scale }],
           }}
         />
 
@@ -60,13 +102,13 @@ export function LoadingScreen({ message, progress }: LoadingScreenProps) {
         <View
           style={{
             position: 'absolute',
-            top: 10,
-            left: 10,
+            top: 14,
+            left: 14,
             width: 76,
             height: 76,
             borderRadius: 38,
             borderWidth: 1.5,
-            borderColor: 'rgba(255,59,92,0.18)',
+            borderColor: 'rgba(255,59,92,0.16)',
           }}
         />
 
@@ -74,14 +116,14 @@ export function LoadingScreen({ message, progress }: LoadingScreenProps) {
         <Animated.View
           style={{
             position: 'absolute',
-            top: 10,
-            left: 10,
+            top: 14,
+            left: 14,
             width: 76,
             height: 76,
             borderRadius: 38,
             borderWidth: 1.5,
             borderTopColor: '#FF3B5C',
-            borderRightColor: 'rgba(255,59,92,0.3)',
+            borderRightColor: 'rgba(255,59,92,0.35)',
             borderBottomColor: 'transparent',
             borderLeftColor: 'transparent',
             transform: [{ rotate }],
@@ -92,14 +134,14 @@ export function LoadingScreen({ message, progress }: LoadingScreenProps) {
         <View
           style={{
             position: 'absolute',
-            top: 22,
-            left: 22,
+            top: 26,
+            left: 26,
             width: 52,
             height: 52,
             borderRadius: 26,
-            backgroundColor: 'rgba(255,59,92,0.06)',
+            backgroundColor: 'rgba(255,59,92,0.07)',
             borderWidth: 1,
-            borderColor: 'rgba(255,59,92,0.2)',
+            borderColor: 'rgba(255,59,92,0.22)',
             alignItems: 'center',
             justifyContent: 'center',
           }}
@@ -107,28 +149,14 @@ export function LoadingScreen({ message, progress }: LoadingScreenProps) {
           <Text
             style={{
               color: '#FF3B5C',
-              fontSize: 11,
-              fontWeight: '500',
-              letterSpacing: 0.5,
+              fontSize: 12,
+              fontWeight: '600',
+              letterSpacing: 0.3,
             }}
           >
             {progress}%
           </Text>
         </View>
-
-        {/* Accent dot */}
-        <Animated.View
-          style={{
-            position: 'absolute',
-            top: 6,
-            right: 6,
-            width: 8,
-            height: 8,
-            borderRadius: 4,
-            backgroundColor: '#FF3B5C',
-            transform: [{ scale: pulseAnim }],
-          }}
-        />
       </View>
 
       <Text

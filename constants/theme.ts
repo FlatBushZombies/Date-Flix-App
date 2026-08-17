@@ -75,3 +75,29 @@ export const duration = {
   base: 250,
   slow: 400,
 } as const
+
+// Soft, neutral shadows — never colored/heavy. Cards should feel like they're
+// resting gently above the background, not casting a hard drop shadow.
+export const shadow = {
+  sm: {
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  md: {
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  lg: {
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.12,
+    shadowRadius: 28,
+    elevation: 12,
+  },
+} as const

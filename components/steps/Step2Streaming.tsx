@@ -46,21 +46,21 @@ export function Step2Streaming({
       
       {/* Back */}
       <TouchableOpacity onPress={onBack} style={{ marginBottom: 16 }}>
-        <Text style={{ color: '#9CA3AF' }}>← Back</Text>
+        <Text style={{ color: '#4b5563' }}>← Back</Text>
       </TouchableOpacity>
 
-      {/* Glass Container */}
+      {/* Card container */}
       <View style={{
-        backgroundColor: 'rgba(255,255,255,0.05)',
+        backgroundColor: '#ffffff',
         borderRadius: 28,
         padding: 20,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
+        borderColor: '#18161c',
       }}>
-        
+
         <Text style={{
           fontSize: 11,
-          color: '#FF3B5C',
+          color: '#C81E4B',
           letterSpacing: 1.5,
           marginBottom: 8,
         }}>
@@ -69,7 +69,8 @@ export function Step2Streaming({
 
         <Text style={{
           fontSize: 26,
-          color: '#FFFFFF',
+          fontWeight: '700',
+          color: '#14121A',
           marginBottom: 6,
         }}>
           Where will you watch?
@@ -77,7 +78,7 @@ export function Step2Streaming({
 
         <Text style={{
           fontSize: 13,
-          color: '#A1A1AA',
+          color: '#4b5563',
           marginBottom: 24,
         }}>
           Select your streaming services
@@ -108,9 +109,9 @@ export function Step2Streaming({
             borderRadius: 20,
             alignItems: 'center',
             marginBottom: 28,
-            borderWidth: 1,
-            backgroundColor: anyStreaming ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.03)',
-            borderColor: anyStreaming ? '#3B82F6' : 'rgba(255,255,255,0.08)',
+            borderWidth: anyStreaming ? 2 : 1,
+            backgroundColor: anyStreaming ? 'rgba(255,59,92,0.08)' : '#ffffff',
+            borderColor: anyStreaming ? '#FF3B5C' : '#18161c',
             position: 'relative',
           }}
         >
@@ -131,7 +132,7 @@ export function Step2Streaming({
             <Check size={13} color="white" strokeWidth={3} />
           </Animated.View>
           <Text style={{
-            color: anyStreaming ? '#93C5FD' : '#9CA3AF',
+            color: anyStreaming ? '#C81E4B' : '#4b5563',
             fontSize: 13,
           }}>
             I don&apos;t mind — show me anything
@@ -148,12 +149,13 @@ export function Step2Streaming({
             paddingVertical: 16,
             borderRadius: 999,
             alignItems: 'center',
-            backgroundColor: canContinue ? '#3B82F6' : '#1f2937',
+            backgroundColor: canContinue ? '#FF3B5C' : '#eceaea',
           }}
         >
           <Text style={{
             fontSize: 15,
-            color: canContinue ? '#fff' : '#6b7280',
+            fontWeight: '500',
+            color: canContinue ? '#fff' : '#9a969e',
           }}>
             Continue →
           </Text>

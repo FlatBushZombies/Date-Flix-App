@@ -18,6 +18,7 @@ import { useUser } from "@clerk/clerk-expo"
 import { LinearGradient } from "expo-linear-gradient"
 import * as Sharing from "expo-sharing"
 import { captureRef } from "react-native-view-shot"
+import Svg, { Circle } from "react-native-svg"
 import Animated, {
   FadeInDown,
   FadeIn,
@@ -67,6 +68,7 @@ import type { DebateSession } from "@/types"
 import { useToast } from "@/components/Toast/ToastProvider"
 import { useConfirm } from "@/components/Confirm/ConfirmProvider"
 import { CARD_HEIGHT, CARD_WIDTH, CompatibilityCard } from "@/components/CompatibilityCard"
+import { shadow } from "@/constants/theme"
 
 const { height } = Dimensions.get("window")
 
@@ -177,6 +179,54 @@ function PremiumAvatar({
           }}
         />
       )}
+    </View>
+  )
+}
+
+// ─── Compact circular score ring (compatibility %) ───────────────────────────
+
+function ScoreRing({
+  score,
+  size = 50,
+  strokeWidth = 4.5,
+}: {
+  score: number
+  size?: number
+  strokeWidth?: number
+}) {
+  const radius = (size - strokeWidth) / 2
+  const circumference = 2 * Math.PI * radius
+  const progress = Math.max(0, Math.min(100, score)) / 100
+  const strokeDashoffset = circumference * (1 - progress)
+
+  return (
+    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+      <Svg width={size} height={size}>
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="rgba(255,255,255,0.28)"
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="#ffffff"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          fill="none"
+          rotation={-90}
+          origin={[size / 2, size / 2]}
+        />
+      </Svg>
+      <View style={{ position: "absolute", alignItems: "center" }}>
+        <Text style={{ fontSize: size * 0.24, fontWeight: "800", color: "#fff" }}>{score}%</Text>
+      </View>
     </View>
   )
 }
@@ -1161,171 +1211,191 @@ export default function DebateSettlerScreen() {
             <TouchableOpacity activeOpacity={1}>
               <Animated.View
                 entering={FadeInDown.springify()}
-                className="bg-white rounded-t-[28px] px-6 pt-3 pb-11"
-                style={{ maxHeight: height * 0.87 }}
+                className="rounded-t-[28px] overflow-hidden"
+                style={{ maxHeight: height * 0.89 }}
               >
-              {/* Drag handle */}
-              <View className="w-9 h-1 rounded-full bg-gray-200 self-center mb-5" />
+                <LinearGradient
+                  colors={["#ec4899", "#7c3aed"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{ paddingTop: 12, paddingBottom: 28, paddingHorizontal: 18 }}
+                >
+                  {/* Drag handle */}
+                  <View className="w-9 h-1 rounded-full bg-white/35 self-center mb-4" />
 
-              <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Modal header */}
-                <View className="items-center mb-6">
-                  <LinearGradient
-                    colors={["#ec4899", "#8B5CF6"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    className="w-[68px] h-[68px] rounded-full items-center justify-center mb-3.5"
-                    style={{
-                      elevation: 6,
-                      shadowColor: "#ec4899",
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.3,
-                      shadowRadius: 10,
-                    }}
-                  >
-                    <HeartIcon size={28} color="#fff" />
-                  </LinearGradient>
-                  <Text className="text-[22px] font-extrabold text-[#1a0a0f] tracking-tight">
-                    Perfect Match Found!
-                  </Text>
-                </View>
-
-                {activeSession.ai_verdict && (
-                  <>
-                    {/* Main recommendation */}
-                    <LinearGradient
-                      colors={["#fdf2f8", "#fce7f3"]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      className="rounded-[20px] p-6 items-center mb-5"
-                    >
-                      <Text
-                        className="text-[11px] font-bold text-pink-500 mb-2.5"
-                        style={{ textTransform: "uppercase", letterSpacing: 1.5 }}
-                      >
-                        Tonight's Pick
-                      </Text>
-                      <Text className="text-[26px] font-black text-[#1a0a0f] text-center mb-4 tracking-tight">
-                        {activeSession.ai_verdict.recommendation}
-                      </Text>
-                      <View className="flex-row items-baseline gap-x-1.5 bg-pink-500/10 px-4 py-2 rounded-full">
-                        <Text className="text-[22px] font-extrabold text-pink-600">
-                          {activeSession.ai_verdict.compatibilityScore}%
-                        </Text>
-                        <Text className="text-[13px] font-medium text-pink-900">
-                          compatibility
+                  <ScrollView showsVerticalScrollIndicator={false}>
+                    {/* Top bar — headline + compatibility ring */}
+                    <View className="flex-row items-center justify-between mb-4">
+                      <View className="flex-row items-center gap-x-2.5 flex-1 pr-3">
+                        <View className="w-9 h-9 rounded-full bg-white/20 items-center justify-center">
+                          <HeartIcon size={17} color="#fff" />
+                        </View>
+                        <Text
+                          className="text-white text-[16px] font-extrabold tracking-tight flex-1"
+                          numberOfLines={1}
+                        >
+                          Perfect Match Found!
                         </Text>
                       </View>
-                    </LinearGradient>
-
-                    {/* Reasoning */}
-                    <View className="mb-4">
-                      <Text className="text-[15px] text-gray-600 leading-6 text-center">
-                        {activeSession.ai_verdict.reasoning}
-                      </Text>
-                    </View>
-
-                    {/* Couple insight */}
-                    <View className="flex-row items-start bg-violet-50 p-3.5 rounded-[14px] mb-6 gap-x-2.5 border border-violet-200">
-                      <View className="w-7 h-7 rounded-full bg-violet-100 items-center justify-center shrink-0 mt-0.5">
-                        <SparklesIcon size={16} color="#7c3aed" />
-                      </View>
-                      <Text className="flex-1 text-[13px] text-violet-700 italic leading-[19px]">
-                        {activeSession.ai_verdict.coupleInsight}
-                      </Text>
-                    </View>
-
-                    {/* Alternatives */}
-                    <View className="mb-6">
-                      <Text className="text-[15px] font-bold text-[#1a0a0f] mb-3">
-                        Other Great Options
-                      </Text>
-                      {activeSession.ai_verdict.movieSuggestions
-                        .slice(1)
-                        .map((movie: any, index: number) => (
-                          <View
-                            key={index}
-                            className="flex-row items-start bg-gray-50 p-3.5 rounded-[14px] mb-2 gap-x-3 border border-gray-100"
-                          >
-                            <View className="w-[26px] h-[26px] rounded-full bg-pink-100 items-center justify-center shrink-0 mt-0.5">
-                              <Text className="text-[12px] font-bold text-pink-500">
-                                {index + 2}
-                              </Text>
-                            </View>
-                            <View className="flex-1">
-                              <Text className="text-[14px] font-bold text-[#1a0a0f] mb-0.5">
-                                {movie.title}
-                              </Text>
-                              <Text className="text-[12px] text-gray-400 leading-[17px]">
-                                {movie.reason}
-                              </Text>
-                            </View>
-                          </View>
-                        ))}
-                    </View>
-                  </>
-                )}
-
-                {/* Verdict actions */}
-                <View className="gap-y-2.5">
-                  <PrimaryButton
-                    onPress={() => {
-                      setShowVerdictModal(false)
-                      toast.info(
-                        "Enjoy Your Movie Night!",
-                        "Head to the Discover tab to find where to watch your movie."
-                      )
-                    }}
-                    colors={["#ec4899", "#db2777"]}
-                  >
-                    <PlayCircleIcon size={20} color="#fff" />
-                    <Text className="text-white text-[16px] font-bold">Let's Watch!</Text>
-                  </PrimaryButton>
-
-                  {activeSession.ai_verdict && (
-                    <TouchableOpacity
-                      className="py-[15px] items-center justify-center rounded-[18px] border-[1.5px] border-pink-300 bg-transparent flex-row"
-                      style={{ gap: 8 }}
-                      onPress={handleShareCompatibilityCard}
-                      disabled={isSharingCard}
-                      activeOpacity={0.7}
-                    >
-                      {isSharingCard ? (
-                        <ActivityIndicator color="#ec4899" size="small" />
-                      ) : (
-                        <>
-                          <ShareIcon size={17} color="#ec4899" />
-                          <Text className="text-pink-500 text-[15px] font-semibold">
-                            Share Compatibility
-                          </Text>
-                        </>
+                      {activeSession.ai_verdict && (
+                        <ScoreRing score={activeSession.ai_verdict.compatibilityScore} size={50} />
                       )}
-                    </TouchableOpacity>
-                  )}
+                    </View>
 
-                  <TouchableOpacity
-                    className="py-[13px] items-center justify-center"
-                    onPress={() =>
-                      confirm.show({
-                        title: "Start New Debate?",
-                        message: "This will discard tonight's result. You'll lose this verdict for good.",
-                        variant: "warning",
-                        buttons: [
-                          { label: "Cancel", style: "cancel" },
-                          { label: "Start New", style: "destructive", onPress: resetSession },
-                        ],
-                      })
-                    }
-                    activeOpacity={0.7}
-                    accessibilityRole="button"
-                    accessibilityLabel="Start a new debate, discarding tonight's result"
-                  >
-                    <Text className="text-gray-400 text-[14px] font-medium">
-                      Start New Debate
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
+                    {/* Participants — decorative, mirrors the two real players */}
+                    <View className="flex-row items-center justify-center mb-5">
+                      <View style={{ zIndex: 2 }}>
+                        <PremiumAvatar
+                          imageUrl={host?.image_url}
+                          initials={host?.first_name?.[0]}
+                          size={34}
+                          gradientColors={["#8B5CF6", "#7C3AED"]}
+                          ringColors={["#ffffff", "#ffffff", "#ffffff"]}
+                        />
+                      </View>
+                      <View style={{ zIndex: 1, marginLeft: -14 }}>
+                        <PremiumAvatar
+                          imageUrl={partner?.image_url}
+                          initials={partner?.first_name?.[0]}
+                          size={34}
+                          gradientColors={["#ec4899", "#f472b6"]}
+                          ringColors={["#ffffff", "#ffffff", "#ffffff"]}
+                        />
+                      </View>
+                    </View>
+
+                    {activeSession.ai_verdict && (
+                      <View className="bg-white rounded-[22px] px-5 pt-5 pb-4 mb-4" style={shadow.lg}>
+                        <View className="self-start bg-pink-50 px-3 py-1 rounded-full mb-3">
+                          <Text
+                            className="text-[10.5px] font-bold text-pink-500"
+                            style={{ textTransform: "uppercase", letterSpacing: 1.3 }}
+                          >
+                            Tonight's Pick
+                          </Text>
+                        </View>
+
+                        <Text className="text-[23px] font-black text-[#1a0a0f] leading-7 tracking-tight mb-2.5">
+                          {activeSession.ai_verdict.recommendation}
+                        </Text>
+
+                        <Text className="text-[14px] text-gray-500 leading-[20px] mb-3.5">
+                          {activeSession.ai_verdict.reasoning}
+                        </Text>
+
+                        {/* Couple insight */}
+                        <View className="flex-row items-start bg-violet-50 px-3 py-2.5 rounded-[12px] mb-4 gap-x-2">
+                          <SparklesIcon size={14} color="#7c3aed" style={{ marginTop: 1 }} />
+                          <Text className="flex-1 text-[12px] text-violet-700 italic leading-[17px]">
+                            {activeSession.ai_verdict.coupleInsight}
+                          </Text>
+                        </View>
+
+                        {/* Alternates — compact mini card-stack */}
+                        <Text
+                          className="text-[11px] font-bold text-gray-400 mb-2"
+                          style={{ textTransform: "uppercase", letterSpacing: 1 }}
+                        >
+                          Other Great Options
+                        </Text>
+                        <View className="flex-row">
+                          {activeSession.ai_verdict.movieSuggestions
+                            .slice(1)
+                            .map((movie: any, index: number) => (
+                              <View
+                                key={index}
+                                className="flex-1 bg-gray-50 rounded-[14px] p-3 border border-gray-100"
+                                style={{
+                                  marginLeft: index === 0 ? 0 : -10,
+                                  zIndex: index === 0 ? 2 : 1,
+                                  transform: [{ rotate: index === 0 ? "-1.5deg" : "1.5deg" }],
+                                  ...shadow.sm,
+                                }}
+                              >
+                                <View className="w-5 h-5 rounded-full bg-pink-100 items-center justify-center mb-1.5">
+                                  <Text className="text-[10px] font-bold text-pink-500">
+                                    {index + 2}
+                                  </Text>
+                                </View>
+                                <Text
+                                  numberOfLines={1}
+                                  className="text-[12.5px] font-bold text-[#1a0a0f] mb-0.5"
+                                >
+                                  {movie.title}
+                                </Text>
+                                <Text
+                                  numberOfLines={2}
+                                  className="text-[10.5px] text-gray-400 leading-[14px]"
+                                >
+                                  {movie.reason}
+                                </Text>
+                              </View>
+                            ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Verdict actions */}
+                    <View className="gap-y-2.5">
+                      <PrimaryButton
+                        onPress={() => {
+                          setShowVerdictModal(false)
+                          toast.info(
+                            "Enjoy Your Movie Night!",
+                            "Head to the Discover tab to find where to watch your movie."
+                          )
+                        }}
+                        colors={["#ec4899", "#db2777"]}
+                      >
+                        <PlayCircleIcon size={20} color="#fff" />
+                        <Text className="text-white text-[16px] font-bold">Let's Watch!</Text>
+                      </PrimaryButton>
+
+                      {activeSession.ai_verdict && (
+                        <TouchableOpacity
+                          className="py-[15px] items-center justify-center rounded-[18px] border-[1.5px] border-white/40 bg-white/10 flex-row"
+                          style={{ gap: 8 }}
+                          onPress={handleShareCompatibilityCard}
+                          disabled={isSharingCard}
+                          activeOpacity={0.7}
+                        >
+                          {isSharingCard ? (
+                            <ActivityIndicator color="#fff" size="small" />
+                          ) : (
+                            <>
+                              <ShareIcon size={17} color="#fff" />
+                              <Text className="text-white text-[15px] font-semibold">
+                                Share Compatibility
+                              </Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      )}
+
+                      <TouchableOpacity
+                        className="py-[13px] items-center justify-center"
+                        onPress={() =>
+                          confirm.show({
+                            title: "Start New Debate?",
+                            message: "This will discard tonight's result. You'll lose this verdict for good.",
+                            variant: "warning",
+                            buttons: [
+                              { label: "Cancel", style: "cancel" },
+                              { label: "Start New", style: "destructive", onPress: resetSession },
+                            ],
+                          })
+                        }
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel="Start a new debate, discarding tonight's result"
+                      >
+                        <Text className="text-white/70 text-[14px] font-medium">
+                          Start New Debate
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </ScrollView>
+                </LinearGradient>
               </Animated.View>
             </TouchableOpacity>
           </TouchableOpacity>

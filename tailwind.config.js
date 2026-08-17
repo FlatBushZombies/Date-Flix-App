@@ -6,14 +6,17 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: '#3B82F6',
-        'primary-light': '#60A5FA',
-        surface: '#1f2937',
-        'surface-2': '#374151',
+        // NOTE: these tokens back the "Discover" movie-night planner flow
+        // (app/(tabs)/discover.tsx and its children) only — confirmed via
+        // repo-wide grep before repointing. White/premium theme values.
+        primary: '#FF3B5C',
+        'primary-light': '#C81E4B',
+        surface: '#ffffff',
+        'surface-2': '#18161c',
         text: {
-          primary: '#ffffff',
-          secondary: '#d1d5db',
-          muted: '#9ca3af'
+          primary: '#14121A',
+          secondary: '#4b5563',
+          muted: '#6b7280'
         }
       }
     },

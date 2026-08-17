@@ -1,7 +1,8 @@
 import { BottomSheet } from "@/components/ui/BottomSheet"
+import { EmptyState } from "@/components/ui/EmptyState"
+import { CloudOff, X, BellOff } from "lucide-react-native"
 import React from "react"
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native"
-import { Ionicons } from "@expo/vector-icons"
 import type { AppNotification } from "@/types"
 
 function timeAgo(iso: string) {
@@ -46,7 +47,7 @@ export function NotificationsModal({
             accessibilityRole="button"
             accessibilityLabel="Close notifications"
           >
-            <Ionicons name="close" size={22} color="#6b7280" />
+            <X size={22} color="#6b7280" />
           </TouchableOpacity>
         </View>
         <TouchableOpacity onPress={onMarkAllRead} style={{ alignSelf: "flex-start", paddingVertical: 6 }}>
@@ -60,39 +61,23 @@ export function NotificationsModal({
           <Text style={{ marginTop: 10, color: "#6b7280", fontWeight: "600" }}>Loading…</Text>
         </View>
       ) : error ? (
-        <View style={{ padding: 22, alignItems: "center" }}>
-          <Ionicons name="cloud-offline-outline" size={34} color="#ef4444" />
-          <Text style={{ marginTop: 10, color: "#111827", fontWeight: "700" }}>Couldn't load notifications</Text>
-          <Text style={{ marginTop: 4, color: "#6b7280", fontSize: 13, textAlign: "center" }}>
-            Check your connection and try again.
-          </Text>
-          <TouchableOpacity
-            onPress={onRetry}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Retry loading notifications"
-            style={{
-              marginTop: 16,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 6,
-              backgroundColor: "#ec4899",
-              borderRadius: 14,
-              paddingHorizontal: 18,
-              paddingVertical: 10,
-            }}
-          >
-            <Ionicons name="refresh" size={15} color="#fff" />
-            <Text style={{ color: "#fff", fontWeight: "700" }}>Retry</Text>
-          </TouchableOpacity>
-        </View>
+        <EmptyState
+          icon={<CloudOff size={32} color="#ef4444" strokeWidth={1.6} />}
+          title="Couldn't Load Notifications"
+          description="Check your connection and try again."
+          actionLabel="Retry"
+          onAction={onRetry}
+          tintColor="#ef4444"
+        />
       ) : (
         <ScrollView contentContainerStyle={{ padding: 14 }}>
           {items.length === 0 ? (
-            <View style={{ padding: 22, alignItems: "center" }}>
-              <Ionicons name="notifications-off-outline" size={34} color="#9ca3af" />
-              <Text style={{ marginTop: 10, color: "#6b7280", fontWeight: "700" }}>All caught up</Text>
-            </View>
+            <EmptyState
+              icon={<BellOff size={32} color="#9ca3af" strokeWidth={1.6} />}
+              title="All Caught Up"
+              description="You don't have any notifications right now."
+              tintColor="#9ca3af"
+            />
           ) : (
             items.map((n) => (
               <TouchableOpacity

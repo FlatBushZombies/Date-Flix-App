@@ -5,7 +5,9 @@ import { useState, useEffect } from "react"
 import { useUser } from "@clerk/clerk-expo"
 import { useToast } from "@/components/Toast/ToastProvider"
 import { withAffiliateTag } from "@/utils/affiliateLinks"
+import { EmptyState } from "@/components/ui/EmptyState"
 import { Ionicons } from "@expo/vector-icons"
+import { CloudOff, Heart } from "lucide-react-native"
 import { getUserMatches, syncUserWithSupabase } from "@/utils/supabase-helpers"
 import { STREAMING_PLATFORMS, getWatchUrl } from "@/lib/streaming"
 import type { SupabaseMatch, SupabaseUser } from "@/types"
@@ -89,37 +91,14 @@ export default function MatchScreen() {
           <Text style={styles.headerTitle}>Your Matches</Text>
         </View>
 
-        <View style={styles.emptyContainer}>
-          <LinearGradient
-            colors={["#fee2e2", "#fecaca"]}
-            style={styles.emptyIconContainer}
-          >
-            <Ionicons name="cloud-offline-outline" size={64} color="#ef4444" />
-          </LinearGradient>
-          <Text style={styles.emptyTitle}>Couldn't Load Matches</Text>
-          <Text style={styles.emptySubtitle}>
-            Something went wrong reaching the server. Check your connection and try again.
-          </Text>
-          <TouchableOpacity
-            onPress={loadMatches}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Retry loading matches"
-            style={{
-              marginTop: 20,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              backgroundColor: "#ec4899",
-              borderRadius: 16,
-              paddingHorizontal: 20,
-              paddingVertical: 12,
-            }}
-          >
-            <Ionicons name="refresh" size={16} color="#fff" />
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Retry</Text>
-          </TouchableOpacity>
-        </View>
+        <EmptyState
+          icon={<CloudOff size={40} color="#ef4444" strokeWidth={1.6} />}
+          title="Couldn't Load Matches"
+          description="Something went wrong reaching the server. Check your connection and try again."
+          actionLabel="Retry"
+          onAction={loadMatches}
+          tintColor="#ef4444"
+        />
       </View>
     )
   }
@@ -133,19 +112,11 @@ export default function MatchScreen() {
           <Text style={styles.headerSubtitle}>Movies you and your friends both loved</Text>
         </View>
 
-        {/* Empty State */}
-        <View style={styles.emptyContainer}>
-          <LinearGradient
-            colors={["#fce7f3", "#fbcfe8"]}
-            style={styles.emptyIconContainer}
-          >
-            <Ionicons name="heart-outline" size={64} color="#ec4899" />
-          </LinearGradient>
-          <Text style={styles.emptyTitle}>No Matches Yet</Text>
-          <Text style={styles.emptySubtitle}>
-            Invite friends and start swiping together to find movies you both love!
-          </Text>
-        </View>
+        <EmptyState
+          icon={<Heart size={40} color="#ec4899" strokeWidth={1.6} />}
+          title="No Matches Yet"
+          description="Invite friends and start swiping together to find movies you both love!"
+        />
       </View>
     )
   }
@@ -394,33 +365,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#6b7280",
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 40,
-    paddingBottom: 100,
-  },
-  emptyIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  emptyTitle: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#111827",
-    marginBottom: 12,
-  },
-  emptySubtitle: {
-    fontSize: 16,
-    color: "#6b7280",
-    textAlign: "center",
-    lineHeight: 24,
-  },
   matchesContainer: {
     paddingHorizontal: 24,
     paddingBottom: 40,
@@ -430,11 +374,11 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     marginBottom: 20,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
     shadowRadius: 16,
-    elevation: 8,
+    elevation: 6,
   },
   posterContainer: {
     position: "relative",

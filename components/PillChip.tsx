@@ -27,10 +27,10 @@ export function PillChip({ label, selected, onPress }: PillChipProps) {
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected }}
-      className={`rounded-full px-4 py-2 border relative ${
+      className={`rounded-full px-4 py-2.5 relative ${
         selected
-          ? 'bg-primary/10 border-primary'
-          : 'bg-surface border-surface-2'
+          ? 'bg-primary/10 border-2 border-primary'
+          : 'bg-surface border border-surface-2'
       }`}
     >
       <Animated.View

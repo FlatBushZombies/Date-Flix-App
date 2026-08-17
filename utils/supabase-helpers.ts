@@ -182,6 +182,52 @@ export const getUserMatches = async (userId: string) => {
   return data as (SupabaseMatch & { user1: SupabaseUser; user2: SupabaseUser })[]
 }
 
+// ==================== WATCHLIST ====================
+
+export const saveToWatchlist = async (userId: string, movie: Movie) => {
+  const { error } = await supabase
+    .from("watchlist")
+    .upsert(
+      { user_id: userId, movie_id: movie.id, movie_data: movie },
+      { onConflict: "user_id,movie_id" },
+    )
+
+  if (error) {
+    console.error("[v0] Error saving to watchlist:", error)
+    return false
+  }
+  return true
+}
+
+export const removeFromWatchlist = async (userId: string, movieId: number) => {
+  const { error } = await supabase
+    .from("watchlist")
+    .delete()
+    .eq("user_id", userId)
+    .eq("movie_id", movieId)
+
+  if (error) {
+    console.error("[v0] Error removing from watchlist:", error)
+    return false
+  }
+  return true
+}
+
+// Returns null on fetch failure (distinct from a genuinely empty watchlist).
+export const getWatchlist = async (userId: string) => {
+  const { data, error } = await supabase
+    .from("watchlist")
+    .select("movie_id, movie_data, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("[v0] Error fetching watchlist:", error)
+    return null
+  }
+  return data as { movie_id: number; movie_data: Movie; created_at: string }[]
+}
+
 // Invitation Management
 export const createInvitation = async (senderId: string, recipientEmail?: string) => {
   const inviteCode = Math.random().toString(36).substring(2, 10).toUpperCase()
@@ -1045,7 +1091,18 @@ export const deleteUserAccount = async (userId: string) => {
       throw new Error("Failed to delete notifications")
     }
 
-    // 2. Delete swipes (references user_id)
+    // 2. Delete watchlist (references user_id)
+    const { error: watchlistError } = await supabase
+      .from("watchlist")
+      .delete()
+      .eq("user_id", userId)
+
+    if (watchlistError) {
+      console.error("[v0] Error deleting watchlist:", watchlistError)
+      throw new Error("Failed to delete watchlist")
+    }
+
+    // 3. Delete swipes (references user_id)
     const { error: swipesError } = await supabase
       .from("swipes")
       .delete()
@@ -1056,7 +1113,7 @@ export const deleteUserAccount = async (userId: string) => {
       throw new Error("Failed to delete swipes")
     }
 
-    // 3. Delete matches (references user1_id and user2_id)
+    // 4. Delete matches (references user1_id and user2_id)
     const { error: matchesError } = await supabase
       .from("matches")
       .delete()
@@ -1067,7 +1124,7 @@ export const deleteUserAccount = async (userId: string) => {
       throw new Error("Failed to delete matches")
     }
 
-    // 4. Delete invitations (references sender_id and recipient_id)
+    // 5. Delete invitations (references sender_id and recipient_id)
     const { error: invitationsError } = await supabase
       .from("invitations")
       .delete()
@@ -1078,7 +1135,7 @@ export const deleteUserAccount = async (userId: string) => {
       throw new Error("Failed to delete invitations")
     }
 
-    // 5. Delete swipe sessions (references user1_id and user2_id)
+    // 6. Delete swipe sessions (references user1_id and user2_id)
     const { error: sessionsError } = await supabase
       .from("swipe_sessions")
       .delete()
@@ -1089,7 +1146,7 @@ export const deleteUserAccount = async (userId: string) => {
       throw new Error("Failed to delete swipe sessions")
     }
 
-    // 6. Delete debate sessions (references host_id and partner_id)
+    // 7. Delete debate sessions (references host_id and partner_id)
     const { error: debateError } = await supabase
       .from("debate_sessions")
       .delete()
@@ -1100,7 +1157,7 @@ export const deleteUserAccount = async (userId: string) => {
       throw new Error("Failed to delete debate sessions")
     }
 
-    // 7. Finally, delete the user record
+    // 8. Finally, delete the user record
     const { error: userError } = await supabase
       .from("users")
       .delete()

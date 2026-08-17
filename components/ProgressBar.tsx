@@ -12,9 +12,8 @@ export function ProgressBar({ currentStep, totalSteps }: ProgressBarProps) {
       {Array.from({ length: totalSteps }).map((_, i) => (
         <View
           key={i}
-          className={`flex-1 h-0.5 rounded-full ${
-            i < currentStep ? 'bg-primary' : 'bg-surface-2'
-          }`}
+          className="flex-1 h-0.5 rounded-full"
+          style={{ backgroundColor: i < currentStep ? '#FF3B5C' : '#374151' }}
         />
       ))}
     </View>

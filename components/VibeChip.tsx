@@ -27,10 +27,10 @@ export function VibeChip({ label, emoji, selected, onPress }: VibeChipProps) {
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected }}
-      className={`rounded-xl py-3 px-2 items-center border relative ${
+      className={`rounded-2xl py-3.5 px-2 items-center relative ${
         selected
-          ? 'bg-primary/10 border-primary'
-          : 'bg-surface border-surface-2'
+          ? 'bg-primary/10 border-2 border-primary'
+          : 'bg-surface border border-surface-2'
       }`}
     >
       <Animated.View

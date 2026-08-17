@@ -1,4 +1,4 @@
-import { color, radius } from "@/constants/theme"
+import { color, radius, shadow } from "@/constants/theme"
 import React from "react"
 import { Modal, TouchableOpacity, View } from "react-native"
 
@@ -31,6 +31,7 @@ export function BottomSheet({
             borderTopLeftRadius: radius["3xl"],
             borderTopRightRadius: radius["3xl"],
             maxHeight: `${maxHeightPercent * 100}%` as `${number}%`,
+            ...shadow.lg,
           }}
         >
           <View style={{ alignItems: "center", paddingTop: 12 }}>

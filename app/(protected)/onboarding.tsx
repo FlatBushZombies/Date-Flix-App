@@ -26,16 +26,16 @@ import {
 } from "react-native-heroicons/outline"
 import {
   HeartIcon as HeartSolid,
-  SparklesIcon as SparklesSolid,
   ShieldCheckIcon as ShieldSolid,
+  CheckIcon as CheckSolid,
 } from "react-native-heroicons/solid"
-import { LinearGradient } from "expo-linear-gradient"
 import Animated, {
   FadeIn,
   FadeInDown,
   FadeInUp,
   SlideInRight,
   SlideOutLeft,
+  ZoomIn,
   useSharedValue,
   useAnimatedStyle,
   withSpring,
@@ -49,23 +49,23 @@ const { width, height } = Dimensions.get("window")
 // Single source of truth — one accent, one background family, consistent opacity scale
 const T = {
   // Backgrounds
-  bg:        "#07080f",   // deepest bg
-  surface:   "#0e1018",   // card surface
+  bg:        "#ffffff",   // page background — pure white
+  surface:   "#f4f4f7",   // light gray card / pill fill
   // Borders
-  borderLo:  "rgba(255,255,255,0.08)",
-  borderMid: "rgba(255,255,255,0.13)",
+  borderLo:  "rgba(17,17,23,0.06)",
+  borderMid: "rgba(17,17,23,0.10)",
   // Text
-  textPrimary:   "#ffffff",
-  textSecondary: "rgba(255,255,255,0.55)",
-  textTertiary:  "rgba(255,255,255,0.30)",
+  textPrimary:   "#15151c",
+  textSecondary: "rgba(21,21,28,0.56)",
+  textTertiary:  "rgba(21,21,28,0.36)",
   // Accent — single colour used everywhere
   accent:    "#ec4899",
   accentBg:  "rgba(236,72,153,0.12)",  // tinted surface
   accentRim: "rgba(236,72,153,0.28)",  // border on tinted surface
   // Type scale
   headingSize: 32,
-  headingWeight: "700" as const,
-  headingLine: 40,
+  headingWeight: "800" as const,
+  headingLine: 39,
   bodySize: 15,
   bodyLine: 24,
   labelSize: 11,
@@ -256,7 +256,7 @@ function CTAButton({
         style={{
           width: "100%",
           height: 58,
-          borderRadius: 18,
+          borderRadius: 29,
           backgroundColor: T.accent,
           flexDirection: "row",
           alignItems: "center",
@@ -264,10 +264,10 @@ function CTAButton({
           gap: 10,
           // Subtle glow — only on iOS (elevation on Android avoids artefact)
           shadowColor: T.accent,
-          shadowOpacity: 0.38,
-          shadowRadius: 18,
-          shadowOffset: { width: 0, height: 6 },
-          elevation: 8,
+          shadowOpacity: 0.32,
+          shadowRadius: 20,
+          shadowOffset: { width: 0, height: 8 },
+          elevation: 6,
         }}
       >
         {iconLeft}
@@ -280,7 +280,7 @@ function CTAButton({
   )
 }
 
-// Ghost button with a visible border
+// Ghost / secondary button — soft light-gray pill, no border
 function GhostButton({ label, onPress }: { label: string; onPress: () => void }) {
   return (
     <TouchableOpacity
@@ -291,31 +291,35 @@ function GhostButton({ label, onPress }: { label: string; onPress: () => void })
         height: 58,
         alignItems: "center",
         justifyContent: "center",
-        borderRadius: 18,
-        borderWidth: 1,
-        borderColor: T.borderMid,
+        borderRadius: 29,
+        backgroundColor: T.surface,
       }}
     >
-      <Text style={{ fontSize: 16, fontWeight: "600", color: T.textSecondary }}>
+      <Text style={{ fontSize: 16, fontWeight: "700", color: T.textPrimary }}>
         {label}
       </Text>
     </TouchableOpacity>
   )
 }
 
-// Card row — crisp border, readable surface
+// Card row — soft white surface with a gentle shadow, hairline border for crispness
 function RowCard({ children, style }: { children: React.ReactNode; style?: object }) {
   return (
     <View
       style={{
         flexDirection: "row",
         alignItems: "center",
-        padding: 16,
+        padding: 18,
         gap: 14,
-        borderRadius: 16,
-        backgroundColor: "rgba(255,255,255,0.05)",
+        borderRadius: 20,
+        backgroundColor: "#ffffff",
         borderWidth: 1,
         borderColor: T.borderLo,
+        shadowColor: "#1a1a2e",
+        shadowOpacity: 0.06,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 2,
         ...style,
       }}
     >
@@ -326,18 +330,18 @@ function RowCard({ children, style }: { children: React.ReactNode; style?: objec
 
 // Icon box — uses explicit rgba so hex-alpha shorthand (#color20) isn't needed
 function IconBox({ color, children }: { color: string; children: React.ReactNode }) {
-  // Convert a 6-digit hex to rgba at 15% opacity for RN compatibility
+  // Convert a 6-digit hex to rgba at 12% opacity for RN compatibility
   const hex = color.replace("#", "")
   const r = parseInt(hex.slice(0, 2), 16)
   const g = parseInt(hex.slice(2, 4), 16)
   const b = parseInt(hex.slice(4, 6), 16)
-  const bg = `rgba(${r},${g},${b},0.14)`
+  const bg = `rgba(${r},${g},${b},0.12)`
   return (
     <View
       style={{
-        width: 48,
-        height: 48,
-        borderRadius: 14,
+        width: 50,
+        height: 50,
+        borderRadius: 16,
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: bg,
@@ -391,12 +395,12 @@ export default function OnboardingScreen() {
                   position: "absolute", left: 0, top: 8,
                   width: 98, height: 140, borderRadius: 20, overflow: "hidden",
                   transform: [{ rotate: "-10deg" }],
-                  shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 14,
-                  shadowOffset: { width: 0, height: 8 }, elevation: 8,
+                  shadowColor: "#1a1a2e", shadowOpacity: 0.14, shadowRadius: 16,
+                  shadowOffset: { width: 0, height: 8 }, elevation: 5,
                 }}>
-                  <View style={{ flex: 1, backgroundColor: "#141726", alignItems: "center", justifyContent: "center" }}>
-                    <View style={{ width: 50, height: 74, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.04)", alignItems: "center", justifyContent: "center" }}>
-                      <FilmIcon size={32} color="#2d3654" strokeWidth={1.5} />
+                  <View style={{ flex: 1, backgroundColor: T.surface, alignItems: "center", justifyContent: "center" }}>
+                    <View style={{ width: 50, height: 74, borderRadius: 12, backgroundColor: "#ffffff", alignItems: "center", justifyContent: "center" }}>
+                      <FilmIcon size={32} color="#d7d9e4" strokeWidth={1.5} />
                     </View>
                     <View style={{ position: "absolute", bottom: 10, right: 10 }}>
                       <HeartSolid size={18} color={T.accent} />
@@ -408,12 +412,12 @@ export default function OnboardingScreen() {
                   position: "absolute", right: 0, top: 8,
                   width: 98, height: 140, borderRadius: 20, overflow: "hidden",
                   transform: [{ rotate: "10deg" }],
-                  shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 14,
-                  shadowOffset: { width: 0, height: 8 }, elevation: 8,
+                  shadowColor: "#1a1a2e", shadowOpacity: 0.14, shadowRadius: 16,
+                  shadowOffset: { width: 0, height: 8 }, elevation: 5,
                 }}>
-                  <View style={{ flex: 1, backgroundColor: "#141726", alignItems: "center", justifyContent: "center" }}>
-                    <View style={{ width: 50, height: 74, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.04)", alignItems: "center", justifyContent: "center" }}>
-                      <VideoCameraIcon size={32} color="#2d3654" strokeWidth={1.5} />
+                  <View style={{ flex: 1, backgroundColor: T.surface, alignItems: "center", justifyContent: "center" }}>
+                    <View style={{ width: 50, height: 74, borderRadius: 12, backgroundColor: "#ffffff", alignItems: "center", justifyContent: "center" }}>
+                      <VideoCameraIcon size={32} color="#d7d9e4" strokeWidth={1.5} />
                     </View>
                     <View style={{ position: "absolute", bottom: 10, right: 10 }}>
                       <HeartSolid size={18} color={T.accent} />
@@ -423,8 +427,8 @@ export default function OnboardingScreen() {
                 {/* Centre heart */}
                 <View style={{
                   position: "absolute", bottom: 0, zIndex: 10,
-                  shadowColor: T.accent, shadowOpacity: 0.45, shadowRadius: 18,
-                  shadowOffset: { width: 0, height: 4 }, elevation: 12,
+                  shadowColor: T.accent, shadowOpacity: 0.35, shadowRadius: 18,
+                  shadowOffset: { width: 0, height: 6 }, elevation: 10,
                 }}>
                   <View style={{ width: 70, height: 70, borderRadius: 35, backgroundColor: T.accent, alignItems: "center", justifyContent: "center" }}>
                     <HeartSolid size={38} color="#fff" />
@@ -440,12 +444,10 @@ export default function OnboardingScreen() {
                 style={{
                   flexDirection: "row",
                   justifyContent: "space-around",
-                  backgroundColor: "rgba(255,255,255,0.05)",
+                  backgroundColor: T.surface,
                   borderRadius: 18,
                   paddingVertical: 20,
                   paddingHorizontal: 16,
-                  borderWidth: 1,
-                  borderColor: T.borderLo,
                 }}
               >
                 {screen.stats.map((stat, i) => (
@@ -595,11 +597,11 @@ export default function OnboardingScreen() {
                       <View style={{
                         width: 38, height: 38, borderRadius: 12,
                         alignItems: "center", justifyContent: "center",
-                        backgroundColor: active ? "#f97316" : "rgba(255,255,255,0.05)",
+                        backgroundColor: active ? "#f97316" : T.surface,
                         borderWidth: 1,
                         borderColor: active ? "transparent" : T.borderLo,
                       }}>
-                        <FireIcon size={16} color={active ? "#fff" : "#3d4560"} strokeWidth={1.8} />
+                        <FireIcon size={16} color={active ? "#fff" : "#c4c7d4"} strokeWidth={1.8} />
                       </View>
                       <Text style={{ fontSize: 11, fontWeight: "600", color: active ? "#f97316" : T.textTertiary }}>
                         {["M", "T", "W", "T", "F", "S", "S"][day - 1]}
@@ -656,10 +658,10 @@ export default function OnboardingScreen() {
                 {screen.privacyPoints.map((point, i) => (
                   <Animated.View key={i} entering={FadeInDown.delay(230 + i * 90).springify()}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-                      <View style={{ width: 44, height: 44, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: T.borderLo, flexShrink: 0 }}>
+                      <View style={{ width: 44, height: 44, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: T.surface, borderWidth: 1, borderColor: T.borderLo, flexShrink: 0 }}>
                         <PrivacyIcon name={point.icon} size={20} color={point.color} />
                       </View>
-                      <Text style={{ fontSize: 15, fontWeight: "500", color: "rgba(255,255,255,0.72)", flex: 1, lineHeight: 22 }}>{point.text}</Text>
+                      <Text style={{ fontSize: 15, fontWeight: "500", color: "rgba(21,21,28,0.78)", flex: 1, lineHeight: 22 }}>{point.text}</Text>
                     </View>
                   </Animated.View>
                 ))}
@@ -668,7 +670,7 @@ export default function OnboardingScreen() {
 
             <Animated.View entering={FadeIn.delay(580)} style={{
               padding: 16, borderRadius: 14,
-              backgroundColor: "rgba(255,255,255,0.03)",
+              backgroundColor: T.surface,
               borderWidth: 1, borderColor: T.borderLo,
             }}>
               <Text style={{ fontSize: 13, color: T.textTertiary, textAlign: "center", lineHeight: 20 }}>
@@ -684,42 +686,18 @@ export default function OnboardingScreen() {
       case "final":
         return (
           <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center", gap: 22 }}>
-            {/* Sparkle icon */}
-            <Animated.View entering={FadeInDown.delay(100)} style={{ alignItems: "center" }}>
-              <View style={{
-                width: 88, height: 88, borderRadius: 26,
-                alignItems: "center", justifyContent: "center",
-                backgroundColor: T.accentBg,
-                borderWidth: 1, borderColor: T.accentRim,
-                shadowColor: T.accent, shadowOpacity: 0.28, shadowRadius: 20,
-                shadowOffset: { width: 0, height: 6 }, elevation: 8,
-              }}>
-                <SparklesSolid size={46} color={T.accent} />
-              </View>
-              {/* Confetti dots */}
-              <View style={{ position: "absolute", top: -16, left: 0, right: 0, height: 90, overflow: "hidden" }}>
-                {[...Array(6)].map((_, i) => (
-                  <View key={i} style={{
-                    position: "absolute",
-                    width: 7, height: 7, borderRadius: 3.5,
-                    backgroundColor: [T.accent, "#8B5CF6", "#06b6d4", "#f97316", "#10b981", "#eab308"][i],
-                    left: 20 + i * 48, top: [12, 28, 8, 36, 20, 32][i],
-                    opacity: 0.7,
-                  }} />
-                ))}
-              </View>
-            </Animated.View>
-
             {"testimonials" in screen && screen.testimonials && (
               <View style={{ gap: 12 }}>
                 {screen.testimonials.map((testimonial, i) => (
                   <Animated.View key={i} entering={FadeInDown.delay(280 + i * 130).springify()} style={{
                     padding: 18, borderRadius: 16,
-                    backgroundColor: "rgba(255,255,255,0.04)",
+                    backgroundColor: "#ffffff",
                     borderWidth: 1, borderColor: T.borderLo,
+                    shadowColor: "#1a1a2e", shadowOpacity: 0.05, shadowRadius: 14,
+                    shadowOffset: { width: 0, height: 3 }, elevation: 1,
                   }}>
                     <ChatBubbleLeftIcon size={16} color={T.textTertiary} strokeWidth={1.8} />
-                    <Text style={{ fontSize: 14, fontStyle: "italic", lineHeight: 22, marginTop: 9, color: "rgba(255,255,255,0.62)" }}>"{testimonial.text}"</Text>
+                    <Text style={{ fontSize: 14, fontStyle: "italic", lineHeight: 22, marginTop: 9, color: "rgba(21,21,28,0.68)" }}>"{testimonial.text}"</Text>
                     <Text style={{ fontSize: 13, fontWeight: "600", marginTop: 9, color: T.textTertiary }}>— {testimonial.author}</Text>
                   </Animated.View>
                 ))}
@@ -756,13 +734,12 @@ export default function OnboardingScreen() {
               accessibilityRole="button"
               accessibilityLabel="Go back"
               style={{
-                width: 42, height: 42, borderRadius: 21,
+                width: 44, height: 44, borderRadius: 22,
                 alignItems: "center", justifyContent: "center",
-                backgroundColor: "rgba(255,255,255,0.05)",
-                borderWidth: 1, borderColor: T.borderLo,
+                backgroundColor: T.surface,
               }}
             >
-              <Ionicons name="chevron-back" size={20} color={T.textSecondary} />
+              <Ionicons name="chevron-back" size={20} color={T.textPrimary} />
             </TouchableOpacity>
           </Animated.View>
         ) : (
@@ -783,12 +760,11 @@ export default function OnboardingScreen() {
               accessibilityLabel="Skip onboarding"
               style={{
                 paddingHorizontal: 16, paddingVertical: 9,
-                borderRadius: 12,
-                backgroundColor: "rgba(255,255,255,0.05)",
-                borderWidth: 1, borderColor: T.borderLo,
+                borderRadius: 14,
+                backgroundColor: T.surface,
               }}
             >
-              <Text style={{ fontSize: 13, fontWeight: "600", color: T.textTertiary }}>Skip</Text>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: T.textSecondary }}>Skip</Text>
             </TouchableOpacity>
           </Animated.View>
         ) : (
@@ -803,6 +779,45 @@ export default function OnboardingScreen() {
         exiting={SlideOutLeft.duration(260)}
         style={{ flex: 1 }}
       >
+        {/* Success badge — final screen only, sits above the headline */}
+        {isFinal && (
+          <Animated.View
+            entering={ZoomIn.delay(80).springify().damping(14)}
+            style={{ alignItems: "center", paddingTop: 4, paddingBottom: 6 }}
+          >
+            <View style={{ width: 96, height: 96, alignItems: "center", justifyContent: "center" }}>
+              {/* Confetti dots */}
+              <View style={{ position: "absolute", top: -18, left: -30, right: -30, height: 110, overflow: "hidden" }}>
+                {[...Array(6)].map((_, i) => (
+                  <View key={i} style={{
+                    position: "absolute",
+                    width: 7, height: 7, borderRadius: 3.5,
+                    backgroundColor: [T.accent, "#8B5CF6", "#06b6d4", "#f97316", "#10b981", "#eab308"][i],
+                    left: 12 + i * 34, top: [14, 30, 6, 38, 20, 32][i],
+                    opacity: 0.6,
+                  }} />
+                ))}
+              </View>
+              <View style={{
+                width: 96, height: 96, borderRadius: 48,
+                alignItems: "center", justifyContent: "center",
+                backgroundColor: T.accentBg,
+                borderWidth: 1, borderColor: T.accentRim,
+                shadowColor: T.accent, shadowOpacity: 0.22, shadowRadius: 22,
+                shadowOffset: { width: 0, height: 8 }, elevation: 6,
+              }}>
+                <View style={{
+                  width: 66, height: 66, borderRadius: 33,
+                  alignItems: "center", justifyContent: "center",
+                  backgroundColor: T.accent,
+                }}>
+                  <CheckSolid size={32} color="#fff" />
+                </View>
+              </View>
+            </View>
+          </Animated.View>
+        )}
+
         {/* Headline block */}
         <View style={{ paddingHorizontal: 28, paddingTop: 2, paddingBottom: 2 }}>
           <Animated.Text
@@ -811,9 +826,10 @@ export default function OnboardingScreen() {
               fontSize: T.headingSize,
               fontWeight: T.headingWeight,
               lineHeight: T.headingLine,
-              letterSpacing: -0.6,
+              letterSpacing: -0.8,
               color: T.textPrimary,
               marginBottom: 10,
+              textAlign: isFinal ? "center" : "left",
             }}
           >
             {screen.headline}
@@ -822,7 +838,12 @@ export default function OnboardingScreen() {
           {"subtext" in screen && screen.subtext && (
             <Animated.Text
               entering={FadeInDown.delay(180).springify()}
-              style={{ fontSize: T.bodySize, lineHeight: T.bodyLine, color: T.textSecondary }}
+              style={{
+                fontSize: T.bodySize,
+                lineHeight: T.bodyLine,
+                color: T.textSecondary,
+                textAlign: isFinal ? "center" : "left",
+              }}
             >
               {screen.subtext}
             </Animated.Text>
@@ -843,7 +864,7 @@ export default function OnboardingScreen() {
       {/* ── Bottom bar ── */}
       <View style={{ paddingHorizontal: 28, paddingBottom: 46, gap: 10 }}>
         {/* Progress bar only — counter is now in the header */}
-        <View style={{ width: "100%", height: 2.5, backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 2, overflow: "hidden", marginBottom: 4 }}>
+        <View style={{ width: "100%", height: 3, backgroundColor: T.surface, borderRadius: 2, overflow: "hidden", marginBottom: 4 }}>
           <View style={{ height: "100%", borderRadius: 2, width: `${((currentScreen + 1) / SCREENS.length) * 100}%`, backgroundColor: T.accent }} />
         </View>
 

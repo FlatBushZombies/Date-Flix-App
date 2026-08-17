@@ -159,6 +159,20 @@ export async function getPopularMovies(): Promise<Movie[]> {
   }
 }
 
+// Best-effort lookup for a movie by title (+ optional year) — used to attach
+// real poster/backdrop art to the AI planner's text-only recommendations.
+export async function searchMovieByTitle(title: string, year?: number): Promise<Movie | null> {
+  const results = await searchMovies(title)
+  if (results.length === 0) return null
+
+  if (year) {
+    const yearMatch = results.find((m) => m.release_date?.startsWith(String(year)))
+    if (yearMatch) return yearMatch
+  }
+
+  return results[0]
+}
+
 export async function getMoviesByGenre(genreId: number): Promise<Movie[]> {
   try {
     const response = await fetch(`${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=${genreId}`)

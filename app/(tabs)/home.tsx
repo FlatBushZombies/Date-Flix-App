@@ -5,6 +5,7 @@ import { MovieCard } from "@/components/MovieCard"
 import { NotificationsModal } from "@/components/NotificationsModal"
 import { StreakModal } from "@/components/StreakModal"
 import { useToast } from "@/components/Toast/ToastProvider"
+import { shadow } from "@/constants/theme"
 import { useNotifications } from "@/hooks/useNotifications"
 import type { StreakEvaluation, SupabaseUser, SwipeSession, Movie } from "@/types"
 import {
@@ -386,7 +387,8 @@ export default function SwipeScreen() {
       {activeSessions.length > 0 && (
         <Animated.View
           entering={FadeInDown.delay(200)}
-          className="mx-6 mt-4 flex-row items-center px-4 py-3 bg-white rounded-2xl shadow shadow-black/10"
+          className="mx-6 mt-4 flex-row items-center px-4 py-3.5 bg-white rounded-3xl"
+          style={shadow.sm}
         >
           <View className="w-2 h-2 rounded-full bg-green-500 mr-2.5" />
           <Text className="flex-1 text-sm font-semibold text-gray-700">

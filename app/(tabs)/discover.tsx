@@ -1,3 +1,4 @@
+import { DiscoverLanding } from '@/components/DiscoverLanding';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ProgressBar } from '@/components/ProgressBar';
 import { ResultsScreen } from '@/components/ResultsScreen';
@@ -7,7 +8,9 @@ import { Step3Vibe } from '@/components/steps/Step3Vibe';
 import { Step4Prefs } from '@/components/steps/Step4Prefs';
 import { Step5Occasion } from '@/components/steps/Step5Occasion';
 import { useMoviePlanner } from '@/hooks/useMoviePlanner';
+import { useWatchlist } from '@/hooks/useWatchlist';
 import { Genre, PlannerState, StreamingPlatform } from '@/types/planner';
+import { useUser } from '@clerk/clerk-expo';
 import { AlertTriangle } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
@@ -33,10 +36,13 @@ const initialState: PlannerState = {
 };
 
 export default function MoviePlannerScreen() {
+  const [showLanding, setShowLanding] = useState(true);
   const [step, setStep] = useState(1);
   const [plannerState, setPlannerState] = useState<PlannerState>(initialState);
   const { plan, prompt, loading, loadingMessage, progress, error, generatePlan, reset } =
     useMoviePlanner();
+  const { user } = useUser();
+  const { isSaved, toggleSave } = useWatchlist(user?.id);
 
   const update = (patch: Partial<PlannerState>) =>
     setPlannerState((s) => ({ ...s, ...patch }));
@@ -49,13 +55,14 @@ export default function MoviePlannerScreen() {
     setPlannerState(initialState);
     setStep(1);
     reset();
+    setShowLanding(true);
   };
 
   // Loading state
   if (loading) {
     return (
-      <SafeAreaView className="flex-1" style={{ backgroundColor: '#0a0a0f' }}>
-        <StatusBar barStyle="light-content" backgroundColor="#0a0a0f" />
+      <SafeAreaView className="flex-1" style={{ backgroundColor: '#ffffff' }}>
+        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
         <View className="flex-1 px-5 pt-8">
           <View className="items-center mb-8">
             <Text
@@ -77,7 +84,7 @@ export default function MoviePlannerScreen() {
   // Error state
   if (error) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center px-6" style={{ backgroundColor: '#0a0a0f' }}>
+      <SafeAreaView className="flex-1 items-center justify-center px-6" style={{ backgroundColor: '#ffffff' }}>
         <View className="w-16 h-16 rounded-2xl items-center justify-center mb-4" style={{ backgroundColor: 'rgba(255,59,92,0.12)' }}>
           <AlertTriangle size={28} color="#FF3B5C" strokeWidth={1.8} />
         </View>
@@ -103,30 +110,28 @@ export default function MoviePlannerScreen() {
     );
   }
 
-  // Results
+  // Results — full-bleed reveal, owns its own layout (no wizard chrome)
   if (plan) {
     return (
-      <SafeAreaView className="flex-1" style={{ backgroundColor: '#0a0a0f' }}>
-        <StatusBar barStyle="light-content" backgroundColor="#0a0a0f" />
-        <ScrollView className="flex-1 px-5 pt-8" showsVerticalScrollIndicator={false}>
-          <View className="items-center mb-6">
-            <Text
-              className="text-2xl font-bold"
-              style={{ color: '#FF3B5C' }}
-            >
-              Duo
-            </Text>
-          </View>
-          <ResultsScreen plan={plan} prompt={prompt} onReset={handleReset} />
-        </ScrollView>
-      </SafeAreaView>
+      <ResultsScreen
+        plan={plan}
+        prompt={prompt}
+        onReset={handleReset}
+        isSaved={isSaved}
+        toggleSave={toggleSave}
+      />
     );
+  }
+
+  // Landing / cover screen — shown once before the wizard begins
+  if (showLanding) {
+    return <DiscoverLanding onStart={() => setShowLanding(false)} />;
   }
 
   // Planner steps
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: '#0a0a0f' }}>
-      <StatusBar barStyle="light-content" backgroundColor="#0a0a0f" />
+    <SafeAreaView className="flex-1" style={{ backgroundColor: '#ffffff' }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       <ScrollView
         className="flex-1 px-5 pt-8"
         showsVerticalScrollIndicator={false}

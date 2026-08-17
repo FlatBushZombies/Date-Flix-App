@@ -1,16 +1,23 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import { Vibe, Duration } from '@/types/planner';
-import { VibeChip } from '@/components/VibeChip';
 import { PillChip } from '@/components/PillChip';
+import { Duration, Vibe } from '@/types/planner';
+import { Check } from 'lucide-react-native';
+import React from 'react';
+import { Image, Text, TouchableOpacity, View } from 'react-native';
 
-const VIBES: { value: Vibe; label: string; emoji: string }[] = [
-  { value: 'cozy', label: 'Cozy', emoji: '🕯️' },
-  { value: 'excited', label: 'Excited', emoji: '⚡' },
-  { value: 'emotional', label: 'Emotional', emoji: '🥹' },
-  { value: 'chill', label: 'Chill', emoji: '😌' },
-  { value: 'laugh', label: 'Laughing', emoji: '🤣' },
-  { value: 'surprised', label: 'Surprised', emoji: '🤯' },
+// Each mood is a premium 3D-illustrated icon (isometric mini-scene) on a
+// white, black-bordered card. Selection state (ring + checkmark) stays the
+// app's own pink accent.
+const VIBES: {
+  value: Vibe;
+  label: string;
+  icon: number;
+}[] = [
+  { value: 'cozy', label: 'Cozy', icon: require('@/assets/icons/cozy.png') },
+  { value: 'excited', label: 'Excited', icon: require('@/assets/icons/excited.png') },
+  { value: 'emotional', label: 'Emotional', icon: require('@/assets/icons/emotional.png') },
+  { value: 'chill', label: 'Chill', icon: require('@/assets/icons/chill.png') },
+  { value: 'laugh', label: 'Laughing', icon: require('@/assets/icons/laughing.png') },
+  { value: 'surprised', label: 'Surprised', icon: require('@/assets/icons/suprised.png') },
 ];
 
 const DURATIONS: { value: Duration; label: string }[] = [
@@ -47,13 +54,13 @@ export function Step3Vibe({
         activeOpacity={0.7}
         style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24 }}
       >
-        <Text style={{ fontSize: 13, color: '#9A8A94' }}>← Back</Text>
+        <Text style={{ fontSize: 13, color: '#4b5563' }}>← Back</Text>
       </TouchableOpacity>
 
       <Text
         style={{
           fontSize: 11,
-          color: '#FF3B5C',
+          color: '#C81E4B',
           textTransform: 'uppercase',
           letterSpacing: 1.5,
           marginBottom: 8,
@@ -67,33 +74,81 @@ export function Step3Vibe({
         style={{
           fontSize: 24,
           fontWeight: '700',
-          color: '#F0EAE4',
+          color: '#14121A',
           marginBottom: 8,
         }}
       >
-        Set the vibe
+        What mood are you looking for?
       </Text>
 
-      <Text style={{ fontSize: 13, color: '#9A8A94', marginBottom: 24 }}>
+      <Text style={{ fontSize: 13, color: '#4b5563', marginBottom: 24 }}>
         How do you want to feel tonight?
       </Text>
 
-      {/* Vibe grid */}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
-        {VIBES.map((v) => (
-          <View key={v.value} style={{ width: '31%' }}>
-            <VibeChip
-              label={v.label}
-              emoji={v.emoji}
-              selected={vibe === v.value}
-              onPress={() => onVibeChange(v.value)}
-            />
-          </View>
-        ))}
+      {/* Vibe tile grid */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 28 }}>
+        {VIBES.map((v) => {
+          const selected = vibe === v.value;
+          return (
+            <View key={v.value} style={{ width: '47.5%' }}>
+              <TouchableOpacity
+                onPress={() => onVibeChange(v.value)}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={v.label}
+                accessibilityState={{ selected }}
+                style={{
+                  aspectRatio: 1,
+                  borderRadius: 20,
+                  overflow: 'hidden',
+                  backgroundColor: selected ? 'rgba(255,59,92,0.06)' : '#ffffff',
+                  borderWidth: selected ? 2.5 : 1.5,
+                  borderColor: selected ? '#FF3B5C' : '#18161c',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                }}
+              >
+                {/* Icon */}
+                <Image
+                  source={v.icon}
+                  style={{ width: 68, height: 68, marginBottom: 10 }}
+                  resizeMode="contain"
+                />
+
+                {/* Label */}
+                <Text style={{ color: '#14121A', fontWeight: '700', fontSize: 15 }}>
+                  {v.label}
+                </Text>
+
+                {/* Checkmark badge */}
+                {selected && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: 10,
+                      right: 10,
+                      width: 22,
+                      height: 22,
+                      borderRadius: 11,
+                      backgroundColor: '#FF3B5C',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1.5,
+                      borderColor: '#ffffff',
+                    }}
+                  >
+                    <Check size={13} color="#fff" strokeWidth={3} />
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          );
+        })}
       </View>
 
       {/* Duration */}
-      <Text style={{ fontSize: 13, color: '#9A8A94', marginBottom: 12 }}>
+      <Text style={{ fontSize: 13, color: '#4b5563', marginBottom: 12 }}>
         How long do you have?
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 28 }}>
@@ -116,17 +171,17 @@ export function Step3Vibe({
           paddingVertical: 16,
           borderRadius: 12,
           alignItems: 'center',
-          backgroundColor: canContinue ? '#FF3B5C' : '#3a2030',
+          backgroundColor: canContinue ? '#FF3B5C' : '#eceaea',
         }}
       >
         <Text
           style={{
             fontWeight: '500',
             fontSize: 15,
-            color: canContinue ? '#ffffff' : '#6a5060',
+            color: canContinue ? '#ffffff' : '#9a969e',
           }}
         >
-          Continue →
+          {vibe ? 'Continue →' : 'Pick a mood to continue'}
         </Text>
       </TouchableOpacity>
     </View>

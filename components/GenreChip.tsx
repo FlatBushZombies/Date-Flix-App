@@ -34,10 +34,10 @@ export function GenreChip({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected }}
-      className={`rounded-xl p-3.5 items-center border relative ${
+      className={`rounded-2xl p-4 items-center relative ${
         selected
-          ? 'bg-primary/10 border-primary'
-          : 'bg-surface border-surface-2'
+          ? 'bg-primary/10 border-2 border-primary'
+          : 'bg-surface border border-surface-2'
       }`}
     >
       <Animated.View

@@ -31,13 +31,13 @@ export function Step5Occasion({
         activeOpacity={0.7}
         style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24 }}
       >
-        <Text style={{ fontSize: 13, color: '#9A8A94' }}>← Back</Text>
+        <Text style={{ fontSize: 13, color: '#4b5563' }}>← Back</Text>
       </TouchableOpacity>
 
       <Text
         style={{
           fontSize: 11,
-          color: '#FF3B5C',
+          color: '#C81E4B',
           textTransform: 'uppercase',
           letterSpacing: 1.5,
           marginBottom: 8,
@@ -51,14 +51,14 @@ export function Step5Occasion({
         style={{
           fontSize: 24,
           fontWeight: '700',
-          color: '#F0EAE4',
+          color: '#14121A',
           marginBottom: 8,
         }}
       >
         What's the occasion?
       </Text>
 
-      <Text style={{ fontSize: 13, color: '#9A8A94', marginBottom: 24 }}>
+      <Text style={{ fontSize: 13, color: '#4b5563', marginBottom: 24 }}>
         Tell us about tonight
       </Text>
 
@@ -85,14 +85,14 @@ export function Step5Occasion({
           paddingVertical: 16,
           borderRadius: 12,
           alignItems: 'center',
-          backgroundColor: selected && !loading ? '#FF3B5C' : '#3a2030',
+          backgroundColor: selected && !loading ? '#FF3B5C' : '#eceaea',
         }}
       >
         <Text
           style={{
             fontWeight: '500',
             fontSize: 15,
-            color: selected && !loading ? '#ffffff' : '#6a5060',
+            color: selected && !loading ? '#ffffff' : '#9a969e',
           }}
         >
           ✨  Plan our movie night

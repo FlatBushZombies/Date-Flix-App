@@ -163,7 +163,7 @@ export default function LoginScreen() {
         <TouchableOpacity
           activeOpacity={0.88}
           onPress={handleGoogleSignIn}
-          className="flex-row items-center justify-center rounded-2xl bg-zinc-900 mb-3"
+          className="flex-row items-center justify-center rounded-3xl bg-zinc-900 mb-3"
           style={{
             height: 56,
             shadowColor: "#000",
@@ -178,7 +178,7 @@ export default function LoginScreen() {
             style={{
               width: 28,
               height: 28,
-              borderRadius: 6,
+              borderRadius: 10,
               backgroundColor: "#ffffff",
             }}
           >

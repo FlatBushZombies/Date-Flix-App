@@ -24,19 +24,19 @@ export function Step1Genre({ selected, onChange, onNext }: { selected: string[];
   return (
     <View style={{ padding: 20 }}>
       
-      {/* Glass Container */}
+      {/* Card container */}
       <View
         style={{
-          backgroundColor: 'rgba(255,255,255,0.05)',
+          backgroundColor: '#ffffff',
           borderRadius: 28,
           padding: 20,
           borderWidth: 1,
-          borderColor: 'rgba(255,255,255,0.08)',
+          borderColor: '#18161c',
         }}
       >
         <Text style={{
           fontSize: 11,
-          color: '#FF3B5C',
+          color: '#C81E4B',
           letterSpacing: 1.5,
           marginBottom: 8,
         }}>
@@ -45,7 +45,8 @@ export function Step1Genre({ selected, onChange, onNext }: { selected: string[];
 
         <Text style={{
           fontSize: 26,
-          color: '#FFFFFF',
+          fontWeight: '700',
+          color: '#14121A',
           marginBottom: 6,
         }}>
           What are you in the mood for?
@@ -53,7 +54,7 @@ export function Step1Genre({ selected, onChange, onNext }: { selected: string[];
 
         <Text style={{
           fontSize: 13,
-          color: '#A1A1AA',
+          color: '#4b5563',
           marginBottom: 24,
         }}>
           Pick one or more genres
@@ -89,12 +90,13 @@ export function Step1Genre({ selected, onChange, onNext }: { selected: string[];
             paddingVertical: 16,
             borderRadius: 999,
             alignItems: 'center',
-            backgroundColor: selected.length > 0 ? '#3B82F6' : '#1f2937',
+            backgroundColor: selected.length > 0 ? '#FF3B5C' : '#eceaea',
           }}
         >
           <Text style={{
             fontSize: 15,
-            color: selected.length > 0 ? '#fff' : '#6b7280',
+            fontWeight: '500',
+            color: selected.length > 0 ? '#fff' : '#9a969e',
           }}>
             Continue →
           </Text>

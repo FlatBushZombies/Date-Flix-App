@@ -2,6 +2,7 @@
 
 import { useConfirm } from "@/components/Confirm/ConfirmProvider"
 import { useToast } from "@/components/Toast/ToastProvider"
+import { shadow } from "@/constants/theme"
 import type { Invitation, SupabaseUser, SwipeSession } from "@/types"
 import { permanentlyDeleteAccount } from "@/utils/account"
 import {
@@ -702,7 +703,7 @@ const s = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: C.border,
-    overflow: "hidden",
+    ...shadow.sm,
   },
   statsRow: {
     flexDirection: "row",
@@ -800,9 +801,10 @@ const s = StyleSheet.create({
     backgroundColor: C.surface,
     borderWidth: 1,
     borderColor: C.border,
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 14,
     marginBottom: 10,
+    ...shadow.sm,
   },
   sessionAvatarWrap: {
     marginRight: 12,
@@ -849,9 +851,10 @@ const s = StyleSheet.create({
     backgroundColor: C.surface,
     borderWidth: 1,
     borderColor: C.border,
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 16,
     marginBottom: 10,
+    ...shadow.sm,
   },
   actionCardSoon: {
     opacity: 0.6,

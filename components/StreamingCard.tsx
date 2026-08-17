@@ -27,10 +27,11 @@ export function StreamingCard({ config, selected, onPress }: StreamingCardProps)
       accessibilityRole="button"
       accessibilityLabel={config.name}
       accessibilityState={{ selected }}
-      className="rounded-2xl p-4 flex-row items-center border relative"
+      className="rounded-2xl p-4 flex-row items-center relative"
       style={{
-        backgroundColor: selected ? '#1a1528' : '#151520',
-        borderColor: selected ? config.color : '#2a2535',
+        backgroundColor: '#ffffff',
+        borderWidth: selected ? 2 : 1,
+        borderColor: selected ? config.color : '#18161c',
       }}
     >
       <Animated.View
