@@ -9,7 +9,20 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "nflx",
+          "disneyplus",
+          "aiv",
+          "videos",
+          "hbomax",
+          "hulu",
+          "peacock",
+          "paramountplus",
+          "mubi"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +32,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.noirsfera.duo_app"
     },
     "web": {
       "output": "static",

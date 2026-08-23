@@ -7,7 +7,7 @@ import { useToast } from "@/components/Toast/ToastProvider"
 import { withAffiliateTag } from "@/utils/affiliateLinks"
 import { EmptyState } from "@/components/ui/EmptyState"
 import { Ionicons } from "@expo/vector-icons"
-import { CloudOff, Heart } from "lucide-react-native"
+import { CloudOff } from "lucide-react-native"
 import { getUserMatches, syncUserWithSupabase } from "@/utils/supabase-helpers"
 import { STREAMING_PLATFORMS, getWatchUrl } from "@/lib/streaming"
 import type { SupabaseMatch, SupabaseUser } from "@/types"
@@ -113,7 +113,7 @@ export default function MatchScreen() {
         </View>
 
         <EmptyState
-          icon={<Heart size={40} color="#ec4899" strokeWidth={1.6} />}
+          icon={<Image source={require("@/assets/icons/love.png")} style={{ width: 48, height: 48 }} resizeMode="contain" />}
           title="No Matches Yet"
           description="Invite friends and start swiping together to find movies you both love!"
         />
@@ -165,7 +165,11 @@ export default function MatchScreen() {
                     end={{ x: 1, y: 1 }}
                     style={styles.matchBadgeGradient}
                   >
-                    <Ionicons name="heart" size={14} color="#fff" />
+                    <Image
+                      source={require("@/assets/icons/love.png")}
+                      style={{ width: 18, height: 18 }}
+                      resizeMode="contain"
+                    />
                     <Text style={styles.matchBadgeText}>Match!</Text>
                   </LinearGradient>
                 </View>

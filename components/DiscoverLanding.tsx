@@ -1,7 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Clapperboard } from 'lucide-react-native';
 import React from 'react';
-import { SafeAreaView, StatusBar, Text, TouchableOpacity, View } from 'react-native';
+import { Image, SafeAreaView, StatusBar, Text, TouchableOpacity, View } from 'react-native';
 
 interface DiscoverLandingProps {
   onStart: () => void;
@@ -66,7 +65,11 @@ export function DiscoverLanding({ onStart }: DiscoverLandingProps) {
                   zIndex: p.z,
                 }}
               >
-                <Clapperboard size={30} color="rgba(255,255,255,0.5)" strokeWidth={1.4} />
+                <Image
+                  source={require('@/assets/icons/cinema.png')}
+                  style={{ width: 64, height: 64, opacity: 0.85 }}
+                  resizeMode="contain"
+                />
               </LinearGradient>
             ))}
           </View>

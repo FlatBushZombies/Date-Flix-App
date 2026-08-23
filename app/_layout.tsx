@@ -1,3 +1,4 @@
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, useFonts } from "@expo-google-fonts/inter"
 import { ClerkProvider, SignedIn, SignedOut } from "@clerk/clerk-expo"
 import { Stack } from "expo-router"
 import { useState } from "react"
@@ -20,10 +21,18 @@ if (!publishableKey) {
 
 export default function RootLayout() {
   const [showSplash, setShowSplash] = useState(true)
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  })
 
   const handleSplashComplete = () => {
     setShowSplash(false)
   }
+
+  if (!fontsLoaded) return null
 
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>

@@ -1,5 +1,5 @@
-import { View, Text, TouchableOpacity, Dimensions, ScrollView } from "react-native"
-import { useState } from "react"
+import { View, Text, TouchableOpacity, Dimensions, ScrollView, Pressable } from "react-native"
+import { useEffect, useState } from "react"
 import { useRouter } from "expo-router"
 import {
   FilmIcon,
@@ -30,6 +30,7 @@ import {
   CheckIcon as CheckSolid,
 } from "react-native-heroicons/solid"
 import Animated, {
+  Easing,
   FadeIn,
   FadeInDown,
   FadeInUp,
@@ -38,30 +39,43 @@ import Animated, {
   ZoomIn,
   useSharedValue,
   useAnimatedStyle,
+  withRepeat,
+  withSequence,
   withSpring,
+  withTiming,
 } from "react-native-reanimated"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { Ionicons } from "@expo/vector-icons"
+import * as Haptics from "expo-haptics"
 
 const { width, height } = Dimensions.get("window")
 
+// Ease-out used for every press / on-screen transition below — the same
+// curve the animate-expo recipes use for UI motion.
+const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1)
+
 // ─── Design tokens ────────────────────────────────────────────────────────────
-// Single source of truth — one accent, one background family, consistent opacity scale
+// Copies the reference design's structure (gray diagonal backdrop, white pill
+// cards, dark selector carousel, pill CTA with an arrow badge) — only the
+// accent color and all copy stay ours.
 const T = {
   // Backgrounds
-  bg:        "#ffffff",   // page background — pure white
-  surface:   "#f4f4f7",   // light gray card / pill fill
+  bg:        "#e9e9e6",   // page background — flat warm gray (was pure white)
+  wedge:     "#f5f5f3",   // lighter diagonal panel behind the header/hero
+  surface:   "#ffffff",   // contrast surface — cards, icon boxes, back button
+  dark:      "#18181c",   // dark selector card (genres carousel)
   // Borders
   borderLo:  "rgba(17,17,23,0.06)",
   borderMid: "rgba(17,17,23,0.10)",
+  track:     "rgba(17,17,23,0.10)",
   // Text
   textPrimary:   "#15151c",
   textSecondary: "rgba(21,21,28,0.56)",
   textTertiary:  "rgba(21,21,28,0.36)",
-  // Accent — single colour used everywhere
+  // Accent — single colour used everywhere, ours (not the reference's)
   accent:    "#ec4899",
-  accentBg:  "rgba(236,72,153,0.12)",  // tinted surface
-  accentRim: "rgba(236,72,153,0.28)",  // border on tinted surface
+  accentBg:  "rgba(236,72,153,0.12)",
+  accentRim: "rgba(236,72,153,0.28)",
   // Type scale
   headingSize: 32,
   headingWeight: "800" as const,
@@ -130,7 +144,7 @@ const SCREENS = [
     id: 5,
     type: "genres",
     headline: "Every Genre,\nEvery Mood",
-    subtext: "From action-packed blockbusters to cozy rom-coms, we've got it all covered.",
+    subtext: "From action-packed blockbusters to cozy rom-coms, we've got it all covered. Tap the ones you love.",
     genres: [
       { name: "Action",    emoji: "💥", color: "#ef4444" },
       { name: "Comedy",    emoji: "😂", color: "#f97316" },
@@ -228,23 +242,43 @@ function PrivacyIcon({ name, size, color }: { name: string; size: number; color:
 
 // ─── Shared UI primitives ──────────────────────────────────────────────────────
 
-// Solid pill CTA — consistent accent colour, no per-screen gradient shift
+// Diagonal two-tone backdrop — the reference design's signature panel behind
+// the header and hero content. Purely decorative, so it never intercepts touches.
+function DiagonalBackdrop() {
+  return (
+    <View pointerEvents="none" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, overflow: "hidden", backgroundColor: T.bg }}>
+      <View
+        style={{
+          position: "absolute",
+          width: width * 1.9,
+          height: height * 0.85,
+          top: -height * 0.22,
+          left: -width * 0.55,
+          backgroundColor: T.wedge,
+          transform: [{ rotate: "-9deg" }],
+        }}
+      />
+    </View>
+  )
+}
+
+// Solid pill CTA — label left, circular arrow badge right. Matches the
+// reference button shape; disabled state lightens the fill instead of
+// swapping in a different color.
 function CTAButton({
   label,
   onPress,
   onPressIn,
   onPressOut,
   animStyle,
-  iconLeft,
-  iconRight,
+  icon,
 }: {
   label: string
   onPress: () => void
   onPressIn: () => void
   onPressOut: () => void
   animStyle: object
-  iconLeft?: React.ReactNode
-  iconRight?: React.ReactNode
+  icon?: React.ReactNode
 }) {
   return (
     <Animated.View style={[{ width: "100%" }, animStyle]}>
@@ -252,17 +286,19 @@ function CTAButton({
         onPressIn={onPressIn}
         onPressOut={onPressOut}
         onPress={onPress}
-        activeOpacity={0.88}
+        activeOpacity={0.92}
+        accessibilityRole="button"
+        accessibilityLabel={label}
         style={{
           width: "100%",
-          height: 58,
-          borderRadius: 29,
+          height: 60,
+          borderRadius: 30,
           backgroundColor: T.accent,
           flexDirection: "row",
           alignItems: "center",
-          justifyContent: "center",
-          gap: 10,
-          // Subtle glow — only on iOS (elevation on Android avoids artefact)
+          justifyContent: "space-between",
+          paddingLeft: 26,
+          paddingRight: 8,
           shadowColor: T.accent,
           shadowOpacity: 0.32,
           shadowRadius: 20,
@@ -270,29 +306,47 @@ function CTAButton({
           elevation: 6,
         }}
       >
-        {iconLeft}
-        <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700", letterSpacing: 0.1 }}>
-          {label}
-        </Text>
-        {iconRight}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          {icon}
+          <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700", letterSpacing: 0.1 }}>
+            {label}
+          </Text>
+        </View>
+        <View
+          style={{
+            width: 44, height: 44, borderRadius: 22,
+            alignItems: "center", justifyContent: "center",
+            backgroundColor: "rgba(255,255,255,0.22)",
+            borderWidth: 1, borderColor: "rgba(255,255,255,0.35)",
+          }}
+        >
+          <ArrowRightIcon size={19} color="#fff" strokeWidth={2.4} />
+        </View>
       </TouchableOpacity>
     </Animated.View>
   )
 }
 
-// Ghost / secondary button — soft light-gray pill, no border
+// Ghost / secondary button — solid white pill, floats on the gray backdrop
 function GhostButton({ label, onPress }: { label: string; onPress: () => void }) {
   return (
     <TouchableOpacity
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.75}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={{
         width: "100%",
-        height: 58,
+        height: 60,
         alignItems: "center",
         justifyContent: "center",
-        borderRadius: 29,
+        borderRadius: 30,
         backgroundColor: T.surface,
+        shadowColor: "#1a1a2e",
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 1,
       }}
     >
       <Text style={{ fontSize: 16, fontWeight: "700", color: T.textPrimary }}>
@@ -302,7 +356,7 @@ function GhostButton({ label, onPress }: { label: string; onPress: () => void })
   )
 }
 
-// Card row — soft white surface with a gentle shadow, hairline border for crispness
+// Card row — the reference design's white option pill
 function RowCard({ children, style }: { children: React.ReactNode; style?: object }) {
   return (
     <View
@@ -311,8 +365,8 @@ function RowCard({ children, style }: { children: React.ReactNode; style?: objec
         alignItems: "center",
         padding: 18,
         gap: 14,
-        borderRadius: 20,
-        backgroundColor: "#ffffff",
+        borderRadius: 22,
+        backgroundColor: T.surface,
         borderWidth: 1,
         borderColor: T.borderLo,
         shadowColor: "#1a1a2e",
@@ -328,14 +382,16 @@ function RowCard({ children, style }: { children: React.ReactNode; style?: objec
   )
 }
 
-// Icon box — uses explicit rgba so hex-alpha shorthand (#color20) isn't needed
+// Icon box — uses explicit rgba so hex-alpha shorthand (#color20) isn't needed.
+// A border in the same colour (not just a tinted fill) keeps each swatch
+// visually bounded instead of bleeding into the card behind it.
 function IconBox({ color, children }: { color: string; children: React.ReactNode }) {
-  // Convert a 6-digit hex to rgba at 12% opacity for RN compatibility
   const hex = color.replace("#", "")
   const r = parseInt(hex.slice(0, 2), 16)
   const g = parseInt(hex.slice(2, 4), 16)
   const b = parseInt(hex.slice(4, 6), 16)
   const bg = `rgba(${r},${g},${b},0.12)`
+  const border = `rgba(${r},${g},${b},0.28)`
   return (
     <View
       style={{
@@ -345,6 +401,8 @@ function IconBox({ color, children }: { color: string; children: React.ReactNode
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: bg,
+        borderWidth: 1,
+        borderColor: border,
         flexShrink: 0,
       }}
     >
@@ -353,11 +411,85 @@ function IconBox({ color, children }: { color: string; children: React.ReactNode
   )
 }
 
+// ─── Wake gate ─────────────────────────────────────────────────────────────────
+// Mirrors the reference design's plain "tap to wake" interstitial: flat
+// background, breathing icon with a radar pulse, tap anywhere to continue.
+function WakeGate({ onWake }: { onWake: () => void }) {
+  const breathe = useSharedValue(1)
+  const ring = useSharedValue(0)
+  const press = useSharedValue(1)
+
+  useEffect(() => {
+    breathe.value = withRepeat(
+      withSequence(
+        withTiming(1.08, { duration: 900, easing: EASE_OUT }),
+        withTiming(1, { duration: 900, easing: EASE_OUT }),
+      ),
+      -1,
+      false,
+    )
+    ring.value = withRepeat(withTiming(1, { duration: 1600, easing: Easing.out(Easing.quad) }), -1, false)
+  }, [])
+
+  const breatheStyle = useAnimatedStyle(() => ({ transform: [{ scale: breathe.value * press.value }] }))
+  const ringStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + ring.value * 0.6 }],
+    opacity: (1 - ring.value) * 0.35,
+  }))
+
+  const handlePress = () => {
+    press.value = withSequence(
+      withTiming(0.94, { duration: 90, easing: EASE_OUT }),
+      withTiming(1, { duration: 160, easing: EASE_OUT }),
+    )
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    onWake()
+  }
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel="Tap to begin"
+      style={{ flex: 1, backgroundColor: T.bg, alignItems: "center", justifyContent: "center", gap: 22 }}
+    >
+      <View style={{ width: 140, height: 140, alignItems: "center", justifyContent: "center" }}>
+        <Animated.View style={[ringStyle, { position: "absolute", width: 96, height: 96, borderRadius: 48, backgroundColor: T.accent }]} />
+        <Animated.View
+          style={[
+            breatheStyle,
+            {
+              width: 96, height: 96, borderRadius: 48,
+              alignItems: "center", justifyContent: "center",
+              backgroundColor: T.accent,
+              shadowColor: T.accent, shadowOpacity: 0.35, shadowRadius: 22,
+              shadowOffset: { width: 0, height: 8 }, elevation: 10,
+            },
+          ]}
+        >
+          <HeartSolid size={42} color="#fff" />
+        </Animated.View>
+      </View>
+
+      <Animated.View entering={FadeIn.delay(200)} style={{ alignItems: "center", gap: 6 }}>
+        <Text style={{ fontSize: 20, fontWeight: "800", color: T.textPrimary }}>Tap to begin</Text>
+        <Text style={{ fontSize: 14, color: T.textSecondary }}>Let's find your perfect movie night</Text>
+      </Animated.View>
+
+      <Animated.View entering={FadeIn.delay(500)}>
+        <Ionicons name="hand-left-outline" size={22} color={T.textTertiary} />
+      </Animated.View>
+    </Pressable>
+  )
+}
+
 // ─── Main screen ───────────────────────────────────────────────────────────────
 
 export default function OnboardingScreen() {
   const router = useRouter()
+  const [awake, setAwake] = useState(false)
   const [currentScreen, setCurrentScreen] = useState(0)
+  const [selectedGenres, setSelectedGenres] = useState<string[]>(["Romance", "Comedy"])
   const screen = SCREENS[currentScreen]
 
   const scale = useSharedValue(1)
@@ -365,8 +497,14 @@ export default function OnboardingScreen() {
     transform: [{ scale: scale.value }],
   }))
 
-  const handlePressIn  = () => { scale.value = withSpring(0.97) }
-  const handlePressOut = () => { scale.value = withSpring(1) }
+  // 120ms / ~3% scale — press feedback ceiling for something touched this often.
+  const handlePressIn  = () => { scale.value = withTiming(0.97, { duration: 120, easing: EASE_OUT }) }
+  const handlePressOut = () => { scale.value = withTiming(1, { duration: 160, easing: EASE_OUT }) }
+
+  const toggleGenre = (name: string) => {
+    Haptics.selectionAsync()
+    setSelectedGenres((prev) => (prev.includes(name) ? prev.filter((g) => g !== name) : [...prev, name]))
+  }
 
   const completeOnboarding = async () => {
     try { await AsyncStorage.setItem("@onboarding_complete", "true") } catch {}
@@ -379,6 +517,10 @@ export default function OnboardingScreen() {
   }
   const handleSkip = () => completeOnboarding()
   const handleBack = () => { if (currentScreen > 0) setCurrentScreen((p) => p - 1) }
+
+  if (!awake) {
+    return <WakeGate onWake={() => setAwake(true)} />
+  }
 
   // ── Per-screen content ────────────────────────────────────────────────────
   const renderContent = () => {
@@ -398,8 +540,8 @@ export default function OnboardingScreen() {
                   shadowColor: "#1a1a2e", shadowOpacity: 0.14, shadowRadius: 16,
                   shadowOffset: { width: 0, height: 8 }, elevation: 5,
                 }}>
-                  <View style={{ flex: 1, backgroundColor: T.surface, alignItems: "center", justifyContent: "center" }}>
-                    <View style={{ width: 50, height: 74, borderRadius: 12, backgroundColor: "#ffffff", alignItems: "center", justifyContent: "center" }}>
+                  <View style={{ flex: 1, backgroundColor: T.wedge, alignItems: "center", justifyContent: "center" }}>
+                    <View style={{ width: 50, height: 74, borderRadius: 12, backgroundColor: T.surface, alignItems: "center", justifyContent: "center" }}>
                       <FilmIcon size={32} color="#d7d9e4" strokeWidth={1.5} />
                     </View>
                     <View style={{ position: "absolute", bottom: 10, right: 10 }}>
@@ -415,8 +557,8 @@ export default function OnboardingScreen() {
                   shadowColor: "#1a1a2e", shadowOpacity: 0.14, shadowRadius: 16,
                   shadowOffset: { width: 0, height: 8 }, elevation: 5,
                 }}>
-                  <View style={{ flex: 1, backgroundColor: T.surface, alignItems: "center", justifyContent: "center" }}>
-                    <View style={{ width: 50, height: 74, borderRadius: 12, backgroundColor: "#ffffff", alignItems: "center", justifyContent: "center" }}>
+                  <View style={{ flex: 1, backgroundColor: T.wedge, alignItems: "center", justifyContent: "center" }}>
+                    <View style={{ width: 50, height: 74, borderRadius: 12, backgroundColor: T.surface, alignItems: "center", justifyContent: "center" }}>
                       <VideoCameraIcon size={32} color="#d7d9e4" strokeWidth={1.5} />
                     </View>
                     <View style={{ position: "absolute", bottom: 10, right: 10 }}>
@@ -445,9 +587,16 @@ export default function OnboardingScreen() {
                   flexDirection: "row",
                   justifyContent: "space-around",
                   backgroundColor: T.surface,
-                  borderRadius: 18,
+                  borderRadius: 22,
                   paddingVertical: 20,
                   paddingHorizontal: 16,
+                  borderWidth: 1,
+                  borderColor: T.borderLo,
+                  shadowColor: "#1a1a2e",
+                  shadowOpacity: 0.06,
+                  shadowRadius: 16,
+                  shadowOffset: { width: 0, height: 4 },
+                  elevation: 2,
                 }}
               >
                 {screen.stats.map((stat, i) => (
@@ -520,11 +669,11 @@ export default function OnboardingScreen() {
             {/* Avatar pair illustration */}
             <Animated.View entering={FadeInDown.delay(100)} style={{ alignItems: "center", gap: 12 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 0 }}>
-                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#06b6d4", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: T.bg }}>
+                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#06b6d4", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: T.wedge }}>
                   <UserIcon size={28} color="#fff" strokeWidth={1.8} />
                 </View>
-                <View style={{ width: 40, height: 1.5, backgroundColor: T.borderLo }} />
-                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: T.accent, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: T.bg }}>
+                <View style={{ width: 40, height: 1.5, backgroundColor: T.borderMid }} />
+                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: T.accent, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: T.wedge }}>
                   <UserIcon size={28} color="#fff" strokeWidth={1.8} />
                 </View>
               </View>
@@ -555,31 +704,47 @@ export default function OnboardingScreen() {
 
       case "genres":
         return (
-          <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center" }}>
+          <View style={{ flex: 1, justifyContent: "center", gap: 14 }}>
             {"genres" in screen && screen.genres && (
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 9, justifyContent: "center" }}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 28, gap: 12 }}
+              >
                 {screen.genres.map((genre, i) => {
-                  const hex = genre.color.replace("#", "")
-                  const r = parseInt(hex.slice(0, 2), 16)
-                  const g = parseInt(hex.slice(2, 4), 16)
-                  const b = parseInt(hex.slice(4, 6), 16)
+                  const isSelected = selectedGenres.includes(genre.name)
                   return (
                     <Animated.View key={i} entering={FadeInDown.delay(100 + i * 45).springify()}>
-                      <View style={{
-                        flexDirection: "row", alignItems: "center",
-                        paddingHorizontal: 16, paddingVertical: 12, gap: 8,
-                        borderRadius: 14,
-                        backgroundColor: `rgba(${r},${g},${b},0.10)`,
-                        borderWidth: 1,
-                        borderColor: `rgba(${r},${g},${b},0.22)`,
-                      }}>
-                        <Text style={{ fontSize: 18 }}>{genre.emoji}</Text>
-                        <Text style={{ fontSize: 14, fontWeight: "600", color: genre.color }}>{genre.name}</Text>
-                      </View>
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() => toggleGenre(genre.name)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${genre.name}${isSelected ? ", selected" : ""}`}
+                        style={{
+                          width: 108, height: 122, borderRadius: 22,
+                          backgroundColor: T.dark,
+                          borderWidth: isSelected ? 2 : 1,
+                          borderColor: isSelected ? T.accent : "rgba(255,255,255,0.10)",
+                          alignItems: "center", justifyContent: "center",
+                          padding: 12,
+                        }}
+                      >
+                        {isSelected && (
+                          <View style={{
+                            position: "absolute", top: 8, right: 8,
+                            width: 20, height: 20, borderRadius: 10,
+                            backgroundColor: T.accent, alignItems: "center", justifyContent: "center",
+                          }}>
+                            <CheckSolid size={11} color="#fff" />
+                          </View>
+                        )}
+                        <Text style={{ fontSize: 28, marginBottom: 8 }}>{genre.emoji}</Text>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff", textAlign: "center" }}>{genre.name}</Text>
+                      </TouchableOpacity>
                     </Animated.View>
                   )
                 })}
-              </View>
+              </ScrollView>
             )}
           </View>
         )
@@ -599,7 +764,7 @@ export default function OnboardingScreen() {
                         alignItems: "center", justifyContent: "center",
                         backgroundColor: active ? "#f97316" : T.surface,
                         borderWidth: 1,
-                        borderColor: active ? "transparent" : T.borderLo,
+                        borderColor: active ? "rgba(0,0,0,0.08)" : T.borderLo,
                       }}>
                         <FireIcon size={16} color={active ? "#fff" : "#c4c7d4"} strokeWidth={1.8} />
                       </View>
@@ -669,9 +834,10 @@ export default function OnboardingScreen() {
             )}
 
             <Animated.View entering={FadeIn.delay(580)} style={{
-              padding: 16, borderRadius: 14,
+              padding: 16, borderRadius: 18,
               backgroundColor: T.surface,
-              borderWidth: 1, borderColor: T.borderLo,
+              shadowColor: "#1a1a2e", shadowOpacity: 0.05, shadowRadius: 12,
+              shadowOffset: { width: 0, height: 2 }, elevation: 1,
             }}>
               <Text style={{ fontSize: 13, color: T.textTertiary, textAlign: "center", lineHeight: 20 }}>
                 By continuing, you agree to our{" "}
@@ -690,11 +856,10 @@ export default function OnboardingScreen() {
               <View style={{ gap: 12 }}>
                 {screen.testimonials.map((testimonial, i) => (
                   <Animated.View key={i} entering={FadeInDown.delay(280 + i * 130).springify()} style={{
-                    padding: 18, borderRadius: 16,
-                    backgroundColor: "#ffffff",
-                    borderWidth: 1, borderColor: T.borderLo,
-                    shadowColor: "#1a1a2e", shadowOpacity: 0.05, shadowRadius: 14,
-                    shadowOffset: { width: 0, height: 3 }, elevation: 1,
+                    padding: 18, borderRadius: 20,
+                    backgroundColor: T.surface,
+                    shadowColor: "#1a1a2e", shadowOpacity: 0.06, shadowRadius: 14,
+                    shadowOffset: { width: 0, height: 4 }, elevation: 2,
                   }}>
                     <ChatBubbleLeftIcon size={16} color={T.textTertiary} strokeWidth={1.8} />
                     <Text style={{ fontSize: 14, fontStyle: "italic", lineHeight: 22, marginTop: 9, color: "rgba(21,21,28,0.68)" }}>"{testimonial.text}"</Text>
@@ -712,15 +877,21 @@ export default function OnboardingScreen() {
   }
 
   const isFinal = screen.type === "final"
+  // Screens built around a centered illustration/carousel read the headline
+  // centered too, so the whole screen reads as one aligned block instead of
+  // a left-anchored title floating over centered content. List-driven
+  // screens (howItWorks, features) keep their left-aligned reading flow.
+  const isCentered = isFinal || ["hero", "social", "streaks", "privacy", "genres"].includes(screen.type)
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
+      <DiagonalBackdrop />
 
       {/* ── Header ── */}
       <View style={{
         flexDirection: "row",
-        justifyContent: "space-between",
         alignItems: "center",
+        gap: 14,
         paddingHorizontal: 20,
         paddingTop: 58,
         height: 106,
@@ -743,32 +914,26 @@ export default function OnboardingScreen() {
             </TouchableOpacity>
           </Animated.View>
         ) : (
-          <View style={{ width: 42 }} />
+          <View style={{ width: 44 }} />
         )}
 
-        {/* Progress pill — moved to header for cleaner bottom bar */}
-        <Text style={{ fontSize: T.labelSize, fontWeight: "600", color: T.textTertiary, letterSpacing: 0.5 }}>
-          {currentScreen + 1} / {SCREENS.length}
-        </Text>
+        {/* Slim progress bar */}
+        <View style={{ flex: 1, height: 5, borderRadius: 3, overflow: "hidden", backgroundColor: T.track }}>
+          <View style={{ height: "100%", borderRadius: 3, width: `${((currentScreen + 1) / SCREENS.length) * 100}%`, backgroundColor: T.accent }} />
+        </View>
 
-        {/* Skip */}
-        {currentScreen < SCREENS.length - 1 ? (
+        {/* Skip — kept minimal, no pill, so it doesn't fight the design */}
+        {currentScreen < SCREENS.length - 1 && (
           <Animated.View entering={FadeIn.delay(400)}>
             <TouchableOpacity
               onPress={handleSkip}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
               accessibilityLabel="Skip onboarding"
-              style={{
-                paddingHorizontal: 16, paddingVertical: 9,
-                borderRadius: 14,
-                backgroundColor: T.surface,
-              }}
             >
-              <Text style={{ fontSize: 13, fontWeight: "600", color: T.textSecondary }}>Skip</Text>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: T.textTertiary }}>Skip</Text>
             </TouchableOpacity>
           </Animated.View>
-        ) : (
-          <View style={{ width: 60 }} />
         )}
       </View>
 
@@ -829,7 +994,7 @@ export default function OnboardingScreen() {
               letterSpacing: -0.8,
               color: T.textPrimary,
               marginBottom: 10,
-              textAlign: isFinal ? "center" : "left",
+              textAlign: isCentered ? "center" : "left",
             }}
           >
             {screen.headline}
@@ -842,7 +1007,7 @@ export default function OnboardingScreen() {
                 fontSize: T.bodySize,
                 lineHeight: T.bodyLine,
                 color: T.textSecondary,
-                textAlign: isFinal ? "center" : "left",
+                textAlign: isCentered ? "center" : "left",
               }}
             >
               {screen.subtext}
@@ -850,7 +1015,7 @@ export default function OnboardingScreen() {
           )}
 
           {"micro" in screen && screen.micro && (
-            <Animated.View entering={FadeIn.delay(360)} style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 }}>
+            <Animated.View entering={FadeIn.delay(360)} style={{ flexDirection: "row", alignItems: "center", justifyContent: isCentered ? "center" : "flex-start", gap: 6, marginTop: 10 }}>
               <UserGroupIcon size={13} color={T.accent} strokeWidth={2} />
               <Text style={{ fontSize: 13, fontWeight: "600", color: T.accent }}>{screen.micro}</Text>
             </Animated.View>
@@ -863,11 +1028,6 @@ export default function OnboardingScreen() {
 
       {/* ── Bottom bar ── */}
       <View style={{ paddingHorizontal: 28, paddingBottom: 46, gap: 10 }}>
-        {/* Progress bar only — counter is now in the header */}
-        <View style={{ width: "100%", height: 3, backgroundColor: T.surface, borderRadius: 2, overflow: "hidden", marginBottom: 4 }}>
-          <View style={{ height: "100%", borderRadius: 2, width: `${((currentScreen + 1) / SCREENS.length) * 100}%`, backgroundColor: T.accent }} />
-        </View>
-
         {isFinal ? (
           <View style={{ gap: 10 }}>
             <CTAButton
@@ -876,7 +1036,7 @@ export default function OnboardingScreen() {
               onPressIn={handlePressIn}
               onPressOut={handlePressOut}
               animStyle={animatedButtonStyle}
-              iconLeft={<UserGroupIcon size={19} color="#fff" strokeWidth={2} />}
+              icon={<UserGroupIcon size={19} color="#fff" strokeWidth={2} />}
             />
             <GhostButton
               label={"ctaSecondary" in screen ? (screen as any).ctaSecondary : ""}
@@ -890,7 +1050,6 @@ export default function OnboardingScreen() {
             onPressIn={handlePressIn}
             onPressOut={handlePressOut}
             animStyle={animatedButtonStyle}
-            iconRight={<ArrowRightIcon size={19} color="#fff" strokeWidth={2.5} />}
           />
         )}
       </View>

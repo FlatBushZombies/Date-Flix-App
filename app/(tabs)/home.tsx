@@ -7,6 +7,7 @@ import { StreakModal } from "@/components/StreakModal"
 import { useToast } from "@/components/Toast/ToastProvider"
 import { shadow } from "@/constants/theme"
 import { useNotifications } from "@/hooks/useNotifications"
+import { getPreferences } from "@/lib/preferences"
 import type { StreakEvaluation, SupabaseUser, SwipeSession, Movie } from "@/types"
 import {
     acceptInvitation,
@@ -36,6 +37,7 @@ import {
     View
 } from "react-native"
 import {
+    ArrowTrendingUpIcon,
     BellIcon,
     MapPinIcon,
     UserPlusIcon,
@@ -87,6 +89,13 @@ export default function SwipeScreen() {
 
   const toast = useToast()
   const confirm = useConfirm()
+
+  // Read once on mount — set from Account Settings, doesn't need to be reactive
+  // mid-session. Only mutes the in-app streak toasts, not push notifications.
+  const [partnerActivityMuted, setPartnerActivityMuted] = useState(false)
+  useEffect(() => {
+    getPreferences().then((p) => setPartnerActivityMuted(p.partnerActivityMuted))
+  }, [])
 
   const {
     items: notifications,
@@ -152,7 +161,7 @@ export default function SwipeScreen() {
       })
     }
 
-    if (evaluation.event === "none") return
+    if (evaluation.event === "none" || partnerActivityMuted) return
 
     const partnerName = (isUser1 ? session.user2.first_name : session.user1.first_name) || "your partner"
     const day = evaluation.event === "broken" ? evaluation.previousStreak ?? 0 : evaluation.currentStreak
@@ -346,14 +355,14 @@ export default function SwipeScreen() {
             <Text className="text-white font-bold text-sm">Invite</Text>
           </TouchableOpacity>
 
-          {/* Map button */}
+          {/* Top Picks button */}
           <TouchableOpacity
-            onPress={() => router.push("/map")}
+            onPress={() => router.push("/top-picks")}
             className="w-11 h-11 rounded-full bg-white justify-center items-center shadow shadow-black/10"
             accessibilityRole="button"
-            accessibilityLabel="View genre journey map"
+            accessibilityLabel="View top upvoted movies"
           >
-            <MapPinIcon size={22} color="#0f172a" strokeWidth={1.6} />
+            <ArrowTrendingUpIcon size={22} color="#0f172a" strokeWidth={1.6} />
           </TouchableOpacity>
 
           {/* Streak badge */}

@@ -1,5 +1,5 @@
 import { GenreChip } from '@/components/GenreChip';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Image, Text, TouchableOpacity, View } from 'react-native';
 
 const GENRES = [
   { value: 'romance', label: 'Romance', emoji: '💕', desc: 'Love stories' },
@@ -34,6 +34,24 @@ export function Step1Genre({ selected, onChange, onNext }: { selected: string[];
           borderColor: '#18161c',
         }}
       >
+        <View
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 18,
+            backgroundColor: '#FFF1F4',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 16,
+          }}
+        >
+          <Image
+            source={require('@/assets/icons/cinema.png')}
+            style={{ width: 34, height: 34 }}
+            resizeMode="contain"
+          />
+        </View>
+
         <Text style={{
           fontSize: 11,
           color: '#C81E4B',

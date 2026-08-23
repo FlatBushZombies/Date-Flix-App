@@ -1,9 +1,11 @@
+import { useToast } from '@/components/Toast/ToastProvider';
 import { EnrichedMovie, useEnrichedMovies } from '@/hooks/useEnrichedMovies';
 import { getWatchUrl } from '@/lib/streaming';
+import { sendToStreamingApp } from '@/lib/tvCast';
 import type { Movie } from '@/types';
 import { MovieNightPlan } from '@/types/planner';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Bookmark, ChevronLeft as ChevronLeftIcon, Clapperboard, Share2, Star } from 'lucide-react-native';
+import { Bookmark, ChevronLeft as ChevronLeftIcon, Clapperboard, Share2, Star, Tv } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -34,6 +36,8 @@ interface ResultsScreenProps {
 export function ResultsScreen({ plan, prompt, onReset, isSaved, toggleSave }: ResultsScreenProps) {
   const { movies: enriched, loading: enrichLoading } = useEnrichedMovies(plan.movies);
   const [overviewExpanded, setOverviewExpanded] = useState(false);
+  const [sendingToTv, setSendingToTv] = useState(false);
+  const toast = useToast();
 
   const list: EnrichedMovie[] =
     enriched.length > 0 ? enriched : plan.movies.map((m) => ({ ...m, tmdb: null }));
@@ -88,6 +92,27 @@ export function ResultsScreen({ plan, prompt, onReset, isSaved, toggleSave }: Re
 
   const handleWatch = () => {
     Linking.openURL(getWatchUrl(active.streaming, active.title)).catch(() => {});
+  };
+
+  // There's no video to cast directly — this opens the title in its actual
+  // streaming app, which has its own Cast/AirPlay button once it's open.
+  // Falls back to the same web search "Watch Now" uses if the app isn't
+  // installed, so it never dead-ends.
+  const handleSendToTv = async () => {
+    if (sendingToTv) return;
+    setSendingToTv(true);
+    try {
+      const result = await sendToStreamingApp(active.streaming, active.title);
+      if (result === 'app') {
+        toast.info('Opened ' + active.streaming, 'Tap the Cast or AirPlay icon in the app to send it to your TV.');
+      } else {
+        toast.info('Opened in browser', `Install the ${active.streaming} app to send it to your TV directly.`);
+      }
+    } catch {
+      toast.error('Error', "Couldn't open the streaming app. Try again.");
+    } finally {
+      setSendingToTv(false);
+    }
   };
 
   const saved = !!active.tmdb && isSaved(active.tmdb.id);
@@ -309,6 +334,30 @@ export function ResultsScreen({ plan, prompt, onReset, isSaved, toggleSave }: Re
                     <Share2 size={20} color="#fff" />
                   </TouchableOpacity>
                   <Text style={{ color: '#C9BFC4', fontSize: 11, marginTop: 6 }}>Share</Text>
+                </View>
+
+                <View style={{ alignItems: 'center' }}>
+                  <TouchableOpacity
+                    onPress={handleSendToTv}
+                    disabled={sendingToTv}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Send to TV"
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 28,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'rgba(255,255,255,0.12)',
+                      opacity: sendingToTv ? 0.5 : 1,
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,255,255,0.15)',
+                    }}
+                  >
+                    <Tv size={20} color="#fff" />
+                  </TouchableOpacity>
+                  <Text style={{ color: '#C9BFC4', fontSize: 11, marginTop: 6 }}>TV</Text>
                 </View>
               </View>
 

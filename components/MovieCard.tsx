@@ -516,7 +516,11 @@ export function MovieCard({ movie, onSwipe, onSave, onShare, onTrailer }: MovieC
                             style={{ width: 40, height: 40, borderRadius: 20 }}
                           />
                         ) : (
-                          <Ionicons name="person" size={20} color="rgba(255,255,255,0.6)" />
+                          <Image
+                            source={require("@/assets/icons/user.png")}
+                            style={{ width: 24, height: 24 }}
+                            resizeMode="contain"
+                          />
                         )}
                       </View>
                       <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.8)", textAlign: "center" }} numberOfLines={2}>
@@ -591,7 +595,11 @@ export function MovieCard({ movie, onSwipe, onSave, onShare, onTrailer }: MovieC
                   shadowRadius: 18,
                   elevation: 12,
                 }}>
-                <Ionicons name="heart" size={32} color="#111111" />
+                <Image
+                  source={require("@/assets/icons/love.png")}
+                  style={{ width: 40, height: 40 }}
+                  resizeMode="contain"
+                />
               </TouchableOpacity>
             </Animated.View>
 

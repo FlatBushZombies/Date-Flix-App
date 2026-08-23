@@ -1,11 +1,11 @@
 // Shared design tokens — the single source of truth for color, spacing, radius,
 // type scale, and animation duration across the app.
 //
-// Two screens intentionally keep their own scoped palettes rather than pulling
-// from this file: debate.tsx's pink+violet romantic theme (the pink is sourced
-// from `color.accentPink` below to stay in sync; violet is its own token,
-// scoped to that screen) and map.tsx's dark space palette (its own file-local
-// constants — a deliberately distinct "genre journey" visual language).
+// debate.tsx intentionally keeps its own scoped pink+violet romantic theme
+// rather than pulling from this file (the pink is sourced from
+// `color.accentPink` below to stay in sync; violet is its own token, scoped
+// to that screen), and top-picks.tsx keeps its own dark cinematic palette
+// as file-local constants.
 
 export const color = {
   // Brand — Netflix red family (login, tabs, home, match brand touches)

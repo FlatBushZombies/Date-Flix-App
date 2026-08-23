@@ -1,10 +1,8 @@
 "use client"
 
-import { useConfirm } from "@/components/Confirm/ConfirmProvider"
 import { useToast } from "@/components/Toast/ToastProvider"
 import { shadow } from "@/constants/theme"
 import type { Invitation, SupabaseUser, SwipeSession } from "@/types"
-import { permanentlyDeleteAccount } from "@/utils/account"
 import {
   acceptInvitation,
   createInvitation,
@@ -16,7 +14,7 @@ import {
 import { useClerk, useUser } from "@clerk/clerk-expo"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
-import { Film, Flame, Heart, Users } from "lucide-react-native"
+import { Film, Flame, Users } from "lucide-react-native"
 import type React from "react"
 import { useEffect, useState } from "react"
 import {
@@ -68,9 +66,7 @@ export default function ProfileScreen() {
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [inviteCode, setInviteCode] = useState("")
   const [loading, setLoading] = useState(false)
-  const [deletingAccount, setDeletingAccount] = useState(false)
   const toast = useToast()
-  const confirm = useConfirm()
 
   useEffect(() => {
     if (user) loadUserData()
@@ -141,53 +137,6 @@ export default function ProfileScreen() {
     }
   }
 
-  const handleDeleteAccount = async () => {
-    if (!user) return
-    confirm.show({
-      title: "Delete Account",
-      message: "Are you sure you want to permanently delete your account? This action cannot be undone.",
-      variant: "destructive",
-      buttons: [
-        { label: "Cancel", style: "cancel" },
-        {
-          label: "Delete",
-          style: "destructive",
-          onPress: () => {
-            confirm.show({
-              title: "Final Warning",
-              message:
-                "This will permanently delete all your data including matches, swipes, and profile information. Are you absolutely sure?",
-              variant: "destructive",
-              buttons: [
-                { label: "Cancel", style: "cancel" },
-                {
-                  label: "Yes, Delete Everything",
-                  style: "destructive",
-                  onPress: async () => {
-                    setDeletingAccount(true)
-                    try {
-                      const result = await permanentlyDeleteAccount(user.id, user)
-                      if (result.success) {
-                        toast.success("Account Deleted", result.message)
-                        router.replace("/")
-                      } else {
-                        confirm.show({ title: "Deletion Failed", message: result.message, variant: "warning" })
-                      }
-                    } catch {
-                      toast.error("Error", "Failed to delete account. Please try again or contact support.")
-                    } finally {
-                      setDeletingAccount(false)
-                    }
-                  },
-                },
-              ],
-            })
-          },
-        },
-      ],
-    })
-  }
-
   return (
     <ScrollView style={s.root} showsVerticalScrollIndicator={false}>
       {/* ── Header ──────────────────────────────────────────── */}
@@ -227,7 +176,7 @@ export default function ProfileScreen() {
                 <Image source={{ uri: user.imageUrl }} style={s.mainAvatar} />
               ) : (
                 <View style={[s.mainAvatar, s.mainAvatarFallback]}>
-                  <Ionicons name="person" size={36} color={C.cyan} />
+                  <Image source={require('@/assets/icons/user.png')} style={{ width: 40, height: 40 }} resizeMode="contain" />
                 </View>
               )}
             </View>
@@ -248,7 +197,7 @@ export default function ProfileScreen() {
               />
             ) : (
               <View style={s.partnerAvatarEmpty}>
-                <Heart size={18} color={C.textSub} />
+                <Image source={require('@/assets/icons/love.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />
               </View>
             )}
           </View>
@@ -308,7 +257,7 @@ export default function ProfileScreen() {
                     <Image source={{ uri: partner.image_url }} style={s.sessionAvatar} />
                   ) : (
                     <View style={[s.sessionAvatar, s.sessionAvatarFallback]}>
-                      <Ionicons name="person" size={20} color={C.cyan} />
+                      <Image source={require('@/assets/icons/user.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />
                     </View>
                   )}
                 </View>
@@ -336,17 +285,17 @@ export default function ProfileScreen() {
         />
         <ActionCard
           title="Watch Together"
-          description="Create a synced movie night"
-          action="Soon"
-          icon={<Users size={18} color={C.textSub} />}
-          soon
+          description="Invite a friend and swipe in a synced session"
+          action="Invite"
+          icon={<Users size={18} color={C.cyan} />}
+          onPress={() => setShowInviteModal(true)}
         />
         <ActionCard
           title="Shared Watchlist"
-          description="Save movies you both want to see"
-          action="Soon"
-          icon={<Heart size={18} color={C.textSub} />}
-          soon
+          description="Movies you both saved to watch later"
+          action="View"
+          icon={<Image source={require('@/assets/icons/love.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />}
+          onPress={() => router.push("/watchlist")}
         />
       </View>
 
@@ -356,7 +305,7 @@ export default function ProfileScreen() {
 
         <TouchableOpacity
           style={s.footerRow}
-          onPress={() => toast.info("Account", "Account settings coming soon")}
+          onPress={() => router.push("/account-settings")}
           accessibilityRole="button"
           accessibilityLabel="Account settings"
         >
@@ -373,30 +322,6 @@ export default function ProfileScreen() {
         >
           <Text style={s.footerText}>Logout</Text>
           <Ionicons name="chevron-forward" size={16} color={C.textSub} />
-        </TouchableOpacity>
-
-        <View style={s.footerDivider} />
-
-        {/* Delete Account Button — solid red, the only high-contrast destructive element on this screen */}
-        <TouchableOpacity
-          style={[s.btnDelete, deletingAccount && s.btnDeleteDisabled]}
-          onPress={handleDeleteAccount}
-          disabled={deletingAccount}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Delete account permanently"
-        >
-          <View style={s.btnInner}>
-            <Ionicons name="trash-outline" size={18} color={deletingAccount ? "#fca5a5" : "#fff"} />
-            <Text style={[s.btnDeleteText, deletingAccount && { color: "#fca5a5" }]}>
-              {deletingAccount ? "Deleting Account…" : "Delete Account"}
-            </Text>
-          </View>
-          {!deletingAccount && (
-            <View style={s.btnDeleteBadge}>
-              <Text style={s.btnDeleteBadgeText}>Permanent</Text>
-            </View>
-          )}
         </TouchableOpacity>
       </View>
 
@@ -935,50 +860,6 @@ const s = StyleSheet.create({
     fontSize: 15,
     color: C.textMuted,
     letterSpacing: 0.1,
-  },
-
-  // Delete — solid red, full weight
-  btnDelete: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-    paddingVertical: 15,
-    paddingHorizontal: 18,
-    borderRadius: 16,
-    backgroundColor: "#ef4444",
-    shadowColor: "#ef4444",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-  },
-  btnDeleteDisabled: {
-    backgroundColor: "#fca5a5",
-    shadowOpacity: 0,
-  },
-  btnDeleteText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#ffffff",
-    marginLeft: 10,
-    letterSpacing: 0.2,
-  },
-  btnDeleteBadge: {
-    backgroundColor: "rgba(0,0,0,0.15)",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  btnDeleteBadgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#fecaca",
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-  },
-  btnInner: {
-    flexDirection: "row",
-    alignItems: "center",
   },
 
   // Modals

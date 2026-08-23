@@ -133,6 +133,32 @@ export async function getMovieImages(movieId: number): Promise<any> {
   }
 }
 
+export async function getNewMovies(): Promise<Movie[]> {
+  try {
+    const response = await fetch(`${BASE_URL}/movie/now_playing?api_key=${TMDB_API_KEY}`)
+    const raw = await response.text()
+
+    if (!raw) return []
+
+    let data: unknown
+    try {
+      data = JSON.parse(raw)
+    } catch (err) {
+      console.error("Error parsing new movies JSON:", err, raw)
+      return []
+    }
+
+    if (typeof data === "object" && data && "results" in data && Array.isArray((data as any).results)) {
+      return (data as any).results as Movie[]
+    }
+
+    return []
+  } catch (error) {
+    console.error("Error fetching new movies:", error)
+    return []
+  }
+}
+
 export async function getPopularMovies(): Promise<Movie[]> {
   try {
     const response = await fetch(`${BASE_URL}/movie/popular?api_key=${TMDB_API_KEY}`)

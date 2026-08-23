@@ -84,6 +84,62 @@ export const googleOAuth = async (startOAuthFlow: any) => {
   }
 }
 
+export const appleOAuth = async (startOAuthFlow: any) => {
+  try {
+    const { createdSessionId, setActive, signUp } = await startOAuthFlow({
+      redirectUrl: Linking.createURL("/(protected)/post-auth"),
+    })
+
+    if (createdSessionId && setActive) {
+      await setActive({ session: createdSessionId })
+
+      if (signUp && signUp.createdUserId) {
+        try {
+          await fetchAPI("/(api)/user", {
+            method: "POST",
+            body: JSON.stringify({
+              name: `${signUp.firstName ?? ""} ${signUp.lastName ?? ""}`.trim(),
+              email: signUp.emailAddress,
+              clerkId: signUp.createdUserId,
+            }),
+          })
+        } catch (error) {
+          // Backend user creation failure should not break the OAuth flow in Expo Go
+          console.warn("Failed to sync user to backend after Apple OAuth:", error)
+        }
+      }
+
+      return {
+        success: true,
+        code: "success",
+        message: "You have successfully signed in with Apple",
+      }
+    }
+
+    return {
+      success: false,
+      code: "session_missing",
+      message: "An error occurred while signing in with Apple",
+    }
+  } catch (err: any) {
+    console.error("Apple OAuth error:", err)
+
+    let message = "Failed to sign in with Apple"
+
+    if (Array.isArray(err?.errors) && err.errors.length > 0) {
+      message = err.errors[0]?.longMessage || message
+    } else if (err?.message) {
+      message = err.message
+    }
+
+    return {
+      success: false,
+      code: err?.code ?? "oauth_error",
+      message,
+    }
+  }
+}
+
 // Account deletion
 export const deleteUserAccount = async (userObject: any) => {
   try {

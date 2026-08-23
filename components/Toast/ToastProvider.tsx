@@ -1,13 +1,7 @@
 import * as Haptics from "expo-haptics"
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react"
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native"
-import {
-  CheckCircleIcon,
-  FireIcon,
-  InformationCircleIcon,
-  XCircleIcon,
-  XMarkIcon,
-} from "react-native-heroicons/outline"
+import { Image, StyleSheet, Text, TouchableOpacity, View, type ImageSourcePropType } from "react-native"
+import { X } from "lucide-react-native"
 import Animated, {
   Easing,
   SlideInUp,
@@ -16,6 +10,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 type ToastKind = "success" | "error" | "info" | "streak" | "streakBroken"
 
@@ -50,16 +45,59 @@ export function useToast() {
   return ctx
 }
 
-const KIND_CONFIG: Record<ToastKind, { accent: string; iconBg: string }> = {
-  success: { accent: "#10b981", iconBg: "rgba(16,185,129,0.18)" },
-  error: { accent: "#f43f5e", iconBg: "rgba(244,63,94,0.18)" },
-  info: { accent: "#06b6d4", iconBg: "rgba(6,182,212,0.18)" },
-  streak: { accent: "#f59e0b", iconBg: "rgba(245,158,11,0.2)" },
-  streakBroken: { accent: "#f43f5e", iconBg: "rgba(244,63,94,0.18)" },
+// Pastel card + two-tone blob wash per kind — the /assets/icons renders already
+// carry their own colored circle, so they sit on white with a little breathing
+// room rather than inside a second tinted icon box.
+const KIND_CONFIG: Record<
+  ToastKind,
+  { base: string; blobA: string; blobB: string; icon: ImageSourcePropType; accent: string }
+> = {
+  success: {
+    base: "#DEF4E4",
+    blobA: "#CDEDD8",
+    blobB: "#C1E7CF",
+    icon: require("@/assets/icons/success.png"),
+    accent: "#22c55e",
+  },
+  error: {
+    base: "#FBE0DF",
+    blobA: "#F8CFCE",
+    blobB: "#F4BFBE",
+    icon: require("@/assets/icons/error.png"),
+    accent: "#ef4444",
+  },
+  streakBroken: {
+    base: "#FBE0DF",
+    blobA: "#F8CFCE",
+    blobB: "#F4BFBE",
+    icon: require("@/assets/icons/error.png"),
+    accent: "#ef4444",
+  },
+  streak: {
+    base: "#FBEED4",
+    blobA: "#F8E4BC",
+    blobB: "#F5DAA5",
+    icon: require("@/assets/icons/warning.png"),
+    accent: "#f59e0b",
+  },
+  info: {
+    base: "#DDEDF6",
+    blobA: "#CCE3F1",
+    blobB: "#BCD9EC",
+    icon: require("@/assets/icons/warning.png"),
+    accent: "#06b6d4",
+  },
 }
 
 const DEFAULT_DURATION = 3500
 const MILESTONE_DURATION = 4500
+
+// Shared quick-and-quiet curve — a toast is uninvited, so it announces itself
+// fast and gets out of the way just as fast. Exit is ~20% quicker than entry
+// since the user has already read it by then.
+const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1)
+const TOAST_ENTER = SlideInUp.duration(300).easing(EASE_OUT)
+const TOAST_EXIT = SlideOutUp.duration(250).easing(EASE_OUT)
 
 let nextId = 1
 
@@ -124,36 +162,34 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 }
 
 function ToastCard({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) {
+  const insets = useSafeAreaInsets()
   const config = KIND_CONFIG[item.kind]
-  const duration = item.milestone ? MILESTONE_DURATION : DEFAULT_DURATION
 
-  const progress = useSharedValue(1)
-  useEffect(() => {
-    progress.value = 1
-    progress.value = withTiming(0, { duration, easing: Easing.linear })
-  }, [])
-
-  const progressStyle = useAnimatedStyle(() => ({
-    width: `${progress.value * 100}%` as any,
+  const dismissScale = useSharedValue(1)
+  const dismissStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: dismissScale.value }],
   }))
+  const handleDismissPressIn = () => {
+    dismissScale.value = withTiming(0.94, { duration: 120, easing: EASE_OUT })
+  }
+  const handleDismissPressOut = () => {
+    dismissScale.value = withTiming(1, { duration: 120, easing: EASE_OUT })
+  }
 
   return (
     <Animated.View
-      entering={SlideInUp.duration(260).easing(Easing.out(Easing.cubic))}
-      exiting={SlideOutUp.duration(200).easing(Easing.in(Easing.cubic))}
-      style={[
-        styles.wrapper,
-        {
-          shadowColor: config.accent,
-        },
-      ]}
+      entering={TOAST_ENTER}
+      exiting={TOAST_EXIT}
+      style={[styles.wrapper, { top: insets.top + 10, shadowColor: config.accent }]}
     >
-      <View style={styles.card}>
-        <View style={[styles.accentStrip, { backgroundColor: config.accent }]} />
+      <View style={[styles.card, { backgroundColor: config.base }]}>
+        {/* Two-tone blob wash, clipped to the card's rounded corners */}
+        <View style={[styles.blob, styles.blobTopRight, { backgroundColor: config.blobA }]} />
+        <View style={[styles.blob, styles.blobBottom, { backgroundColor: config.blobB }]} />
 
         <View style={styles.row}>
-          <View style={[styles.iconWrap, { backgroundColor: config.iconBg, borderColor: `${config.accent}33` }]}>
-            <ToastIcon kind={item.kind} color={config.accent} />
+          <View style={styles.iconWrap}>
+            <Image source={config.icon} style={styles.iconImage} resizeMode="contain" />
             {item.kind === "streak" && item.milestone && <MilestoneBurst accent={config.accent} />}
           </View>
 
@@ -164,26 +200,23 @@ function ToastCard({ item, onDismiss }: { item: ToastItem; onDismiss: () => void
             </Text>
           </View>
 
-          <TouchableOpacity onPress={onDismiss} style={styles.dismissBtn}>
-            <XMarkIcon size={14} color="#64748b" strokeWidth={2.4} />
+          <TouchableOpacity
+            onPress={onDismiss}
+            onPressIn={handleDismissPressIn}
+            onPressOut={handleDismissPressOut}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss notification"
+            style={styles.dismissBtn}
+          >
+            <Animated.View style={dismissStyle}>
+              <X size={17} color="rgba(31,41,55,0.4)" strokeWidth={2.2} />
+            </Animated.View>
           </TouchableOpacity>
-        </View>
-
-        <View style={styles.progressTrack}>
-          <Animated.View
-            style={[styles.progressFill, { backgroundColor: config.accent }, progressStyle]}
-          />
         </View>
       </View>
     </Animated.View>
   )
-}
-
-function ToastIcon({ kind, color }: { kind: ToastKind; color: string }) {
-  if (kind === "success") return <CheckCircleIcon size={22} color={color} strokeWidth={1.9} />
-  if (kind === "error") return <XCircleIcon size={22} color={color} strokeWidth={1.9} />
-  if (kind === "info") return <InformationCircleIcon size={22} color={color} strokeWidth={1.9} />
-  return <FireIcon size={22} color={color} strokeWidth={1.9} />
 }
 
 // Radiating dot burst — plays once on mount, used for milestone streak toasts
@@ -201,12 +234,12 @@ function MilestoneBurst({ accent }: { accent: string }) {
 function BurstDot({ angleDeg, accent }: { angleDeg: number; accent: string }) {
   const progress = useSharedValue(0)
   useEffect(() => {
-    progress.value = withTiming(1, { duration: 650, easing: Easing.out(Easing.cubic) })
+    progress.value = withTiming(1, { duration: 650, easing: EASE_OUT })
   }, [])
 
   const style = useAnimatedStyle(() => {
     const angle = (angleDeg * Math.PI) / 180
-    const distance = progress.value * 22
+    const distance = progress.value * 26
     return {
       opacity: 1 - progress.value,
       transform: [
@@ -223,85 +256,87 @@ function BurstDot({ angleDeg, accent }: { angleDeg: number; accent: string }) {
 const styles = StyleSheet.create({
   wrapper: {
     position: "absolute",
-    top: 54,
-    left: 14,
-    right: 14,
+    left: 16,
+    right: 16,
     zIndex: 999,
-    borderRadius: 20,
-    overflow: "hidden",
-    shadowOpacity: 0.22,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 14,
+    borderRadius: 28,
+    shadowOpacity: 0.16,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 10,
   },
   card: {
-    backgroundColor: "#0f172a",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
+    borderRadius: 28,
+    overflow: "hidden",
   },
-  accentStrip: {
-    height: 2,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    opacity: 0.9,
+  blob: {
+    position: "absolute",
+    borderRadius: 999,
+  },
+  blobTopRight: {
+    width: 140,
+    height: 140,
+    top: -70,
+    right: -30,
+    opacity: 0.65,
+  },
+  blobBottom: {
+    width: 180,
+    height: 100,
+    bottom: -55,
+    left: 40,
+    opacity: 0.55,
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
-    paddingTop: 13,
-    paddingBottom: 10,
-    gap: 13,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 14,
   },
   iconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    borderWidth: 1,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#ffffff",
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  iconImage: {
+    width: 42,
+    height: 42,
   },
   title: {
-    fontSize: 13.5,
-    fontWeight: "700",
-    color: "#f8fafc",
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: "#1f2937",
     letterSpacing: 0.1,
     marginBottom: 3,
   },
   message: {
-    fontSize: 12,
-    color: "#94a3b8",
-    lineHeight: 17,
-    letterSpacing: 0.1,
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: "rgba(31,41,55,0.62)",
+    lineHeight: 18,
+    letterSpacing: 0.05,
   },
   dismissBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
-  },
-  progressTrack: {
-    height: 2,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    opacity: 0.7,
+    alignSelf: "flex-start",
+    marginTop: 2,
   },
   burstContainer: {
     position: "absolute",
-    width: 42,
-    height: 42,
+    width: 56,
+    height: 56,
     alignItems: "center",
     justifyContent: "center",
   },
