@@ -1,25 +1,9 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { Image, SafeAreaView, StatusBar, Text, TouchableOpacity, View } from 'react-native';
 
 interface DiscoverLandingProps {
   onStart: () => void;
 }
-
-// Fanned poster-stack "cover" art. These are abstract placeholders (gradient
-// + film icon), not real movie art — there's no specific movie yet at this
-// point in the flow, so nothing here pretends to be a real title.
-const POSTERS: {
-  rotate: string;
-  translateX: number;
-  translateY: number;
-  colors: [string, string];
-  z: number;
-}[] = [
-  { rotate: '-9deg', translateX: -62, translateY: 16, colors: ['#2a0d17', '#0f0407'], z: 1 },
-  { rotate: '8deg', translateX: 62, translateY: 20, colors: ['#1f0a13', '#0d0306'], z: 1 },
-  { rotate: '0deg', translateX: 0, translateY: 0, colors: ['#FF3B5C', '#7a1230'], z: 2 },
-];
 
 export function DiscoverLanding({ onStart }: DiscoverLandingProps) {
   return (
@@ -34,45 +18,13 @@ export function DiscoverLanding({ onStart }: DiscoverLandingProps) {
           paddingBottom: 28,
         }}
       >
-        {/* Poster stack */}
+        {/* Cinema mark */}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <View style={{ width: 200, height: 220, alignItems: 'center', justifyContent: 'center' }}>
-            {POSTERS.map((p, i) => (
-              <LinearGradient
-                key={i}
-                colors={p.colors}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{
-                  position: 'absolute',
-                  width: 130,
-                  height: 190,
-                  borderRadius: 20,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderWidth: 1,
-                  borderColor: 'rgba(0,0,0,0.08)',
-                  transform: [
-                    { translateX: p.translateX },
-                    { translateY: p.translateY },
-                    { rotate: p.rotate },
-                  ],
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 12 },
-                  shadowOpacity: 0.45,
-                  shadowRadius: 22,
-                  elevation: p.z * 5,
-                  zIndex: p.z,
-                }}
-              >
-                <Image
-                  source={require('@/assets/icons/cinema.png')}
-                  style={{ width: 64, height: 64, opacity: 0.85 }}
-                  resizeMode="contain"
-                />
-              </LinearGradient>
-            ))}
-          </View>
+          <Image
+            source={require('@/assets/icons/cinema.png')}
+            style={{ width: 148, height: 148 }}
+            resizeMode="contain"
+          />
         </View>
 
         {/* Copy + CTA */}

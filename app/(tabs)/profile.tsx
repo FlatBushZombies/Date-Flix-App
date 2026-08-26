@@ -1,7 +1,9 @@
 "use client"
 
 import { useToast } from "@/components/Toast/ToastProvider"
+import { DeviceSheet } from "@/components/cast/DeviceSheet"
 import { shadow } from "@/constants/theme"
+import { useCast } from "@/lib/cast/CastProvider"
 import type { Invitation, SupabaseUser, SwipeSession } from "@/types"
 import {
   acceptInvitation,
@@ -14,7 +16,7 @@ import {
 import { useClerk, useUser } from "@clerk/clerk-expo"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
-import { Film, Flame, Users } from "lucide-react-native"
+import { Bookmark, Film, Flame, Tv, Users } from "lucide-react-native"
 import type React from "react"
 import { useEffect, useState } from "react"
 import {
@@ -67,6 +69,14 @@ export default function ProfileScreen() {
   const [inviteCode, setInviteCode] = useState("")
   const [loading, setLoading] = useState(false)
   const toast = useToast()
+  const cast = useCast()
+  const [showDeviceSheet, setShowDeviceSheet] = useState(false)
+
+  const handleDisconnectTv = async () => {
+    const name = cast.device?.name
+    await cast.disconnect()
+    toast.info("Disconnected", name ? `Disconnected from ${name}.` : "Disconnected from your TV.")
+  }
 
   useEffect(() => {
     if (user) loadUserData()
@@ -294,9 +304,88 @@ export default function ProfileScreen() {
           title="Shared Watchlist"
           description="Movies you both saved to watch later"
           action="View"
-          icon={<Image source={require('@/assets/icons/love.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />}
+          icon={<Bookmark size={18} color={C.cyan} />}
           onPress={() => router.push("/watchlist")}
         />
+      </View>
+
+      {/* ── TV & Casting ──────────────────────────────────────── */}
+      <View style={s.section}>
+        <SectionLabel text="TV" />
+        <View style={s.tvCard}>
+          {cast.connectionState === "connected" ? (
+            <>
+              <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
+                <View style={s.tvIconWrap}>
+                  <Tv size={20} color={C.cyan} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={s.tvConnectedTitle}>TV Connected</Text>
+                  <Text style={s.tvDeviceName}>{cast.device?.name ?? "TV"}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4, gap: 6 }}>
+                    <View style={s.statusDot} />
+                    <Text style={s.tvStatusText}>Connected</Text>
+                  </View>
+                </View>
+              </View>
+
+              {cast.currentMedia && (
+                <View style={s.tvNowPlaying}>
+                  <Text style={s.tvNowPlayingLabel}>Now on TV</Text>
+                  <Text style={s.tvNowPlayingTitle} numberOfLines={1}>{cast.currentMedia.title}</Text>
+                </View>
+              )}
+
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 16, width: "100%" }}>
+                <TouchableOpacity
+                  style={s.btnCyanFlex}
+                  onPress={() => router.push("/remote")}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open remote control"
+                >
+                  <Text style={s.btnCyanText}>Remote Control</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={s.btnGhostFlex}
+                  onPress={handleDisconnectTv}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel="Disconnect from TV"
+                >
+                  <Text style={s.btnGhostText}>Disconnect</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={s.tvIconWrap}>
+                <Tv size={20} color={C.cyan} />
+              </View>
+              <Text style={s.tvTitle}>Watch on TV</Text>
+              <Text style={s.tvDesc}>
+                Connect your phone to a TV to see your picks on the big screen while you browse.
+              </Text>
+              {cast.lastDevice && (
+                <Text style={s.tvLastDevice}>Last connected: {cast.lastDevice.name}</Text>
+              )}
+              <TouchableOpacity
+                style={[s.btnCyanFull, { width: "100%", marginBottom: 0 }]}
+                onPress={() => setShowDeviceSheet(true)}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel="Connect to TV"
+              >
+                <Text style={s.btnCyanText}>Connect to TV</Text>
+              </TouchableOpacity>
+              {!cast.isCastAvailable && (
+                <Text style={s.tvUnavailable}>
+                  Requires the DateFlix development build — casting isn&apos;t available in Expo Go.
+                </Text>
+              )}
+            </>
+          )}
+        </View>
       </View>
 
       {/* ── Footer ───────────────────────────────────────────── */}
@@ -375,6 +464,8 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      <DeviceSheet visible={showDeviceSheet} onClose={() => setShowDeviceSheet(false)} />
     </ScrollView>
   )
 }
@@ -673,6 +764,106 @@ const s = StyleSheet.create({
     color: C.textMuted,
     letterSpacing: 1.2,
     textTransform: "uppercase",
+  },
+
+  // TV & Casting
+  tvCard: {
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 20,
+    padding: 20,
+    alignItems: "center",
+    ...shadow.sm,
+  },
+  tvIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: `${C.cyan}18`,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tvTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: C.text,
+    marginTop: 12,
+  },
+  tvDesc: {
+    fontSize: 13,
+    color: C.textMuted,
+    textAlign: "center",
+    lineHeight: 19,
+    marginTop: 6,
+    marginBottom: 16,
+  },
+  tvLastDevice: {
+    fontSize: 11,
+    color: C.textSub,
+    marginBottom: 14,
+  },
+  tvUnavailable: {
+    fontSize: 11,
+    color: C.textSub,
+    textAlign: "center",
+    marginTop: 12,
+    lineHeight: 15,
+  },
+  tvConnectedTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  tvDeviceName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: C.text,
+    marginTop: 2,
+  },
+  tvStatusText: {
+    fontSize: 12,
+    color: C.green,
+    fontWeight: "600",
+  },
+  tvNowPlaying: {
+    width: "100%",
+    backgroundColor: C.surfaceHigh,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 16,
+  },
+  tvNowPlayingLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: C.textSub,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  tvNowPlayingTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.text,
+    marginTop: 2,
+  },
+  btnCyanFlex: {
+    flex: 1,
+    backgroundColor: C.cyan,
+    borderRadius: 14,
+    paddingVertical: 13,
+    alignItems: "center",
+  },
+  btnGhostFlex: {
+    flex: 1,
+    backgroundColor: "transparent",
+    borderWidth: 1.5,
+    borderColor: C.border,
+    borderRadius: 14,
+    paddingVertical: 13,
+    alignItems: "center",
   },
 
   // Invite buttons

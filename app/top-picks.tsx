@@ -2,8 +2,11 @@ import { useToast } from "@/components/Toast/ToastProvider"
 import { EmptyState } from "@/components/ui/EmptyState"
 import { color, radius, shadow } from "@/constants/theme"
 import { useTopPicks, type TopPick } from "@/hooks/useTopPicks"
+import { useCast } from "@/lib/cast/CastProvider"
+import { castableMovieFromTmdb, castableMovieFromTopPick } from "@/lib/cast/media"
 import { sendToStreamingApp } from "@/lib/tvCast"
 import type { Movie } from "@/types"
+import type { CastableMovie } from "@/types/cast"
 import * as Haptics from "expo-haptics"
 import { useRouter } from "expo-router"
 import { UpvoteIcon } from "@/components/icons/UpvoteIcon"
@@ -47,7 +50,8 @@ function posterUri(path: string | null | undefined, size: "w342" | "w500" = "w34
 export default function TopPicksScreen() {
   const router = useRouter()
   const toast = useToast()
-  const [sendingToTv, setSendingToTv] = useState(false)
+  const cast = useCast()
+  const [castingId, setCastingId] = useState<string | null>(null)
   const {
     newMovies,
     topPicks,
@@ -59,25 +63,37 @@ export default function TopPicksScreen() {
     refresh,
   } = useTopPicks()
 
-  // Sends everyone's #1 upvoted pick to the TV. There's no video to cast
-  // directly — this opens the title in a streaming app/web search, which has
-  // its own Cast/AirPlay button once it's open (see lib/tvCast).
-  const handleWatchOnTv = async () => {
-    const favorite = topPicks[0]
-    if (!favorite || sendingToTv) return
+  // Sends any movie to the TV — from the header's #1 upvoted pick, a New
+  // Releases poster, or a Top 10 row. If a Cast device is already connected
+  // (Profile → TV), the poster/title/overview goes straight there. Otherwise
+  // this falls back to opening the title in a streaming app/web search,
+  // which has its own Cast/AirPlay button once it's open (lib/tvCast) —
+  // DateFlix has no video of its own to stream directly either way.
+  const handleWatchOnTv = async (movie: Movie, castable: CastableMovie) => {
+    if (castingId) return
 
-    setSendingToTv(true)
+    setCastingId(castable.id)
     try {
-      const result = await sendToStreamingApp("", favorite.movie.title)
+      if (cast.connectionState === "connected") {
+        const result = await cast.watchOnTV(castable)
+        if (result.ok) {
+          toast.success("Casting", `Now showing ${movie.title} on ${cast.device?.name ?? "your TV"}.`)
+        } else {
+          toast.error("Cast failed", result.message ?? "Could not send this to your TV.")
+        }
+        return
+      }
+
+      const result = await sendToStreamingApp("", movie.title)
       if (result === "app") {
-        toast.success("Sent to TV", `Opened ${favorite.movie.title}. Tap Cast or AirPlay to send it to your TV.`)
+        toast.success("Sent to TV", `Opened ${movie.title}. Tap Cast or AirPlay to send it to your TV.`)
       } else {
-        toast.info("Opened in browser", `Search results for "${favorite.movie.title}" opened — cast from there.`)
+        toast.info("Opened in browser", `Search results for "${movie.title}" opened — cast from there.`)
       }
     } catch {
-      toast.error("Couldn't connect", "Failed to open the top pick. Check your connection and try again.")
+      toast.error("Couldn't connect", "Failed to open this title. Check your connection and try again.")
     } finally {
-      setSendingToTv(false)
+      setCastingId(null)
     }
   }
 
@@ -143,6 +159,8 @@ export default function TopPicksScreen() {
                       index={index}
                       upvoted={upvotedIds.has(movie.id)}
                       onToggleUpvote={() => toggleUpvote(movie)}
+                      onWatchOnTv={() => handleWatchOnTv(movie, castableMovieFromTmdb(movie))}
+                      casting={castingId === String(movie.id)}
                     />
                   ))}
                 </ScrollView>
@@ -157,25 +175,29 @@ export default function TopPicksScreen() {
                   </View>
                   <View style={{ alignItems: "flex-end", gap: 8 }}>
                     <LiveBadge />
-                    {topPicks.length > 0 && (
-                      <TouchableOpacity
-                        onPress={handleWatchOnTv}
-                        disabled={sendingToTv}
-                        activeOpacity={0.85}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Watch ${topPicks[0].movie.title} on TV`}
-                        style={[styles.watchTvBtn, sendingToTv && { opacity: 0.6 }]}
-                      >
-                        {sendingToTv ? (
-                          <ActivityIndicator size="small" color="#ffffff" />
-                        ) : (
-                          <Tv size={13} color="#ffffff" />
-                        )}
-                        <Text style={styles.watchTvBtnText}>
-                          {sendingToTv ? "Connecting…" : "Watch on TV"}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
+                    {topPicks.length > 0 && (() => {
+                      const favorite = topPicks[0]
+                      const sendingFavorite = castingId === castableMovieFromTopPick(favorite).id
+                      return (
+                        <TouchableOpacity
+                          onPress={() => handleWatchOnTv(favorite.movie, castableMovieFromTopPick(favorite))}
+                          disabled={!!castingId}
+                          activeOpacity={0.85}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Watch ${favorite.movie.title} on TV`}
+                          style={[styles.watchTvBtn, castingId && { opacity: sendingFavorite ? 0.6 : 0.4 }]}
+                        >
+                          {sendingFavorite ? (
+                            <ActivityIndicator size="small" color="#ffffff" />
+                          ) : (
+                            <Tv size={13} color="#ffffff" />
+                          )}
+                          <Text style={styles.watchTvBtnText}>
+                            {sendingFavorite ? "Connecting…" : "Watch on TV"}
+                          </Text>
+                        </TouchableOpacity>
+                      )
+                    })()}
                   </View>
                 </View>
 
@@ -195,6 +217,8 @@ export default function TopPicksScreen() {
                         isLast={index === topPicks.length - 1}
                         upvoted={upvotedIds.has(pick.movieId)}
                         onToggleUpvote={() => toggleUpvote(pick.movie)}
+                        onWatchOnTv={() => handleWatchOnTv(pick.movie, castableMovieFromTopPick(pick))}
+                        casting={castingId === castableMovieFromTopPick(pick).id}
                       />
                     ))}
                   </View>
@@ -240,11 +264,15 @@ function NewMovieCard({
   index,
   upvoted,
   onToggleUpvote,
+  onWatchOnTv,
+  casting,
 }: {
   movie: Movie
   index: number
   upvoted: boolean
   onToggleUpvote: () => void
+  onWatchOnTv: () => void
+  casting: boolean
 }) {
   const heartScale = useSharedValue(1)
 
@@ -293,6 +321,21 @@ function NewMovieCard({
             <UpvoteIcon size={15} color="#ffffff" />
           </Animated.View>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={onWatchOnTv}
+          disabled={casting}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={`Watch ${movie.title} on TV`}
+          style={[styles.posterTvBtn, casting && { opacity: 0.6 }]}
+        >
+          {casting ? (
+            <ActivityIndicator size="small" color="#ffffff" />
+          ) : (
+            <Tv size={13} color="#ffffff" />
+          )}
+        </TouchableOpacity>
       </View>
 
       <Text numberOfLines={1} style={styles.posterTitle}>
@@ -309,12 +352,16 @@ function TopPickRow({
   isLast,
   upvoted,
   onToggleUpvote,
+  onWatchOnTv,
+  casting,
 }: {
   pick: TopPick
   rank: number
   isLast: boolean
   upvoted: boolean
   onToggleUpvote: () => void
+  onWatchOnTv: () => void
+  casting: boolean
 }) {
   const medal = RANK_STYLES[rank - 1]
   const year = pick.movie.release_date ? new Date(pick.movie.release_date).getFullYear() : null
@@ -358,6 +405,21 @@ function TopPickRow({
           {year ?? "—"} · {pick.upvoteCount} upvote{pick.upvoteCount === 1 ? "" : "s"}
         </Text>
       </View>
+
+      <TouchableOpacity
+        onPress={onWatchOnTv}
+        disabled={casting}
+        activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel={`Watch ${pick.movie.title} on TV`}
+        style={[styles.rankTvBtn, casting && { opacity: 0.6 }]}
+      >
+        {casting ? (
+          <ActivityIndicator size="small" color={color.textSecondary} />
+        ) : (
+          <Tv size={15} color={color.textSecondary} />
+        )}
+      </TouchableOpacity>
 
       <TouchableOpacity
         onPress={handlePress}
@@ -493,6 +555,17 @@ const styles = StyleSheet.create({
   posterHeartBtnActive: {
     backgroundColor: color.accentPink,
   },
+  posterTvBtn: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
   posterTitle: {
     color: color.textPrimary,
     fontWeight: "700",
@@ -560,6 +633,17 @@ const styles = StyleSheet.create({
     color: color.textSecondary,
     fontSize: 11,
     marginTop: 2,
+  },
+  rankTvBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+    backgroundColor: color.surfaceHigh,
+    borderWidth: 1,
+    borderColor: color.border,
   },
   rankHeartBtn: {
     width: 36,

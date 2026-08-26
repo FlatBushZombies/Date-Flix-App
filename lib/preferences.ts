@@ -10,6 +10,10 @@ export interface LocalPreferences {
   // server-sent push notifications — see pushEnabled for that.
   partnerActivityMuted: boolean
   pushEnabled: boolean
+  // The last Cast device the user connected to, remembered for display only
+  // (e.g. "Last connected: Living Room TV" in Profile). This is never treated
+  // as an active session — see lib/cast/CastProvider.native.tsx.
+  lastCastDevice: { id: string; name: string } | null
 }
 
 const KEY = "@local_preferences"
@@ -17,6 +21,7 @@ const KEY = "@local_preferences"
 const DEFAULTS: LocalPreferences = {
   partnerActivityMuted: false,
   pushEnabled: true,
+  lastCastDevice: null,
 }
 
 export async function getPreferences(): Promise<LocalPreferences> {

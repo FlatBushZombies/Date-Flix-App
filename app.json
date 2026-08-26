@@ -61,7 +61,14 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      [
+        "react-native-google-cast",
+        {
+          "receiverAppId": "CC1AD845"
+        }
+      ],
+      "./plugins/withCastableAppQueries"
     ],
     "experiments": {
       "typedRoutes": true

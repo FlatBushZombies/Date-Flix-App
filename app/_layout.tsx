@@ -10,6 +10,7 @@ import { PushNotificationHandler } from "@/components/PushNotificationHandler"
 import { SplashScreen } from "@/components/SplashScreen"
 import { ToastProvider } from "@/components/Toast/ToastProvider"
 import { tokenCache } from "@/lib/auth"
+import { CastProvider } from "@/lib/cast/CastProvider"
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY
 
@@ -39,18 +40,21 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ToastProvider>
           <ConfirmProvider>
-            {showSplash && <SplashScreen onAnimationComplete={handleSplashComplete} />}
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="index" />
-              <SignedOut>
-                <Stack.Screen name="(auth)" />
-              </SignedOut>
-              <SignedIn>
-                <PushNotificationHandler />
-                <Stack.Screen name="(protected)" />
-              </SignedIn>
-              <Stack.Screen name="(tabs)" />
-            </Stack>
+            <CastProvider>
+              {showSplash && <SplashScreen onAnimationComplete={handleSplashComplete} />}
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="index" />
+                <SignedOut>
+                  <Stack.Screen name="(auth)" />
+                </SignedOut>
+                <SignedIn>
+                  <PushNotificationHandler />
+                  <Stack.Screen name="(protected)" />
+                </SignedIn>
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="remote" options={{ presentation: "modal" }} />
+              </Stack>
+            </CastProvider>
           </ConfirmProvider>
         </ToastProvider>
       </GestureHandlerRootView>

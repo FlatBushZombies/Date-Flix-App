@@ -5,8 +5,12 @@ import { MovieCard } from "@/components/MovieCard"
 import { NotificationsModal } from "@/components/NotificationsModal"
 import { StreakModal } from "@/components/StreakModal"
 import { useToast } from "@/components/Toast/ToastProvider"
+import { DeviceSheet } from "@/components/cast/DeviceSheet"
 import { shadow } from "@/constants/theme"
 import { useNotifications } from "@/hooks/useNotifications"
+import { useWatchlist } from "@/hooks/useWatchlist"
+import { useCast } from "@/lib/cast/CastProvider"
+import { castableMovieFromTmdb } from "@/lib/cast/media"
 import { getPreferences } from "@/lib/preferences"
 import type { StreakEvaluation, SupabaseUser, SwipeSession, Movie } from "@/types"
 import {
@@ -25,7 +29,8 @@ import { useUser } from "@clerk/clerk-expo"
 import * as Clipboard from "expo-clipboard"
 import { LinearGradient } from "expo-linear-gradient"
 import { useRouter } from "expo-router"
-import { useEffect, useState } from "react"
+import * as WebBrowser from "expo-web-browser"
+import { useEffect, useRef, useState } from "react"
 import {
     Dimensions,
     Image,
@@ -58,6 +63,7 @@ const { width, height } = Dimensions.get("window")
 export default function SwipeScreen() {
   const router = useRouter()
   const { user } = useUser()
+  const { isSaved, toggleSave } = useWatchlist(user?.id)
 
   const [movies, setMovies] = useState<Movie[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -89,6 +95,22 @@ export default function SwipeScreen() {
 
   const toast = useToast()
   const confirm = useConfirm()
+  const cast = useCast()
+
+  // Casting state — mirrors the connect-then-cast pattern used on the
+  // Results screen: if no TV is connected yet, open the device picker and
+  // remember which movie to send once the connection actually completes.
+  const [showDeviceSheet, setShowDeviceSheet] = useState(false)
+  const [castingMovieId, setCastingMovieId] = useState<number | null>(null)
+  const pendingCastMovieRef = useRef<Movie | null>(null)
+
+  useEffect(() => {
+    if (pendingCastMovieRef.current && cast.connectionState === "connected") {
+      const movie = pendingCastMovieRef.current
+      pendingCastMovieRef.current = null
+      castMovieToTv(movie)
+    }
+  }, [cast.connectionState])
 
   // Read once on mount — set from Account Settings, doesn't need to be reactive
   // mid-session. Only mutes the in-app streak toasts, not push notifications.
@@ -266,8 +288,21 @@ export default function SwipeScreen() {
   }
 
   const handleSaveMovie = async (movie: Movie) => {
-    // TODO: Implement save to watchlist functionality
-    toast.success("Saved!", `${movie.title} added to your watchlist`)
+    if (!user) {
+      toast.error("Sign in required", "Sign in to save movies to your watchlist")
+      return
+    }
+    const wasSaved = isSaved(movie.id)
+    const ok = await toggleSave(movie)
+    if (!ok) {
+      toast.error("Error", wasSaved ? "Failed to remove from watchlist" : "Failed to save to watchlist")
+      return
+    }
+    if (wasSaved) {
+      toast.info("Removed", `${movie.title} removed from your watchlist`)
+    } else {
+      toast.success("Saved!", `${movie.title} added to your watchlist`)
+    }
   }
 
   const handleShareMovie = async (movie: Movie) => {
@@ -282,9 +317,40 @@ export default function SwipeScreen() {
     }
   }
 
-  const handleTrailerPress = async (movie: Movie) => {
-    // TODO: Open trailer in a modal or external app
-    toast.info("Trailer", "Trailer feature coming soon!")
+  const handleTrailerPress = async (movie: Movie, youtubeKey: string) => {
+    try {
+      await WebBrowser.openBrowserAsync(`https://www.youtube.com/watch?v=${youtubeKey}`)
+    } catch {
+      toast.error("Error", `Couldn't open the trailer for ${movie.title}`)
+    }
+  }
+
+  // Sends this movie's poster/title to the connected Cast receiver, taking
+  // it full-screen on the TV. See lib/cast/CastProvider.native.tsx — this is
+  // a no-op with a helpful message when casting isn't available (Expo Go,
+  // web, or no native module linked).
+  async function castMovieToTv(movie: Movie) {
+    setCastingMovieId(movie.id)
+    try {
+      const result = await cast.watchOnTV(castableMovieFromTmdb(movie))
+      if (result.ok) {
+        toast.success("Casting", `Now showing ${movie.title} on ${cast.device?.name ?? "your TV"}.`)
+      } else {
+        toast.error("Cast failed", result.message ?? "Could not send this to your TV.")
+      }
+    } finally {
+      setCastingMovieId(null)
+    }
+  }
+
+  const handleWatchOnTv = (movie: Movie) => {
+    if (castingMovieId !== null) return
+    if (cast.connectionState !== "connected") {
+      pendingCastMovieRef.current = movie
+      setShowDeviceSheet(true)
+      return
+    }
+    castMovieToTv(movie)
   }
 
   const currentMovie = movies[currentIndex]
@@ -468,6 +534,8 @@ export default function SwipeScreen() {
                 onSave={handleSaveMovie}
                 onShare={handleShareMovie}
                 onTrailer={handleTrailerPress}
+                onWatchOnTv={handleWatchOnTv}
+                castingToTv={castingMovieId === movie.id}
               />
             </Animated.View>
           ))}
@@ -682,6 +750,14 @@ export default function SwipeScreen() {
         freezeAvailable={streakInfo?.freezeAvailable ?? 0}
         activityStrip={streakActivity}
         loading={streakActivityLoading}
+      />
+
+      <DeviceSheet
+        visible={showDeviceSheet}
+        onClose={() => {
+          setShowDeviceSheet(false)
+          pendingCastMovieRef.current = null
+        }}
       />
     </View>
   )

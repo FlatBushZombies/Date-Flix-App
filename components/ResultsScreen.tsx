@@ -1,12 +1,15 @@
 import { useToast } from '@/components/Toast/ToastProvider';
+import { DeviceSheet } from '@/components/cast/DeviceSheet';
 import { EnrichedMovie, useEnrichedMovies } from '@/hooks/useEnrichedMovies';
+import { castableMovieFromEnriched } from '@/lib/cast/media';
+import { useCast } from '@/lib/cast/CastProvider';
 import { getWatchUrl } from '@/lib/streaming';
 import { sendToStreamingApp } from '@/lib/tvCast';
 import type { Movie } from '@/types';
 import { MovieNightPlan } from '@/types/planner';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Bookmark, ChevronLeft as ChevronLeftIcon, Clapperboard, Share2, Star, Tv } from 'lucide-react-native';
-import React, { useState } from 'react';
+import { Bookmark, Cast, ChevronLeft as ChevronLeftIcon, Clapperboard, Share2, Star, Tv } from 'lucide-react-native';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -37,7 +40,24 @@ export function ResultsScreen({ plan, prompt, onReset, isSaved, toggleSave }: Re
   const { movies: enriched, loading: enrichLoading } = useEnrichedMovies(plan.movies);
   const [overviewExpanded, setOverviewExpanded] = useState(false);
   const [sendingToTv, setSendingToTv] = useState(false);
+  const [showDeviceSheet, setShowDeviceSheet] = useState(false);
+  const [casting, setCasting] = useState(false);
   const toast = useToast();
+  const cast = useCast();
+
+  // Tracks "user asked to cast but wasn't connected yet" across the
+  // device-picker round trip — the sheet's own connect() promise can resolve
+  // slightly before the SDK's session hooks re-render, so castNowViewing()
+  // (defined below, after `active` exists) reacts to the connectionState
+  // change instead of being called directly from a callback. Declared above
+  // the early return below so hook order stays consistent across renders.
+  const pendingCastRef = useRef(false);
+  useEffect(() => {
+    if (pendingCastRef.current && cast.connectionState === 'connected') {
+      pendingCastRef.current = false;
+      castNowViewing();
+    }
+  }, [cast.connectionState]);
 
   const list: EnrichedMovie[] =
     enriched.length > 0 ? enriched : plan.movies.map((m) => ({ ...m, tmdb: null }));
@@ -113,6 +133,36 @@ export function ResultsScreen({ plan, prompt, onReset, isSaved, toggleSave }: Re
     } finally {
       setSendingToTv(false);
     }
+  };
+
+  // Sends this movie's poster/title/overview to the connected Cast receiver
+  // as a "Now Viewing" display. See lib/cast/CastProvider.native.tsx for why this shows
+  // artwork rather than streaming the movie itself (DateFlix has no video of
+  // its own — see the "Known limitations" note in the implementation report).
+  // Declared as a hoisted function so the useEffect above (which runs before
+  // this line executes) can safely reference it.
+  async function castNowViewing() {
+    setCasting(true);
+    try {
+      const result = await cast.watchOnTV(castableMovieFromEnriched(active));
+      if (result.ok) {
+        toast.success('Casting', `Now showing ${active.title} on ${cast.device?.name ?? 'your TV'}.`);
+      } else {
+        toast.error('Cast failed', result.message ?? 'Could not send this to your TV.');
+      }
+    } finally {
+      setCasting(false);
+    }
+  };
+
+  const handleCast = () => {
+    if (casting) return;
+    if (cast.connectionState !== 'connected') {
+      pendingCastRef.current = true;
+      setShowDeviceSheet(true);
+      return;
+    }
+    castNowViewing();
   };
 
   const saved = !!active.tmdb && isSaved(active.tmdb.id);
@@ -359,6 +409,34 @@ export function ResultsScreen({ plan, prompt, onReset, isSaved, toggleSave }: Re
                   </TouchableOpacity>
                   <Text style={{ color: '#C9BFC4', fontSize: 11, marginTop: 6 }}>TV</Text>
                 </View>
+
+                <View style={{ alignItems: 'center' }}>
+                  <TouchableOpacity
+                    onPress={handleCast}
+                    disabled={casting}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      cast.connectionState === 'connected' ? 'Cast to TV' : 'Connect a TV first'
+                    }
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 28,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: cast.connectionState === 'connected' ? '#06b6d4' : 'rgba(255,255,255,0.12)',
+                      opacity: casting ? 0.5 : 1,
+                      borderWidth: 1,
+                      borderColor: cast.connectionState === 'connected' ? 'transparent' : 'rgba(255,255,255,0.15)',
+                    }}
+                  >
+                    <Cast size={20} color="#fff" />
+                  </TouchableOpacity>
+                  <Text style={{ color: '#C9BFC4', fontSize: 11, marginTop: 6 }}>
+                    {cast.connectionState === 'connected' ? 'Casting' : 'Cast'}
+                  </Text>
+                </View>
               </View>
 
               {/* Primary CTA */}
@@ -458,6 +536,8 @@ export function ResultsScreen({ plan, prompt, onReset, isSaved, toggleSave }: Re
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <DeviceSheet visible={showDeviceSheet} onClose={() => setShowDeviceSheet(false)} />
     </View>
   );
 }

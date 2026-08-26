@@ -1,3 +1,4 @@
+import { MiniCastPlayer } from "@/components/cast/MiniCastPlayer"
 import { Tabs } from "expo-router"
 import { Film, User, BookMarked, Plus, Swords } from "lucide-react-native"
 import { View, TouchableOpacity, StyleSheet, GestureResponderEvent } from "react-native"
@@ -61,6 +62,7 @@ const styles = StyleSheet.create({
 
 export default function TabsLayout() {
   return (
+    <View style={{ flex: 1 }}>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -126,5 +128,7 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+    <MiniCastPlayer />
+    </View>
   )
 }

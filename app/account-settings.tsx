@@ -440,7 +440,7 @@ export default function AccountSettingsScreen() {
             <Tv size={16} color={C.cyan} />
           </View>
           <Text style={s.castIntroText}>
-            DateFlix doesn't stream video itself — "Watch on TV" opens a title in its
+            DateFlix doesn&apos;t stream video itself — &quot;Watch on TV&quot; opens a title in its
             streaming app, which has its own Cast or AirPlay button. Connect the apps
             below so casting always goes straight there.
           </Text>
