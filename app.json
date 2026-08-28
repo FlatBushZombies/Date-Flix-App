@@ -68,7 +68,8 @@
           "receiverAppId": "CC1AD845"
         }
       ],
-      "./plugins/withCastableAppQueries"
+      "./plugins/withCastableAppQueries",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true

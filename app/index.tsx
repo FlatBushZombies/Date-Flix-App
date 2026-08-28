@@ -13,7 +13,7 @@ import { HandThumbUpIcon } from "react-native-heroicons/solid"
 import { HeartIcon } from "react-native-heroicons/solid"
 import { FilmIcon } from "react-native-heroicons/solid"
 
-export default function DateFlixOnboarding() {
+export default function DuoAppOnboarding() {
   const { isSignedIn, isLoaded } = useAuth()
 
   if (!isLoaded) return <View className="flex-1 bg-white" />
@@ -122,7 +122,7 @@ export default function DateFlixOnboarding() {
 
         {/* Subtitle */}
         <Text className="text-[15px] leading-6 text-gray-400 text-center mb-7 px-2">
-          Swipe movies you love and let DateFlix find the perfect match for your
+          Swipe movies you love and let Duo App find the perfect match for your
           next movie night.
         </Text>
 

@@ -167,7 +167,7 @@ Deno.serve(async (req) => {
     const subject =
       typeof body.subject === 'string' && body.subject.trim()
         ? body.subject.trim()
-        : `${hostName || 'Someone'} invited you to a DateFlix debate!`
+        : `${hostName || 'Someone'} invited you to a Duo App debate!`
 
     // Enhanced validation and sanitization
     if (!to || !to.includes('@') || !debateCode) {
@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
     const sanitizedSubject = subject.replace(/[<>'"&]/g, '').slice(0, 200)
 
     const resendKey = Deno.env.get('RESEND_API_KEY')
-    const fromEmail = Deno.env.get('INVITE_FROM_EMAIL') ?? 'DateFlix <onboarding@resend.dev>'
+    const fromEmail = Deno.env.get('INVITE_FROM_EMAIL') ?? 'Duo App <onboarding@resend.dev>'
     const appUrl = Deno.env.get('APP_URL') ?? ''
     const mode: InviteResponse['mode'] = fromEmail.toLowerCase().includes('resend.dev')
       ? 'test'
@@ -223,7 +223,7 @@ Deno.serve(async (req) => {
     const text = [
       'Hi!',
       '',
-      `${sanitizedHostName || 'Your partner'} wants to settle a movie debate with you in DateFlix.`,
+      `${sanitizedHostName || 'Your partner'} wants to settle a movie debate with you in Duo App.`,
       '',
       `Your invite code: ${sanitizedDebateCode}`,
       appUrl ? `Open the app: ${appUrl}` : 'Open the app and go to Debate > I Have a Code',
@@ -233,7 +233,7 @@ Deno.serve(async (req) => {
 
     const html = `
       <div style="font-family: ui-sans-serif, system-ui; line-height: 1.5">
-        <h2 style="margin:0 0 12px 0;">You're invited to a DateFlix debate</h2>
+        <h2 style="margin:0 0 12px 0;">You're invited to a Duo App debate</h2>
         <p style="margin:0 0 12px 0;">
           <strong>${safeHostName}</strong> wants to settle a movie debate with you.
         </p>
@@ -244,7 +244,7 @@ Deno.serve(async (req) => {
         <p style="margin:16px 0 0 0;">
           Open the app and go to <strong>Debate</strong> &gt; <strong>I Have a Code</strong>.
         </p>
-        ${safeAppUrl ? `<p style="margin:10px 0 0 0;"><a href="${safeAppUrl}">Open DateFlix</a></p>` : ''}
+        ${safeAppUrl ? `<p style="margin:10px 0 0 0;"><a href="${safeAppUrl}">Open Duo App</a></p>` : ''}
       </div>
     `
 

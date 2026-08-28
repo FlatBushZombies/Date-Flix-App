@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import { useUser } from "@clerk/clerk-expo"
 import { useToast } from "@/components/Toast/ToastProvider"
 import { withAffiliateTag } from "@/utils/affiliateLinks"
+import { EmptyState as IllustratedEmptyState } from "@/components/EmptyState"
 import { EmptyState } from "@/components/ui/EmptyState"
 import { Ionicons } from "@expo/vector-icons"
 import { CloudOff } from "lucide-react-native"
@@ -112,8 +113,7 @@ export default function MatchScreen() {
           <Text style={styles.headerSubtitle}>Movies you and your friends both loved</Text>
         </View>
 
-        <EmptyState
-          icon={<Image source={require("@/assets/icons/love.png")} style={{ width: 48, height: 48 }} resizeMode="contain" />}
+        <IllustratedEmptyState
           title="No Matches Yet"
           description="Invite friends and start swiping together to find movies you both love!"
         />

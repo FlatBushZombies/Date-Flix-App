@@ -137,7 +137,7 @@ export function ResultsScreen({ plan, prompt, onReset, isSaved, toggleSave }: Re
 
   // Sends this movie's poster/title/overview to the connected Cast receiver
   // as a "Now Viewing" display. See lib/cast/CastProvider.native.tsx for why this shows
-  // artwork rather than streaming the movie itself (DateFlix has no video of
+  // artwork rather than streaming the movie itself (Duo App has no video of
   // its own — see the "Known limitations" note in the implementation report).
   // Declared as a hoisted function so the useEffect above (which runs before
   // this line executes) can safely reference it.

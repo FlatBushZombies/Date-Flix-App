@@ -1,5 +1,6 @@
 "use client"
 
+import { EmptyState as IllustratedEmptyState } from "@/components/EmptyState"
 import { EmptyState } from "@/components/ui/EmptyState"
 import type { Movie } from "@/types"
 import { getWatchlist, removeFromWatchlist } from "@/utils/supabase-helpers"
@@ -7,7 +8,7 @@ import { useUser } from "@clerk/clerk-expo"
 import { Ionicons } from "@expo/vector-icons"
 import * as Haptics from "expo-haptics"
 import { useRouter } from "expo-router"
-import { Bookmark, CloudOff } from "lucide-react-native"
+import { CloudOff } from "lucide-react-native"
 import { useEffect, useState } from "react"
 import {
   ActivityIndicator,
@@ -132,11 +133,9 @@ export default function WatchlistScreen() {
           tintColor="#ef4444"
         />
       ) : rows.length === 0 ? (
-        <EmptyState
-          icon={<Bookmark size={40} color={C.cyan} strokeWidth={1.6} />}
+        <IllustratedEmptyState
           title="No Saved Movies"
           description="Save movies while planning a movie night and they'll show up here for you and your partner."
-          tintColor={C.cyan}
         />
       ) : (
         <ScrollView

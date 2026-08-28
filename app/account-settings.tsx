@@ -224,7 +224,7 @@ export default function AccountSettingsScreen() {
     if (testingPlatform) return
     setTestingPlatform(platformName)
     try {
-      const result = await sendToStreamingApp(platformName, "DateFlix")
+      const result = await sendToStreamingApp(platformName, "Duo App")
       if (result === "app") {
         toast.success("Connected", `${platformName} opened — tap its Cast or AirPlay icon to send to your TV.`)
         setCastStatus((prev) => ({ ...prev, [platformName]: true }))
@@ -287,7 +287,7 @@ export default function AccountSettingsScreen() {
         activeSessions: sessions.length,
       }
       await Share.share({
-        title: "My Movie Circle Data",
+        title: "My Duo App Data",
         message: JSON.stringify(payload, null, 2),
       })
     } catch {
@@ -440,7 +440,7 @@ export default function AccountSettingsScreen() {
             <Tv size={16} color={C.cyan} />
           </View>
           <Text style={s.castIntroText}>
-            DateFlix doesn&apos;t stream video itself — &quot;Watch on TV&quot; opens a title in its
+            Duo App doesn&apos;t stream video itself — &quot;Watch on TV&quot; opens a title in its
             streaming app, which has its own Cast or AirPlay button. Connect the apps
             below so casting always goes straight there.
           </Text>

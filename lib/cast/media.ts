@@ -7,7 +7,7 @@ function tmdbImage(path: string | null | undefined, size: "w780" | "w1280" = "w1
   return path ? `https://image.tmdb.org/t/p/${size}${path}` : null
 }
 
-// Collects the fields DateFlix actually has for a TMDB-shaped Movie (top
+// Collects the fields Duo App actually has for a TMDB-shaped Movie (top
 // picks, new releases, swipe cards) into the receiver's metadata shape.
 export function castableMovieFromTmdb(movie: Movie, subtitle?: string): CastableMovie {
   const year = movie.release_date ? new Date(movie.release_date).getFullYear() : null

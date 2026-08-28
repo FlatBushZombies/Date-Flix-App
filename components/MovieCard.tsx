@@ -20,7 +20,7 @@ import Animated, {
 } from "react-native-reanimated"
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window")
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3
+const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.22
 const CARD_WIDTH = SCREEN_WIDTH - 40
 const CARD_HEIGHT = SCREEN_HEIGHT * 0.75
 
@@ -134,9 +134,9 @@ export function MovieCard({ movie, onSwipe, onSave, onShare, onTrailer, onWatchO
     if (isSwiped.value) return
     isSwiped.value = true
     const targetX = direction === "right" ? SCREEN_WIDTH * 1.4 : -SCREEN_WIDTH * 1.4
-    translateX.value = withSpring(targetX, { damping: 35, stiffness: 150, mass: 0.8 })
-    translateY.value = withSpring(translateY.value, { damping: 35, stiffness: 140 })
-    scale.value = withTiming(0.95, { duration: 180, easing: Easing.in(Easing.quad) })
+    translateX.value = withSpring(targetX, { damping: 30, stiffness: 260, mass: 0.6 })
+    translateY.value = withSpring(translateY.value, { damping: 30, stiffness: 220 })
+    scale.value = withTiming(0.95, { duration: 120, easing: Easing.in(Easing.quad) })
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     onSwipe && onSwipe(direction)
   }
@@ -164,16 +164,16 @@ export function MovieCard({ movie, onSwipe, onSave, onShare, onTrailer, onWatchO
 
         translateX.value = withSpring(targetX, {
           velocity: event.velocityX,
-          damping: 35,
-          stiffness: 150,
-          mass: 0.8,
+          damping: 30,
+          stiffness: 260,
+          mass: 0.6,
         })
         translateY.value = withSpring(targetY, {
           velocity: event.velocityY,
-          damping: 35,
-          stiffness: 140,
+          damping: 30,
+          stiffness: 220,
         })
-        scale.value = withTiming(0.95, { duration: 180, easing: Easing.in(Easing.quad) })
+        scale.value = withTiming(0.95, { duration: 120, easing: Easing.in(Easing.quad) })
 
         runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium)
         onSwipe && runOnJS(onSwipe)(direction)

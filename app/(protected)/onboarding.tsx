@@ -1,11 +1,10 @@
 import { View, Text, TouchableOpacity, Dimensions, ScrollView, Pressable } from "react-native"
 import { useEffect, useState } from "react"
 import { useRouter } from "expo-router"
+import { useUser } from "@clerk/clerk-expo"
 import {
   FilmIcon,
   VideoCameraIcon,
-  HeartIcon,
-  HandRaisedIcon,
   SparklesIcon,
   ChartBarIcon,
   BellIcon,
@@ -28,6 +27,7 @@ import {
   HeartIcon as HeartSolid,
   ShieldCheckIcon as ShieldSolid,
   CheckIcon as CheckSolid,
+  BellIcon as BellSolid,
 } from "react-native-heroicons/solid"
 import Animated, {
   Easing,
@@ -39,14 +39,17 @@ import Animated, {
   ZoomIn,
   useSharedValue,
   useAnimatedStyle,
-  withRepeat,
   withSequence,
-  withSpring,
   withTiming,
 } from "react-native-reanimated"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { Ionicons } from "@expo/vector-icons"
 import * as Haptics from "expo-haptics"
+import { useAudioPlayer, setAudioModeAsync } from "expo-audio"
+import { registerForPushNotificationsAsync, updateUserPushToken } from "@/utils/notifications"
+import { setPreferences } from "@/lib/preferences"
+import { TapDemoIcon } from "@/components/onboarding/TapDemoIcon"
+import { SwipeDemoIcon } from "@/components/onboarding/SwipeDemoIcon"
 
 const { width, height } = Dimensions.get("window")
 
@@ -72,10 +75,10 @@ const T = {
   textPrimary:   "#15151c",
   textSecondary: "rgba(21,21,28,0.56)",
   textTertiary:  "rgba(21,21,28,0.36)",
-  // Accent — single colour used everywhere, ours (not the reference's)
-  accent:    "#ec4899",
-  accentBg:  "rgba(236,72,153,0.12)",
-  accentRim: "rgba(236,72,153,0.28)",
+  // Accent — the same red brand tone used in app/index.tsx and app/(auth)/login.tsx
+  accent:    "#E50914",
+  accentBg:  "rgba(229,9,20,0.12)",
+  accentRim: "rgba(229,9,20,0.28)",
   // Type scale
   headingSize: 32,
   headingWeight: "800" as const,
@@ -94,7 +97,7 @@ const SCREENS = [
       "Swipe movies together and instantly discover what you both love. The perfect movie night starts here.",
     micro: "Join 2M+ couples finding their perfect match",
     cta: "Get Started",
-    accent: "#ec4899",
+    accent: "#E50914",
     stats: [
       { value: "50K+", label: "Movies" },
       { value: "10M+", label: "Matches" },
@@ -104,15 +107,10 @@ const SCREENS = [
   {
     id: 2,
     type: "howItWorks",
-    headline: "How It Works",
-    subtext: "Three simple steps to movie night bliss",
-    steps: [
-      { icon: "hand-left", color: "#6b7280", title: "Swipe Left", text: "Not feeling it? Skip to the next one" },
-      { icon: "heart",     color: "#ec4899", title: "Swipe Right", text: "Love it? Add it to your matches" },
-      { icon: "sparkles",  color: "#8B5CF6", title: "It's a Match!", text: "When you both swipe right, it's movie time" },
-    ],
+    headline: "Try It Yourself",
+    subtext: "Swipe left to pass, right to like — this is exactly how movie night decisions happen.",
     cta: "Next",
-    accent: "#ec4899",
+    accent: "#E50914",
   },
   {
     id: 3,
@@ -125,7 +123,7 @@ const SCREENS = [
       { icon: "star",           color: "#eab308", title: "Ratings & Reviews",          text: "IMDB, Rotten Tomatoes, and Metacritic scores" },
     ],
     cta: "Continue",
-    accent: "#ec4899",
+    accent: "#E50914",
   },
   {
     id: 4,
@@ -138,7 +136,7 @@ const SCREENS = [
       { icon: "person",      color: "#ec4899", title: "Go Solo",            text: "Discover new favorites alone" },
     ],
     cta: "Continue",
-    accent: "#ec4899",
+    accent: "#E50914",
   },
   {
     id: 5,
@@ -156,7 +154,7 @@ const SCREENS = [
       { name: "Animation", emoji: "✨", color: "#10b981" },
     ],
     cta: "Almost There",
-    accent: "#ec4899",
+    accent: "#E50914",
   },
   {
     id: 6,
@@ -169,7 +167,7 @@ const SCREENS = [
       { icon: "compass", color: "#06b6d4", title: "Personalized Picks",  text: "Better recommendations over time" },
     ],
     cta: "Next",
-    accent: "#ec4899",
+    accent: "#E50914",
   },
   {
     id: 7,
@@ -183,16 +181,28 @@ const SCREENS = [
       { icon: "trash",            color: "#ec4899", text: "Delete your data anytime" },
     ],
     cta: "I Understand",
-    accent: "#ec4899",
+    accent: "#E50914",
   },
   {
     id: 8,
+    type: "notifications",
+    headline: "Never Miss\na Moment",
+    subtext: "Turn on notifications so you're always first to know.",
+    benefits: [
+      { icon: "heart", color: "#ec4899", text: "Instant alerts the moment you match" },
+      { icon: "flame", color: "#f97316", text: "Gentle nudges to keep your streak alive" },
+      { icon: "bell",  color: "#06b6d4", text: "Movie night invites, delivered live" },
+    ],
+    accent: "#E50914",
+  },
+  {
+    id: 9,
     type: "final",
     headline: "Ready to Find\nYour Perfect Movie?",
     subtext: "Start swiping and discover what you'll watch tonight.",
     ctaPrimary: "Invite a Friend",
     ctaSecondary: "Start Solo",
-    accent: "#ec4899",
+    accent: "#E50914",
     testimonials: [
       { text: "Finally ended the 'what should we watch' debate!", author: "Sarah K." },
       { text: "We've discovered so many great movies together.",   author: "Mike T." },
@@ -202,11 +212,11 @@ const SCREENS = [
 
 // ─── Icon helpers (unchanged) ──────────────────────────────────────────────────
 
-function StepIcon({ name, size, color }: { name: string; size: number; color: string }) {
+function BenefitIcon({ name, size, color }: { name: string; size: number; color: string }) {
   const p = { size, color, strokeWidth: 1.8 as number }
-  if (name === "hand-left") return <HandRaisedIcon {...p} />
-  if (name === "heart")     return <HeartIcon {...p} />
-  return <SparklesIcon {...p} />
+  if (name === "heart") return <HeartSolid size={size} color={color} />
+  if (name === "flame") return <FireIcon {...p} />
+  return <BellIcon {...p} />
 }
 
 function FeatureIcon({ name, size, color }: { name: string; size: number; color: string }) {
@@ -291,14 +301,14 @@ function CTAButton({
         accessibilityLabel={label}
         style={{
           width: "100%",
-          height: 60,
-          borderRadius: 30,
+          height: 66,
+          borderRadius: 33,
           backgroundColor: T.accent,
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
-          paddingLeft: 26,
-          paddingRight: 8,
+          paddingLeft: 28,
+          paddingRight: 7,
           shadowColor: T.accent,
           shadowOpacity: 0.32,
           shadowRadius: 20,
@@ -308,19 +318,19 @@ function CTAButton({
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
           {icon}
-          <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700", letterSpacing: 0.1 }}>
+          <Text style={{ color: "#fff", fontSize: 17, fontWeight: "700", letterSpacing: 0.1 }}>
             {label}
           </Text>
         </View>
         <View
           style={{
-            width: 44, height: 44, borderRadius: 22,
+            width: 52, height: 52, borderRadius: 26,
             alignItems: "center", justifyContent: "center",
             backgroundColor: "rgba(255,255,255,0.22)",
             borderWidth: 1, borderColor: "rgba(255,255,255,0.35)",
           }}
         >
-          <ArrowRightIcon size={19} color="#fff" strokeWidth={2.4} />
+          <ArrowRightIcon size={21} color="#fff" strokeWidth={2.4} />
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -337,10 +347,10 @@ function GhostButton({ label, onPress }: { label: string; onPress: () => void })
       accessibilityLabel={label}
       style={{
         width: "100%",
-        height: 60,
+        height: 66,
         alignItems: "center",
         justifyContent: "center",
-        borderRadius: 30,
+        borderRadius: 33,
         backgroundColor: T.surface,
         shadowColor: "#1a1a2e",
         shadowOpacity: 0.05,
@@ -411,38 +421,39 @@ function IconBox({ color, children }: { color: string; children: React.ReactNode
   )
 }
 
+// The entry sound effect — preloaded via useAudioPlayer below so it's fully
+// decoded and ready by the time the user can possibly tap (zero playback
+// latency). Swap this file to change the sound; nothing else needs updating.
+const TAP_SOUND = require("@/assets/audio/intergalactic-alien-vibration.mp3")
+
 // ─── Wake gate ─────────────────────────────────────────────────────────────────
 // Mirrors the reference design's plain "tap to wake" interstitial: flat
 // background, breathing icon with a radar pulse, tap anywhere to continue.
-function WakeGate({ onWake }: { onWake: () => void }) {
-  const breathe = useSharedValue(1)
-  const ring = useSharedValue(0)
+//
+// `tapSound` is created by the parent OnboardingScreen (see below), not
+// here — useAudioPlayer ties the player's native lifecycle to whichever
+// component created it, and WakeGate itself unmounts the instant onWake()
+// flips the parent's `awake` state, which was tearing the player down
+// before the sound had a chance to actually play. OnboardingScreen stays
+// mounted for the whole flow, so its player survives the transition.
+function WakeGate({ onWake, tapSound }: { onWake: () => void; tapSound: ReturnType<typeof useAudioPlayer> }) {
   const press = useSharedValue(1)
 
-  useEffect(() => {
-    breathe.value = withRepeat(
-      withSequence(
-        withTiming(1.08, { duration: 900, easing: EASE_OUT }),
-        withTiming(1, { duration: 900, easing: EASE_OUT }),
-      ),
-      -1,
-      false,
-    )
-    ring.value = withRepeat(withTiming(1, { duration: 1600, easing: Easing.out(Easing.quad) }), -1, false)
-  }, [])
-
-  const breatheStyle = useAnimatedStyle(() => ({ transform: [{ scale: breathe.value * press.value }] }))
-  const ringStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 + ring.value * 0.6 }],
-    opacity: (1 - ring.value) * 0.35,
-  }))
+  // Real-tap feedback — kept independent of TapDemoIcon's own continuous
+  // demonstration loop, which keeps animating regardless of when the user
+  // actually taps.
+  const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: press.value }] }))
 
   const handlePress = () => {
     press.value = withSequence(
       withTiming(0.94, { duration: 90, easing: EASE_OUT }),
       withTiming(1, { duration: 160, easing: EASE_OUT }),
     )
+    // Fired in the same event handler as the haptic so both feel like one
+    // instantaneous response to the tap.
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    tapSound.seekTo(0).catch(() => {})
+    tapSound.play()
     onWake()
   }
 
@@ -453,23 +464,9 @@ function WakeGate({ onWake }: { onWake: () => void }) {
       accessibilityLabel="Tap to begin"
       style={{ flex: 1, backgroundColor: T.bg, alignItems: "center", justifyContent: "center", gap: 22 }}
     >
-      <View style={{ width: 140, height: 140, alignItems: "center", justifyContent: "center" }}>
-        <Animated.View style={[ringStyle, { position: "absolute", width: 96, height: 96, borderRadius: 48, backgroundColor: T.accent }]} />
-        <Animated.View
-          style={[
-            breatheStyle,
-            {
-              width: 96, height: 96, borderRadius: 48,
-              alignItems: "center", justifyContent: "center",
-              backgroundColor: T.accent,
-              shadowColor: T.accent, shadowOpacity: 0.35, shadowRadius: 22,
-              shadowOffset: { width: 0, height: 8 }, elevation: 10,
-            },
-          ]}
-        >
-          <HeartSolid size={42} color="#fff" />
-        </Animated.View>
-      </View>
+      <Animated.View style={pressStyle}>
+        <TapDemoIcon size={150} />
+      </Animated.View>
 
       <Animated.View entering={FadeIn.delay(200)} style={{ alignItems: "center", gap: 6 }}>
         <Text style={{ fontSize: 20, fontWeight: "800", color: T.textPrimary }}>Tap to begin</Text>
@@ -487,9 +484,25 @@ function WakeGate({ onWake }: { onWake: () => void }) {
 
 export default function OnboardingScreen() {
   const router = useRouter()
+  const { user } = useUser()
   const [awake, setAwake] = useState(false)
+
+  // Created here (not inside WakeGate) so the player's native lifecycle
+  // survives WakeGate unmounting right after the tap — see the comment on
+  // WakeGate above. useAudioPlayer starts loading the source the instant
+  // this component mounts, so it's fully decoded by the time the user can
+  // physically tap.
+  const tapSound = useAudioPlayer(TAP_SOUND)
+  useEffect(() => {
+    // mixWithOthers + playsInSilentMode: a short UI sound effect should
+    // never fight the user's music/podcast for audio focus, and should
+    // still play even if the phone's silent switch is on — matches how
+    // system UI sounds (and most polished onboarding SFX) behave.
+    setAudioModeAsync({ playsInSilentMode: true, interruptionMode: "mixWithOthers" }).catch(() => {})
+  }, [])
   const [currentScreen, setCurrentScreen] = useState(0)
   const [selectedGenres, setSelectedGenres] = useState<string[]>(["Romance", "Comedy"])
+  const [requestingPush, setRequestingPush] = useState(false)
   const screen = SCREENS[currentScreen]
 
   const scale = useSharedValue(1)
@@ -518,8 +531,31 @@ export default function OnboardingScreen() {
   const handleSkip = () => completeOnboarding()
   const handleBack = () => { if (currentScreen > 0) setCurrentScreen((p) => p - 1) }
 
+  // Benefit-framed priming screen fires the *real* system permission dialog
+  // here — never earlier, never silently. Whatever the user answers, we
+  // still advance; onboarding must never dead-end on a permission outcome.
+  const handleEnableNotifications = async () => {
+    if (requestingPush) return
+    setRequestingPush(true)
+    try {
+      const token = await registerForPushNotificationsAsync()
+      if (token && user) {
+        await updateUserPushToken(user.id, token)
+        await setPreferences({ pushEnabled: true })
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      } else {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+      }
+    } catch {
+      // best-effort — never block onboarding on a permission failure
+    } finally {
+      setRequestingPush(false)
+      handleNext()
+    }
+  }
+
   if (!awake) {
-    return <WakeGate onWake={() => setAwake(true)} />
+    return <WakeGate tapSound={tapSound} onWake={() => setAwake(true)} />
   }
 
   // ── Per-screen content ────────────────────────────────────────────────────
@@ -615,28 +651,43 @@ export default function OnboardingScreen() {
 
       case "howItWorks":
         return (
-          <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center", gap: 12 }}>
-            {"steps" in screen && screen.steps && screen.steps.map((step, i) => (
-              <Animated.View key={i} entering={FadeInDown.delay(200 + i * 120).springify()}>
-                <RowCard>
-                  {/* Step number */}
-                  <View style={{
-                    width: 26, height: 26, borderRadius: 13,
-                    alignItems: "center", justifyContent: "center",
-                    borderWidth: 1, borderColor: T.borderMid,
-                  }}>
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: T.textTertiary }}>{i + 1}</Text>
-                  </View>
-                  <IconBox color={step.color}>
-                    <StepIcon name={step.icon} size={24} color={step.color} />
-                  </IconBox>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 15, fontWeight: "700", color: T.textPrimary, marginBottom: 3 }}>{step.title}</Text>
-                    <Text style={{ fontSize: 13, color: T.textSecondary, lineHeight: 19 }}>{step.text}</Text>
-                  </View>
-                </RowCard>
-              </Animated.View>
-            ))}
+          <View style={{ flex: 1, paddingHorizontal: 28, alignItems: "center", justifyContent: "center" }}>
+            <Animated.View entering={FadeInDown.delay(120).springify()} style={{ alignItems: "center" }}>
+              <SwipeDemoIcon size={140} />
+            </Animated.View>
+          </View>
+        )
+
+      case "notifications":
+        return (
+          <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center", gap: 22 }}>
+            <Animated.View entering={FadeInDown.delay(100)} style={{ alignItems: "center" }}>
+              <View style={{
+                width: 88, height: 88, borderRadius: 26,
+                alignItems: "center", justifyContent: "center",
+                backgroundColor: T.accentBg,
+                borderWidth: 1, borderColor: T.accentRim,
+                shadowColor: T.accent, shadowOpacity: 0.22, shadowRadius: 20,
+                shadowOffset: { width: 0, height: 6 }, elevation: 8,
+              }}>
+                <BellSolid size={42} color={T.accent} />
+              </View>
+            </Animated.View>
+
+            {"benefits" in screen && screen.benefits && (
+              <View style={{ gap: 12 }}>
+                {screen.benefits.map((benefit, i) => (
+                  <Animated.View key={i} entering={FadeInDown.delay(230 + i * 90).springify()}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                      <View style={{ width: 44, height: 44, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: T.surface, borderWidth: 1, borderColor: T.borderLo, flexShrink: 0 }}>
+                        <BenefitIcon name={benefit.icon} size={20} color={benefit.color} />
+                      </View>
+                      <Text style={{ fontSize: 15, fontWeight: "500", color: "rgba(21,21,28,0.78)", flex: 1, lineHeight: 22 }}>{benefit.text}</Text>
+                    </View>
+                  </Animated.View>
+                ))}
+              </View>
+            )}
           </View>
         )
 
@@ -877,11 +928,12 @@ export default function OnboardingScreen() {
   }
 
   const isFinal = screen.type === "final"
+  const isNotifPriming = screen.type === "notifications"
   // Screens built around a centered illustration/carousel read the headline
   // centered too, so the whole screen reads as one aligned block instead of
   // a left-anchored title floating over centered content. List-driven
-  // screens (howItWorks, features) keep their left-aligned reading flow.
-  const isCentered = isFinal || ["hero", "social", "streaks", "privacy", "genres"].includes(screen.type)
+  // screens (features) keep their left-aligned reading flow.
+  const isCentered = isFinal || ["hero", "social", "streaks", "privacy", "genres", "howItWorks", "notifications"].includes(screen.type)
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
@@ -1042,6 +1094,18 @@ export default function OnboardingScreen() {
               label={"ctaSecondary" in screen ? (screen as any).ctaSecondary : ""}
               onPress={completeOnboarding}
             />
+          </View>
+        ) : isNotifPriming ? (
+          <View style={{ gap: 10 }}>
+            <CTAButton
+              label={requestingPush ? "Requesting…" : "Enable Notifications"}
+              onPress={handleEnableNotifications}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              animStyle={animatedButtonStyle}
+              icon={<BellIcon size={19} color="#fff" strokeWidth={2} />}
+            />
+            <GhostButton label="Maybe Later" onPress={handleNext} />
           </View>
         ) : (
           <CTAButton

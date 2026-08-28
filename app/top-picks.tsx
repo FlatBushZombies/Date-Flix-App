@@ -1,4 +1,5 @@
 import { useToast } from "@/components/Toast/ToastProvider"
+import { EmptyState as IllustratedEmptyState } from "@/components/EmptyState"
 import { EmptyState } from "@/components/ui/EmptyState"
 import { color, radius, shadow } from "@/constants/theme"
 import { useTopPicks, type TopPick } from "@/hooks/useTopPicks"
@@ -10,7 +11,7 @@ import type { CastableMovie } from "@/types/cast"
 import * as Haptics from "expo-haptics"
 import { useRouter } from "expo-router"
 import { UpvoteIcon } from "@/components/icons/UpvoteIcon"
-import { ChevronLeft, CloudOff, Film, Star, Tv } from "lucide-react-native"
+import { ChevronLeft, CloudOff, Star, Tv } from "lucide-react-native"
 import { useEffect, useState } from "react"
 import {
   ActivityIndicator,
@@ -68,7 +69,7 @@ export default function TopPicksScreen() {
   // (Profile → TV), the poster/title/overview goes straight there. Otherwise
   // this falls back to opening the title in a streaming app/web search,
   // which has its own Cast/AirPlay button once it's open (lib/tvCast) —
-  // DateFlix has no video of its own to stream directly either way.
+  // Duo App has no video of its own to stream directly either way.
   const handleWatchOnTv = async (movie: Movie, castable: CastableMovie) => {
     if (castingId) return
 
@@ -131,11 +132,9 @@ export default function TopPicksScreen() {
               tintColor={color.error}
             />
           ) : isEmpty ? (
-            <EmptyState
-              icon={<Film size={36} color={color.textTertiary} strokeWidth={1.6} />}
+            <IllustratedEmptyState
               title="Nothing here yet"
               description="New releases will show up here as soon as they're available."
-              tintColor={color.textTertiary}
             />
           ) : (
             <>

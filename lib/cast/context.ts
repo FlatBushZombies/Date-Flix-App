@@ -38,7 +38,7 @@ export interface CastContextValue {
   startDiscovery: () => void
 }
 
-const UNAVAILABLE_MESSAGE = "Casting requires the DateFlix mobile app development build."
+const UNAVAILABLE_MESSAGE = "Casting requires the Duo App development build."
 
 export const UNAVAILABLE_VALUE: CastContextValue = {
   isCastAvailable: false,

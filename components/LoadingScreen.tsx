@@ -1,167 +1,114 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Text, View } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 
 interface LoadingScreenProps {
   message: string;
   progress: number;
 }
 
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+const SIZE = 132;
+const STROKE = 7;
+const RADIUS = (SIZE - STROKE) / 2;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
 export function LoadingScreen({ message, progress }: LoadingScreenProps) {
-  const pulseAnim = useRef(new Animated.Value(0)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const breatheAnim = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Slow, soft breathing scale — reads as "expensive" rather than a
-    // mechanical bounce. Asymmetric in/out easing avoids a robotic feel.
-    const pulse = Animated.loop(
+    // Smoothly eases toward whatever progress value comes in — the ring is a
+    // real determinate indicator of `progress`, not a decorative spinner.
+    Animated.timing(progressAnim, {
+      toValue: Math.max(0, Math.min(100, progress)),
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false, // strokeDashoffset isn't a native-driver-supported prop
+    }).start();
+  }, [progress]);
+
+  useEffect(() => {
+    // Slow ambient breathing halo behind the ring — reads as "alive" without
+    // implying any information beyond what `progress` already says.
+    const glow = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, {
+        Animated.timing(glowAnim, {
           toValue: 1,
-          duration: 1600,
-          easing: Easing.out(Easing.cubic),
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
-        Animated.timing(pulseAnim, {
+        Animated.timing(glowAnim, {
           toValue: 0,
-          duration: 1600,
+          duration: 1500,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
       ])
     );
-    // Slower, constant-speed sweep for the accent arc.
-    const rotate = Animated.loop(
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 2600,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    );
-    // Gentle opacity breathing on the outer halo, offset from the scale pulse.
-    const breathe = Animated.loop(
-      Animated.sequence([
-        Animated.timing(breatheAnim, {
-          toValue: 1,
-          duration: 2000,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(breatheAnim, {
-          toValue: 0,
-          duration: 2000,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    pulse.start();
-    rotate.start();
-    breathe.start();
-    return () => {
-      pulse.stop();
-      rotate.stop();
-      breathe.stop();
-    };
+    glow.start();
+    return () => glow.stop();
   }, []);
 
-  const rotate = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
+  const strokeDashoffset = progressAnim.interpolate({
+    inputRange: [0, 100],
+    outputRange: [CIRCUMFERENCE, 0],
   });
-  const scale = pulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.1],
-  });
-  const haloOpacity = breatheAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.35, 0.9],
-  });
+  const glowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.65] });
+  const glowScale = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
 
   return (
     <View className="items-center py-16">
-      {/* Loader container */}
-      <View className="mb-8 relative items-center justify-center" style={{ width: 104, height: 104 }}>
-
-        {/* Outer breathing halo */}
+      <View style={{ width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' }}>
+        {/* Ambient glow */}
         <Animated.View
           style={{
             position: 'absolute',
-            width: 104,
-            height: 104,
-            borderRadius: 52,
-            borderWidth: 1,
-            borderColor: 'rgba(255,59,92,0.16)',
-            opacity: haloOpacity,
-            transform: [{ scale }],
+            width: SIZE,
+            height: SIZE,
+            borderRadius: SIZE / 2,
+            backgroundColor: 'rgba(255,59,92,0.14)',
+            opacity: glowOpacity,
+            transform: [{ scale: glowScale }],
           }}
         />
 
-        {/* Static mid ring */}
-        <View
-          style={{
-            position: 'absolute',
-            top: 14,
-            left: 14,
-            width: 76,
-            height: 76,
-            borderRadius: 38,
-            borderWidth: 1.5,
-            borderColor: 'rgba(255,59,92,0.16)',
-          }}
-        />
+        <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
+          {/* Track */}
+          <Circle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={RADIUS}
+            stroke="rgba(255,59,92,0.14)"
+            strokeWidth={STROKE}
+            fill="none"
+          />
+          {/* Determinate progress arc — starts at 12 o'clock, sweeps clockwise */}
+          <AnimatedCircle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={RADIUS}
+            stroke="#FF3B5C"
+            strokeWidth={STROKE}
+            strokeLinecap="round"
+            fill="none"
+            strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+            strokeDashoffset={strokeDashoffset}
+            rotation={-90}
+            origin={`${SIZE / 2}, ${SIZE / 2}`}
+          />
+        </Svg>
 
-        {/* Spinning arc ring */}
-        <Animated.View
-          style={{
-            position: 'absolute',
-            top: 14,
-            left: 14,
-            width: 76,
-            height: 76,
-            borderRadius: 38,
-            borderWidth: 1.5,
-            borderTopColor: '#FF3B5C',
-            borderRightColor: 'rgba(255,59,92,0.35)',
-            borderBottomColor: 'transparent',
-            borderLeftColor: 'transparent',
-            transform: [{ rotate }],
-          }}
-        />
-
-        {/* Inner pill with progress */}
-        <View
-          style={{
-            position: 'absolute',
-            top: 26,
-            left: 26,
-            width: 52,
-            height: 52,
-            borderRadius: 26,
-            backgroundColor: 'rgba(255,59,92,0.07)',
-            borderWidth: 1,
-            borderColor: 'rgba(255,59,92,0.22)',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text
-            style={{
-              color: '#FF3B5C',
-              fontSize: 12,
-              fontWeight: '600',
-              letterSpacing: 0.3,
-            }}
-          >
-            {progress}%
+        <View style={{ position: 'absolute', alignItems: 'center' }}>
+          <Text style={{ fontSize: 32, fontWeight: '800', color: '#FF3B5C', letterSpacing: -1 }}>
+            {Math.round(progress)}%
           </Text>
         </View>
       </View>
 
-      <Text
-        className="text-xl font-bold text-text-primary mb-1.5 tracking-tight"
-      >
+      <Text className="text-xl font-bold text-text-primary mt-7 mb-1.5 tracking-tight">
         Finding your perfect match
       </Text>
       <Text className="text-sm text-text-muted tracking-wide">{message}</Text>

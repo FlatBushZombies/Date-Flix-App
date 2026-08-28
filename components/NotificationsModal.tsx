@@ -1,6 +1,7 @@
 import { BottomSheet } from "@/components/ui/BottomSheet"
+import { EmptyState as IllustratedEmptyState } from "@/components/EmptyState"
 import { EmptyState } from "@/components/ui/EmptyState"
-import { CloudOff, X, BellOff } from "lucide-react-native"
+import { CloudOff, X } from "lucide-react-native"
 import React from "react"
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native"
 import type { AppNotification } from "@/types"
@@ -72,11 +73,10 @@ export function NotificationsModal({
       ) : (
         <ScrollView contentContainerStyle={{ padding: 14 }}>
           {items.length === 0 ? (
-            <EmptyState
-              icon={<BellOff size={32} color="#9ca3af" strokeWidth={1.6} />}
+            <IllustratedEmptyState
               title="All Caught Up"
               description="You don't have any notifications right now."
-              tintColor="#9ca3af"
+              size={140}
             />
           ) : (
             items.map((n) => (

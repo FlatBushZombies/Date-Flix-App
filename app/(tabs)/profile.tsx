@@ -106,8 +106,8 @@ export default function ProfileScreen() {
       const invitation = await createInvitation(user.id)
       if (invitation) {
         setShowInviteModal(false)
-        const shareMessage = `Join me on Movie Circle! Use code: ${invitation.invite_code}\n\nOr use this link: movieapp://invite/${invitation.invite_code}`
-        await Share.share({ message: shareMessage, title: "Join me on Movie Circle" })
+        const shareMessage = `Join me on Duo App! Use code: ${invitation.invite_code}\n\nOr use this link: movieapp://invite/${invitation.invite_code}`
+        await Share.share({ message: shareMessage, title: "Join me on Duo App" })
         toast.success("Invitation Created!", `Share code: ${invitation.invite_code}`)
         loadUserData()
       }
@@ -153,7 +153,7 @@ export default function ProfileScreen() {
       <View style={s.header}>
         {/* Subtle decorative line accent */}
         <View style={s.headerAccentLine} />
-        <Text style={s.appTitle}>Movie Circle</Text>
+        <Text style={s.appTitle}>Duo App</Text>
         <Text style={s.appSubtitle}>Match, watch, and enjoy movies together</Text>
       </View>
 
@@ -380,7 +380,7 @@ export default function ProfileScreen() {
               </TouchableOpacity>
               {!cast.isCastAvailable && (
                 <Text style={s.tvUnavailable}>
-                  Requires the DateFlix development build — casting isn&apos;t available in Expo Go.
+                  Requires the Duo App development build — casting isn&apos;t available in Expo Go.
                 </Text>
               )}
             </>

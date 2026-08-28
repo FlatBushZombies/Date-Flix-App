@@ -44,6 +44,7 @@ import {
 import {
     ArrowTrendingUpIcon,
     BellIcon,
+    DocumentDuplicateIcon,
     MapPinIcon,
     UserPlusIcon,
     XMarkIcon
@@ -216,7 +217,7 @@ export default function SwipeScreen() {
   const handleShareInvite = async () => {
     try {
       await Share.share({
-        message: `Join me on MovieMatch! Use my invite code: ${inviteCode}\n\nLet's find movies we both love!`,
+        message: `Join me on Duo App! Use my invite code: ${inviteCode}\n\nLet's find movies we both love!`,
       })
     } catch (error) {
       console.error("Error sharing:", error)
@@ -267,24 +268,28 @@ export default function SwipeScreen() {
     })
   }
 
-  const handleSwipe = async (direction: "left" | "right") => {
+  // Advances the deck immediately so swiping never waits on a network round
+  // trip — the save happens in the background and only affects toasts, not
+  // how fast the next card appears.
+  const handleSwipe = (direction: "left" | "right") => {
     const currentMovie = movies[currentIndex]
     const liked = direction === "right"
-    if (user && userSynced) {
-      try {
-        const result = await saveSwipe(user.id, currentMovie.id, liked, currentMovie)
-        const evaluations: { sessionId: string; evaluation: StreakEvaluation }[] =
-          result?.streakEvaluations ?? []
-        evaluations.forEach(({ sessionId, evaluation }) => {
-          const session = activeSessions.find((s) => s.id === sessionId)
-          if (session) applyStreakEvaluation(session, evaluation, activeSessions[0]?.id === sessionId)
-        })
-      } catch (error) {
-        console.error("[v0] Exception while saving swipe:", error)
-      }
-    }
+
     setCurrentIndex((prev) => prev + 1)
     if (currentIndex >= movies.length - 3) loadMovies()
+
+    if (user && userSynced) {
+      saveSwipe(user.id, currentMovie.id, liked, currentMovie)
+        .then((result) => {
+          const evaluations: { sessionId: string; evaluation: StreakEvaluation }[] =
+            result?.streakEvaluations ?? []
+          evaluations.forEach(({ sessionId, evaluation }) => {
+            const session = activeSessions.find((s) => s.id === sessionId)
+            if (session) applyStreakEvaluation(session, evaluation, activeSessions[0]?.id === sessionId)
+          })
+        })
+        .catch((error) => console.error("[v0] Exception while saving swipe:", error))
+    }
   }
 
   const handleSaveMovie = async (movie: Movie) => {
@@ -655,7 +660,7 @@ export default function SwipeScreen() {
                         onPress={handleCopyCode}
                         className="flex-row items-center px-5 py-3.5 rounded-2xl bg-gray-100 gap-2"
                       >
-                        <XMarkIcon size={20} color="#6b7280" strokeWidth={1.6} />
+                        <DocumentDuplicateIcon size={20} color="#6b7280" strokeWidth={1.6} />
                         <Text className="text-sm font-semibold text-gray-500">Copy</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
