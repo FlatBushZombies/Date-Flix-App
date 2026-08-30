@@ -302,7 +302,7 @@ function CTAButton({
         style={{
           width: "100%",
           height: 66,
-          borderRadius: 33,
+          borderRadius: 22,
           backgroundColor: T.accent,
           flexDirection: "row",
           alignItems: "center",
@@ -350,7 +350,7 @@ function GhostButton({ label, onPress }: { label: string; onPress: () => void })
         height: 66,
         alignItems: "center",
         justifyContent: "center",
-        borderRadius: 33,
+        borderRadius: 22,
         backgroundColor: T.surface,
         shadowColor: "#1a1a2e",
         shadowOpacity: 0.05,
@@ -471,10 +471,6 @@ function WakeGate({ onWake, tapSound }: { onWake: () => void; tapSound: ReturnTy
       <Animated.View entering={FadeIn.delay(200)} style={{ alignItems: "center", gap: 6 }}>
         <Text style={{ fontSize: 20, fontWeight: "800", color: T.textPrimary }}>Tap to begin</Text>
         <Text style={{ fontSize: 14, color: T.textSecondary }}>Let's find your perfect movie night</Text>
-      </Animated.View>
-
-      <Animated.View entering={FadeIn.delay(500)}>
-        <Ionicons name="hand-left-outline" size={22} color={T.textTertiary} />
       </Animated.View>
     </Pressable>
   )

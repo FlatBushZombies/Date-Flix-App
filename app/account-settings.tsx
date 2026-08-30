@@ -6,7 +6,6 @@ import { getPreferences, setPreferences } from "@/lib/preferences"
 import { getStreamingConfig } from "@/lib/streaming"
 import { CASTABLE_PLATFORMS, isAppInstalled, sendToStreamingApp } from "@/lib/tvCast"
 import type { Invitation, SupabaseMatch, SupabaseUser, SwipeSession } from "@/types"
-import { permanentlyDeleteAccount } from "@/utils/account"
 import { registerForPushNotificationsAsync, updateUserPushToken } from "@/utils/notifications"
 import {
   deleteSwipeSession,
@@ -25,7 +24,6 @@ import {
   Clock,
   Download,
   Snowflake,
-  Trash2,
   Tv,
   UserMinus,
 } from "lucide-react-native"
@@ -82,9 +80,8 @@ export default function AccountSettingsScreen() {
   const [relationshipLoading, setRelationshipLoading] = useState(true)
   const [endingSessionId, setEndingSessionId] = useState<string | null>(null)
 
-  // ── Data export / delete ──────────────────────────────────
+  // ── Data export ────────────────────────────────────────────
   const [exporting, setExporting] = useState(false)
-  const [deletingAccount, setDeletingAccount] = useState(false)
 
   // ── Cast & TV ────────────────────────────────────────────
   const [castStatus, setCastStatus] = useState<Record<string, boolean>>({})
@@ -295,54 +292,6 @@ export default function AccountSettingsScreen() {
     } finally {
       setExporting(false)
     }
-  }
-
-  // ── Delete account ─────────────────────────────────────────
-  const handleDeleteAccount = () => {
-    if (!user) return
-    confirm.show({
-      title: "Delete Account",
-      message: "Are you sure you want to permanently delete your account? This action cannot be undone.",
-      variant: "destructive",
-      buttons: [
-        { label: "Cancel", style: "cancel" },
-        {
-          label: "Delete",
-          style: "destructive",
-          onPress: () => {
-            confirm.show({
-              title: "Final Warning",
-              message:
-                "This will permanently delete all your data including matches, swipes, and profile information. Are you absolutely sure?",
-              variant: "destructive",
-              buttons: [
-                { label: "Cancel", style: "cancel" },
-                {
-                  label: "Yes, Delete Everything",
-                  style: "destructive",
-                  onPress: async () => {
-                    setDeletingAccount(true)
-                    try {
-                      const result = await permanentlyDeleteAccount(user.id, user)
-                      if (result.success) {
-                        toast.success("Account Deleted", result.message)
-                        router.replace("/")
-                      } else {
-                        confirm.show({ title: "Deletion Failed", message: result.message, variant: "warning" })
-                      }
-                    } catch {
-                      toast.error("Error", "Failed to delete account. Please try again or contact support.")
-                    } finally {
-                      setDeletingAccount(false)
-                    }
-                  },
-                },
-              ],
-            })
-          },
-        },
-      ],
-    })
   }
 
   return (
@@ -601,31 +550,8 @@ export default function AccountSettingsScreen() {
           {exporting && <ActivityIndicator size="small" color={C.cyan} />}
         </TouchableOpacity>
       </View>
-
-      {/* ── Danger zone ── */}
-      <SectionLabel text="Danger Zone" />
-      <View style={{ marginHorizontal: 20, marginBottom: 48 }}>
-        <TouchableOpacity
-          style={[s.btnDelete, deletingAccount && s.btnDeleteDisabled]}
-          onPress={handleDeleteAccount}
-          disabled={deletingAccount}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Delete account permanently"
-        >
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Trash2 size={18} color={deletingAccount ? "#fca5a5" : "#fff"} />
-            <Text style={[s.btnDeleteText, deletingAccount && { color: "#fca5a5" }]}>
-              {deletingAccount ? "Deleting Account…" : "Delete Account"}
-            </Text>
-          </View>
-          {!deletingAccount && (
-            <View style={s.btnDeleteBadge}>
-              <Text style={s.btnDeleteBadgeText}>Permanent</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
+      {/* Account deletion now lives on the Profile screen, not buried here. */}
+      <View style={{ height: 48 }} />
     </ScrollView>
   )
 }
@@ -781,15 +707,4 @@ const s = StyleSheet.create({
     backgroundColor: "rgba(6,182,212,0.1)",
     alignItems: "center", justifyContent: "center",
   },
-  btnDelete: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingVertical: 15, paddingHorizontal: 18, borderRadius: 16,
-    backgroundColor: "#ef4444",
-    shadowColor: "#ef4444", shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25, shadowRadius: 10,
-  },
-  btnDeleteDisabled: { backgroundColor: "#fca5a5", shadowOpacity: 0 },
-  btnDeleteText: { fontSize: 15, fontWeight: "600", color: "#ffffff", marginLeft: 10, letterSpacing: 0.2 },
-  btnDeleteBadge: { backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  btnDeleteBadgeText: { fontSize: 11, fontWeight: "700", color: "#fecaca", letterSpacing: 0.5, textTransform: "uppercase" },
 })

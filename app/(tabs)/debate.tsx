@@ -31,7 +31,6 @@ import Animated, {
 } from "react-native-reanimated"
 import {
   HeartIcon,
-  FilmIcon,
   EnvelopeIcon,
   TicketIcon,
   ArrowLeftIcon,
@@ -69,6 +68,10 @@ import { useToast } from "@/components/Toast/ToastProvider"
 import { useConfirm } from "@/components/Confirm/ConfirmProvider"
 import { CARD_HEIGHT, CARD_WIDTH, CompatibilityCard } from "@/components/CompatibilityCard"
 import { shadow } from "@/constants/theme"
+import { TasteOnboarding, type SeedMovie } from "@/components/debate/TasteOnboarding"
+import { TasteResults } from "@/components/debate/TasteResults"
+import { useTasteEngine } from "@/hooks/useTasteEngine"
+import { Sparkles as SparklesLucide } from "lucide-react-native"
 
 const { height } = Dimensions.get("window")
 
@@ -133,7 +136,7 @@ function PremiumAvatar({
             width: whiteRing,
             height: whiteRing,
             borderRadius: whiteRing / 2,
-            backgroundColor: "#fff9fb",
+            backgroundColor: "#fffafa",
             alignItems: "center",
             justifyContent: "center",
           }}
@@ -175,7 +178,7 @@ function PremiumAvatar({
             borderRadius: 7,
             backgroundColor: statusColor,
             borderWidth: 2.5,
-            borderColor: "#fff9fb",
+            borderColor: "#fffafa",
           }}
         />
       )}
@@ -243,7 +246,7 @@ function ScreenHeader({
   right?: React.ReactNode
 }) {
   return (
-    <View className="flex-row items-center justify-between pt-16 pb-4 px-5">
+    <View className="flex-row items-center justify-between pt-3 pb-4 px-5">
       <TouchableOpacity
         className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center"
         onPress={onBack}
@@ -280,7 +283,7 @@ function PrimaryButton({
         disabled
           ? undefined
           : {
-              shadowColor: "#ec4899",
+              shadowColor: "#E50914",
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity: 0.28,
               shadowRadius: 10,
@@ -317,6 +320,9 @@ export default function DebateSettlerScreen() {
   const toast = useToast()
   const confirm = useConfirm()
 
+  const [activeTab, setActiveTab] = useState<"debate" | "tracker">("debate")
+  const tasteEngine = useTasteEngine(user?.id)
+
   const [activeSession, setActiveSession] = useState<DebateSession | null>(null)
   const [joinCode, setJoinCode] = useState("")
   const [partnerEmail, setPartnerEmail] = useState("")
@@ -331,8 +337,6 @@ export default function DebateSettlerScreen() {
 
   // Animations
   const heartScale = useSharedValue(1)
-  const floatY = useSharedValue(0)
-  const pulseOpacity = useSharedValue(0.5)
 
   useEffect(() => {
     heartScale.value = withRepeat(
@@ -340,16 +344,6 @@ export default function DebateSettlerScreen() {
         withTiming(1.2, { duration: 600, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }),
         withTiming(1, { duration: 600, easing: Easing.bezier(0.25, 0.1, 0.25, 1) })
       ),
-      -1,
-      true
-    )
-    floatY.value = withRepeat(
-      withSequence(withTiming(-8, { duration: 2000 }), withTiming(0, { duration: 2000 })),
-      -1,
-      true
-    )
-    pulseOpacity.value = withRepeat(
-      withSequence(withTiming(0.8, { duration: 1500 }), withTiming(0.3, { duration: 1500 })),
       -1,
       true
     )
@@ -361,8 +355,6 @@ export default function DebateSettlerScreen() {
   }, [user])
 
   const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }))
-  const floatStyle = useAnimatedStyle(() => ({ transform: [{ translateY: floatY.value }] }))
-  const pulseStyle = useAnimatedStyle(() => ({ opacity: pulseOpacity.value }))
 
   // ── Handlers ──────────────────────────────────────────────────────────────────
 
@@ -582,55 +574,15 @@ export default function DebateSettlerScreen() {
 
   const renderHomeScreen = () => (
     <ScrollView
-      className="flex-1 bg-[#fff9fb]"
+      className="flex-1 bg-[#fffafa]"
       contentContainerClassName="pb-12"
       showsVerticalScrollIndicator={false}
     >
       {/* ── Hero ── */}
       <Animated.View
         entering={FadeInDown.delay(100).springify()}
-        className="items-center pt-[88px] px-6 pb-6"
+        className="items-center pt-3 px-6 pb-6"
       >
-        {/* Pulse glow */}
-        <Animated.View
-          style={[pulseStyle, { top: 56 }]}
-          className="absolute w-[220px] h-[220px] rounded-full bg-pink-400/[0.12]"
-        />
-
-        {/* Floating icon */}
-        <Animated.View style={floatStyle} className="relative mb-7">
-          <LinearGradient
-            colors={["#ec4899", "#f472b6", "#fb7185"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            className="w-24 h-24 rounded-full items-center justify-center"
-            style={{
-              shadowColor: "#ec4899",
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 0.35,
-              shadowRadius: 14,
-              elevation: 10,
-            }}
-          >
-            <Animated.View style={heartStyle}>
-              <HeartIcon size={48} color="#fff" />
-            </Animated.View>
-          </LinearGradient>
-          {/* Film badge */}
-          <View
-            className="absolute -bottom-0.5 -right-0.5 w-[34px] h-[34px] rounded-full bg-white items-center justify-center border-[1.5px] border-pink-100"
-            style={{
-              elevation: 3,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.08,
-              shadowRadius: 4,
-            }}
-          >
-            <FilmIcon size={18} color="#ec4899" />
-          </View>
-        </Animated.View>
-
         <Text className="text-[30px] font-extrabold text-[#1a0a0f] mb-2.5 text-center tracking-tight">
           Date Night Debate
         </Text>
@@ -651,7 +603,7 @@ export default function DebateSettlerScreen() {
             initials={user?.firstName?.[0]}
             size={54}
             gradientColors={["#8B5CF6", "#7C3AED"]}
-            ringColors={["#a78bfa", "#ec4899", "#7C3AED"]}
+            ringColors={["#a78bfa", "#E50914", "#7C3AED"]}
           />
 
           {/* Heart connector */}
@@ -665,16 +617,16 @@ export default function DebateSettlerScreen() {
               justifyContent: "center",
               zIndex: 10,
               borderWidth: 1,
-              borderColor: "#fce7f3",
+              borderColor: "#fee2e2",
               marginHorizontal: -8,
-              shadowColor: "#ec4899",
+              shadowColor: "#E50914",
               shadowOffset: { width: 0, height: 1 },
               shadowOpacity: 0.2,
               shadowRadius: 3,
               elevation: 3,
             }}
           >
-            <HeartIcon size={13} color="#ec4899" />
+            <HeartIcon size={13} color="#E50914" />
           </View>
 
           {/* Right avatar — partner placeholder */}
@@ -682,16 +634,16 @@ export default function DebateSettlerScreen() {
             imageUrl={null}
             initials="?"
             size={54}
-            gradientColors={["#ec4899", "#f472b6"]}
-            ringColors={["#f472b6", "#fb7185", "#ec4899"]}
+            gradientColors={["#E50914", "#FF3B47"]}
+            ringColors={["#FF3B47", "#FF2D2D", "#E50914"]}
           />
         </View>
-        <Text className="text-[13px] font-semibold text-pink-500">You + Your Person</Text>
+        <Text className="text-[13px] font-semibold text-red-500">You + Your Person</Text>
       </Animated.View>
 
       {/* ── Action buttons ── */}
       <Animated.View entering={FadeInDown.delay(300).springify()} className="px-6 pt-2">
-        <PrimaryButton onPress={() => setCurrentView("create")} colors={["#ec4899", "#db2777"]}>
+        <PrimaryButton onPress={() => setCurrentView("create")} colors={["#E50914", "#B2070F"]}>
           <EnvelopeIcon size={20} color="#fff" />
           <Text className="text-white text-[16px] font-bold">Invite Your Partner</Text>
         </PrimaryButton>
@@ -704,12 +656,12 @@ export default function DebateSettlerScreen() {
         </View>
 
         <TouchableOpacity
-          className="flex-row items-center justify-center py-[17px] bg-white rounded-[18px] border-[1.5px] border-pink-300 gap-x-2.5"
+          className="flex-row items-center justify-center py-[17px] bg-white rounded-[18px] border-[1.5px] border-red-300 gap-x-2.5"
           onPress={() => setCurrentView("join")}
           activeOpacity={0.85}
         >
-          <ArrowRightEndOnRectangleIcon size={20} color="#ec4899" />
-          <Text className="text-pink-500 text-[16px] font-bold">I Have a Code</Text>
+          <ArrowRightEndOnRectangleIcon size={20} color="#E50914" />
+          <Text className="text-red-500 text-[16px] font-bold">I Have a Code</Text>
         </TouchableOpacity>
       </Animated.View>
 
@@ -721,10 +673,10 @@ export default function DebateSettlerScreen() {
 
         {[
           {
-            icon: <EnvelopeOutlineIcon size={20} color="#ec4899" />,
+            icon: <EnvelopeOutlineIcon size={20} color="#E50914" />,
             title: "Send an Invite",
             desc: "Enter your partner's email to invite them",
-            gradientColors: ["#fce7f3", "#fdf2f8"] as [string, string],
+            gradientColors: ["#fee2e2", "#fef2f2"] as [string, string],
           },
           {
             icon: <HeartOutlineIcon size={20} color="#8B5CF6" />,
@@ -741,10 +693,10 @@ export default function DebateSettlerScreen() {
         ].map((step, index) => (
           <View
             key={index}
-            className="flex-row items-center bg-white rounded-2xl mb-2.5 px-4 py-3.5 gap-x-3.5 border border-pink-50"
+            className="flex-row items-center bg-white rounded-2xl mb-2.5 px-4 py-3.5 gap-x-3.5 border border-red-50"
             style={{
               elevation: 1,
-              shadowColor: "#ec4899",
+              shadowColor: "#E50914",
               shadowOffset: { width: 0, height: 1 },
               shadowOpacity: 0.06,
               shadowRadius: 6,
@@ -760,8 +712,8 @@ export default function DebateSettlerScreen() {
               <Text className="text-[14px] font-bold text-[#1a0a0f] mb-0.5">{step.title}</Text>
               <Text className="text-[13px] text-gray-400 leading-[18px]">{step.desc}</Text>
             </View>
-            <View className="w-6 h-6 rounded-full bg-pink-100 items-center justify-center shrink-0">
-              <Text className="text-[12px] font-bold text-pink-500">{index + 1}</Text>
+            <View className="w-6 h-6 rounded-full bg-red-100 items-center justify-center shrink-0">
+              <Text className="text-[12px] font-bold text-red-500">{index + 1}</Text>
             </View>
           </View>
         ))}
@@ -772,7 +724,7 @@ export default function DebateSettlerScreen() {
   const renderCreateScreen = () => (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1 bg-[#fff9fb]"
+      className="flex-1 bg-[#fffafa]"
     >
       <ScrollView
         className="flex-1"
@@ -784,10 +736,10 @@ export default function DebateSettlerScreen() {
         {/* Illustration */}
         <Animated.View entering={FadeInDown.delay(100)} className="items-center py-8 px-6">
           <LinearGradient
-            colors={["#fce7f3", "#fdf2f8"]}
+            colors={["#fee2e2", "#fef2f2"]}
             className="w-[108px] h-[108px] rounded-full items-center justify-center mb-5"
           >
-            <EnvelopeIcon size={48} color="#ec4899" />
+            <EnvelopeIcon size={48} color="#E50914" />
           </LinearGradient>
           <Text className="text-[15px] text-gray-500 text-center px-6 leading-[22px]">
             We'll send them a beautiful invite email with a code to join your debate
@@ -797,8 +749,8 @@ export default function DebateSettlerScreen() {
         {/* Email input */}
         <Animated.View entering={FadeInDown.delay(200)} className="px-6">
           <Text className="text-[13px] font-semibold text-gray-700 mb-2">Partner's Email</Text>
-          <View className="flex-row items-center bg-white rounded-[14px] border-[1.5px] border-pink-300 px-3.5">
-            <HeartOutlineIcon size={18} color="#ec4899" style={{ marginRight: 10 }} />
+          <View className="flex-row items-center bg-white rounded-[14px] border-[1.5px] border-red-300 px-3.5">
+            <HeartOutlineIcon size={18} color="#E50914" style={{ marginRight: 10 }} />
             <TextInput
               className="flex-1 py-3.5 text-[15px] text-[#1a0a0f]"
               placeholder="love@example.com"
@@ -818,7 +770,7 @@ export default function DebateSettlerScreen() {
             onPress={handleCreateSession}
             disabled={!partnerEmail.trim()}
             loading={isLoading}
-            colors={partnerEmail.trim() ? ["#ec4899", "#db2777"] : ["#e5e7eb", "#d1d5db"]}
+            colors={partnerEmail.trim() ? ["#E50914", "#B2070F"] : ["#e5e7eb", "#d1d5db"]}
           >
             <PaperAirplaneIcon size={18} color={partnerEmail.trim() ? "#fff" : "#9ca3af"} />
             <Text
@@ -837,7 +789,7 @@ export default function DebateSettlerScreen() {
   const renderJoinScreen = () => (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1 bg-[#fff9fb]"
+      className="flex-1 bg-[#fffafa]"
     >
       <ScrollView
         className="flex-1"
@@ -922,7 +874,7 @@ export default function DebateSettlerScreen() {
     return (
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="flex-1 bg-[#fff9fb]"
+        className="flex-1 bg-[#fffafa]"
       >
         <ScrollView
           className="flex-1"
@@ -930,7 +882,7 @@ export default function DebateSettlerScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Session header */}
-          <View className="flex-row items-center justify-between pt-16 pb-4 px-5">
+          <View className="flex-row items-center justify-between pt-3 pb-4 px-5">
             <TouchableOpacity
               className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center"
               onPress={() => {
@@ -957,10 +909,10 @@ export default function DebateSettlerScreen() {
               <XMarkIcon size={20} color="#374151" />
             </TouchableOpacity>
 
-            <View className="flex-row items-center bg-pink-50 px-3.5 py-[7px] rounded-full border border-pink-200">
-              <KeyIcon size={12} color="#ec4899" style={{ marginRight: 4 }} />
+            <View className="flex-row items-center bg-red-50 px-3.5 py-[7px] rounded-full border border-red-200">
+              <KeyIcon size={12} color="#E50914" style={{ marginRight: 4 }} />
               <Text
-                className="text-[13px] font-extrabold text-pink-500"
+                className="text-[13px] font-extrabold text-red-500"
                 style={{ letterSpacing: 2.5 }}
               >
                 {activeSession.code}
@@ -1024,9 +976,9 @@ export default function DebateSettlerScreen() {
             <View className="px-1 items-center justify-center">
               <Animated.View
                 style={heartStyle}
-                className="w-11 h-11 rounded-full bg-pink-100 items-center justify-center"
+                className="w-11 h-11 rounded-full bg-red-100 items-center justify-center"
               >
-                <HeartIcon size={24} color="#ec4899" />
+                <HeartIcon size={24} color="#E50914" />
               </Animated.View>
             </View>
 
@@ -1038,8 +990,8 @@ export default function DebateSettlerScreen() {
                     imageUrl={partner?.image_url}
                     initials={partner?.first_name?.[0]}
                     size={68}
-                    gradientColors={["#ec4899", "#f472b6"]}
-                    ringColors={["#f9a8d4", "#ec4899", "#db2777"]}
+                    gradientColors={["#E50914", "#FF3B47"]}
+                    ringColors={["#fca5a5", "#E50914", "#B2070F"]}
                     statusColor={partnerPrefsSubmitted ? "#22c55e" : "#fbbf24"}
                   />
                   <Text className="text-[15px] font-bold text-[#1a0a0f]">
@@ -1071,7 +1023,7 @@ export default function DebateSettlerScreen() {
                     }}
                   >
                     <LinearGradient
-                      colors={["#fce7f3", "#fdf2f8"]}
+                      colors={["#fee2e2", "#fef2f2"]}
                       style={{
                         position: "absolute",
                         width: 88,
@@ -1085,15 +1037,15 @@ export default function DebateSettlerScreen() {
                         width: 80,
                         height: 80,
                         borderRadius: 40,
-                        backgroundColor: "#fdf2f8",
+                        backgroundColor: "#fef2f2",
                         alignItems: "center",
                         justifyContent: "center",
                         borderWidth: 2,
-                        borderColor: "#fbcfe8",
+                        borderColor: "#fecaca",
                         borderStyle: "dashed",
                       }}
                     >
-                      <ActivityIndicator color="#ec4899" size="small" />
+                      <ActivityIndicator color="#E50914" size="small" />
                     </View>
                   </View>
                   <Text className="text-[15px] font-bold text-[#1a0a0f]">Waiting...</Text>
@@ -1129,7 +1081,7 @@ export default function DebateSettlerScreen() {
                 Describe your perfect movie tonight - genre, mood, length, anything!
               </Text>
               <TextInput
-                className="bg-white rounded-2xl border-[1.5px] border-pink-300 p-3.5 text-[15px] text-[#1a0a0f] min-h-[116px] mb-5"
+                className="bg-white rounded-2xl border-[1.5px] border-red-300 p-3.5 text-[15px] text-[#1a0a0f] min-h-[116px] mb-5"
                 style={{ textAlignVertical: "top", lineHeight: 22 }}
                 placeholder="e.g., Something romantic but not too cheesy, maybe with a bit of humor..."
                 placeholderTextColor="#c4b5c0"
@@ -1143,7 +1095,7 @@ export default function DebateSettlerScreen() {
                 disabled={!myPreferences.trim()}
                 loading={isLoading}
                 colors={
-                  myPreferences.trim() ? ["#ec4899", "#db2777"] : ["#e5e7eb", "#d1d5db"]
+                  myPreferences.trim() ? ["#E50914", "#B2070F"] : ["#e5e7eb", "#d1d5db"]
                 }
               >
                 <CheckCircleIcon
@@ -1171,16 +1123,16 @@ export default function DebateSettlerScreen() {
               <Text className="text-[14px] text-gray-400 text-center leading-5">
                 Waiting for your partner to share their mood...
               </Text>
-              <ActivityIndicator color="#ec4899" style={{ marginTop: 20 }} />
+              <ActivityIndicator color="#E50914" style={{ marginTop: 20 }} />
             </Animated.View>
           )}
 
           {/* Settling animation */}
           {isSettling && (
             <Animated.View entering={FadeIn} className="px-6 py-6">
-              <View className="items-center py-12 rounded-3xl bg-[#fff0f7] border border-pink-100">
+              <View className="items-center py-12 rounded-3xl bg-[#fef2f2] border border-red-100">
                 <Animated.View style={heartStyle}>
-                  <SparklesIcon size={44} color="#ec4899" />
+                  <SparklesIcon size={44} color="#E50914" />
                 </Animated.View>
                 <Text className="text-[18px] font-bold text-[#1a0a0f] mt-[18px] mb-1.5">
                   Finding Your Perfect Movie...
@@ -1188,7 +1140,7 @@ export default function DebateSettlerScreen() {
                 <Text className="text-[14px] text-gray-400">
                   Our AI is analyzing both your preferences
                 </Text>
-                <ActivityIndicator color="#ec4899" style={{ marginTop: 20 }} />
+                <ActivityIndicator color="#E50914" style={{ marginTop: 20 }} />
               </View>
             </Animated.View>
           )}
@@ -1215,7 +1167,7 @@ export default function DebateSettlerScreen() {
                 style={{ maxHeight: height * 0.89 }}
               >
                 <LinearGradient
-                  colors={["#ec4899", "#7c3aed"]}
+                  colors={["#E50914", "#7c3aed"]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={{ paddingTop: 12, paddingBottom: 28, paddingHorizontal: 18 }}
@@ -1258,7 +1210,7 @@ export default function DebateSettlerScreen() {
                           imageUrl={partner?.image_url}
                           initials={partner?.first_name?.[0]}
                           size={34}
-                          gradientColors={["#ec4899", "#f472b6"]}
+                          gradientColors={["#E50914", "#FF3B47"]}
                           ringColors={["#ffffff", "#ffffff", "#ffffff"]}
                         />
                       </View>
@@ -1266,9 +1218,9 @@ export default function DebateSettlerScreen() {
 
                     {activeSession.ai_verdict && (
                       <View className="bg-white rounded-[22px] px-5 pt-5 pb-4 mb-4" style={shadow.lg}>
-                        <View className="self-start bg-pink-50 px-3 py-1 rounded-full mb-3">
+                        <View className="self-start bg-red-50 px-3 py-1 rounded-full mb-3">
                           <Text
-                            className="text-[10.5px] font-bold text-pink-500"
+                            className="text-[10.5px] font-bold text-red-500"
                             style={{ textTransform: "uppercase", letterSpacing: 1.3 }}
                           >
                             Tonight's Pick
@@ -1312,8 +1264,8 @@ export default function DebateSettlerScreen() {
                                   ...shadow.sm,
                                 }}
                               >
-                                <View className="w-5 h-5 rounded-full bg-pink-100 items-center justify-center mb-1.5">
-                                  <Text className="text-[10px] font-bold text-pink-500">
+                                <View className="w-5 h-5 rounded-full bg-red-100 items-center justify-center mb-1.5">
+                                  <Text className="text-[10px] font-bold text-red-500">
                                     {index + 2}
                                   </Text>
                                 </View>
@@ -1345,7 +1297,7 @@ export default function DebateSettlerScreen() {
                             "Head to the Discover tab to find where to watch your movie."
                           )
                         }}
-                        colors={["#ec4899", "#db2777"]}
+                        colors={["#E50914", "#B2070F"]}
                       >
                         <PlayCircleIcon size={20} color="#fff" />
                         <Text className="text-white text-[16px] font-bold">Let's Watch!</Text>
@@ -1416,14 +1368,101 @@ export default function DebateSettlerScreen() {
     )
   }
 
-  switch (currentView) {
-    case "create":
-      return renderCreateScreen()
-    case "join":
-      return renderJoinScreen()
-    case "session":
-      return renderSessionScreen()
-    default:
-      return renderHomeScreen()
+  const renderDebateTab = () => {
+    switch (currentView) {
+      case "create":
+        return renderCreateScreen()
+      case "join":
+        return renderJoinScreen()
+      case "session":
+        return renderSessionScreen()
+      default:
+        return renderHomeScreen()
+    }
   }
+
+  const renderTrackerTab = () => {
+    if (tasteEngine.hasProfile === undefined) {
+      return (
+        <View style={{ flex: 1, backgroundColor: "#0a0a0f", alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator color="#E50914" size="large" />
+        </View>
+      )
+    }
+    if (!tasteEngine.hasProfile) {
+      return (
+        <ScrollView className="flex-1 bg-[#fffafa]" showsVerticalScrollIndicator={false}>
+          <TasteOnboarding
+            onSubmit={(genres, vibe, seedMovies: SeedMovie[]) => tasteEngine.submitOnboarding(genres, vibe, seedMovies)}
+          />
+        </ScrollView>
+      )
+    }
+    return (
+      <TasteResults
+        profile={tasteEngine.profile}
+        feedback={tasteEngine.feedback}
+        recommendations={tasteEngine.recommendations}
+        loading={tasteEngine.loading}
+        loadingMessage={tasteEngine.loadingMessage}
+        error={tasteEngine.error}
+        onRate={tasteEngine.rate}
+        onRefresh={tasteEngine.refresh}
+        onRetake={tasteEngine.retake}
+      />
+    )
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: activeTab === "tracker" ? "#0a0a0f" : "#fffafa" }}>
+      {/* ── Tab switcher ── */}
+      <View style={{ paddingTop: 56, paddingHorizontal: 20, paddingBottom: 12 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            backgroundColor: activeTab === "tracker" ? "rgba(255,255,255,0.08)" : "#f3f4f6",
+            borderRadius: 999,
+            padding: 4,
+          }}
+        >
+          <TouchableOpacity
+            onPress={() => setActiveTab("debate")}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Debate tab"
+            style={{
+              flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+              paddingVertical: 10, borderRadius: 999,
+              backgroundColor: activeTab === "debate" ? "#E50914" : "transparent",
+            }}
+          >
+            <HeartIcon size={14} color={activeTab === "debate" ? "#fff" : "#9ca3af"} />
+            <Text style={{ fontSize: 13, fontWeight: "700", color: activeTab === "debate" ? "#fff" : "#9ca3af" }}>
+              Debate
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setActiveTab("tracker")}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Movie Tracker tab"
+            style={{
+              flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+              paddingVertical: 10, borderRadius: 999,
+              backgroundColor: activeTab === "tracker" ? "#E50914" : "transparent",
+            }}
+          >
+            <SparklesLucide size={14} color={activeTab === "tracker" ? "#fff" : "#9ca3af"} />
+            <Text style={{ fontSize: 13, fontWeight: "700", color: activeTab === "tracker" ? "#fff" : "#9ca3af" }}>
+              Movie Tracker
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={{ flex: 1 }}>
+        {activeTab === "debate" ? renderDebateTab() : renderTrackerTab()}
+      </View>
+    </View>
+  )
 }

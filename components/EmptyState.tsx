@@ -1,6 +1,6 @@
 import { color, fontSize, spacing } from "@/constants/theme"
 import { useEffect } from "react"
-import { Image, Text, View, useWindowDimensions } from "react-native"
+import { Image, Text, View, useWindowDimensions, type ImageSourcePropType } from "react-native"
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -19,6 +19,11 @@ export type EmptyStateProps = {
   description?: string
   size?: number
   animated?: boolean
+  // Defaults to the standard "no data" illustration everywhere. Only pass
+  // this to swap in a context-specific icon (e.g. notifications) — every
+  // other call site should keep the default rather than pass EMPTY_ICON
+  // explicitly.
+  icon?: ImageSourcePropType
 }
 
 // Small ambient particles layered independently on top of the illustration.
@@ -97,7 +102,7 @@ function Particle({
 // opposed to error states, which keep their own iconography in
 // components/ui/EmptyState.tsx since "no results" and "something broke"
 // are different messages).
-export function EmptyState({ title, description, size, animated = true }: EmptyStateProps) {
+export function EmptyState({ title, description, size, animated = true, icon }: EmptyStateProps) {
   const { width: screenWidth } = useWindowDimensions()
   const illustrationSize = size ?? (screenWidth < 360 ? 160 : screenWidth < 420 ? 190 : 220)
   const reducedMotion = useReducedMotion()
@@ -153,7 +158,7 @@ export function EmptyState({ title, description, size, animated = true }: EmptyS
       <View style={{ width: illustrationSize, height: illustrationSize, alignItems: "center", justifyContent: "center" }}>
         <Animated.View style={illustrationStyle}>
           <Image
-            source={EMPTY_ICON}
+            source={icon ?? EMPTY_ICON}
             style={{ width: illustrationSize, height: illustrationSize }}
             resizeMode="contain"
           />

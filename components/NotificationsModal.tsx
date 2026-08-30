@@ -77,6 +77,7 @@ export function NotificationsModal({
               title="All Caught Up"
               description="You don't have any notifications right now."
               size={140}
+              icon={require("@/assets/icons/empty-notification.png")}
             />
           ) : (
             items.map((n) => (

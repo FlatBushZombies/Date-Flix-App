@@ -1,10 +1,12 @@
 "use client"
 
+import { useConfirm } from "@/components/Confirm/ConfirmProvider"
 import { useToast } from "@/components/Toast/ToastProvider"
 import { DeviceSheet } from "@/components/cast/DeviceSheet"
 import { shadow } from "@/constants/theme"
 import { useCast } from "@/lib/cast/CastProvider"
 import type { Invitation, SupabaseUser, SwipeSession } from "@/types"
+import { permanentlyDeleteAccount } from "@/utils/account"
 import {
   acceptInvitation,
   createInvitation,
@@ -16,7 +18,7 @@ import {
 import { useClerk, useUser } from "@clerk/clerk-expo"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
-import { Bookmark, Film, Flame, Tv, Users } from "lucide-react-native"
+import { Bookmark, Film, Flame, Trash2, Tv, Users } from "lucide-react-native"
 import type React from "react"
 import { useEffect, useState } from "react"
 import {
@@ -69,8 +71,10 @@ export default function ProfileScreen() {
   const [inviteCode, setInviteCode] = useState("")
   const [loading, setLoading] = useState(false)
   const toast = useToast()
+  const confirm = useConfirm()
   const cast = useCast()
   const [showDeviceSheet, setShowDeviceSheet] = useState(false)
+  const [deletingAccount, setDeletingAccount] = useState(false)
 
   const handleDisconnectTv = async () => {
     const name = cast.device?.name
@@ -138,13 +142,78 @@ export default function ProfileScreen() {
     }
   }
 
-  const handleLogout = async () => {
-    try {
-      await clerk.signOut()
-      router.replace("/")
-    } catch (e) {
-      console.error(e)
-    }
+  const handleLogout = () => {
+    confirm.show({
+      title: "Log Out?",
+      message: "You'll need to sign back in with Google or Apple to continue swiping and see your matches.",
+      variant: "warning",
+      buttons: [
+        { label: "Cancel", style: "cancel" },
+        {
+          label: "Log Out",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await clerk.signOut()
+              router.replace("/")
+            } catch (e) {
+              console.error(e)
+              toast.error("Error", "Failed to log out. Please try again.")
+            }
+          },
+        },
+      ],
+    })
+  }
+
+  // Two-step, itemized — this permanently destroys real data (matches,
+  // watchlist, swipe/streak history), so it gets more friction than a
+  // typical destructive action, not less.
+  const handleDeleteAccount = () => {
+    if (!user) return
+    confirm.show({
+      title: "Delete Your Account?",
+      message:
+        "This permanently deletes:\n\n• Your profile and photos\n• All matches and swipe history\n• Your watchlist and upvotes\n• Streaks and debate sessions\n\nThis cannot be undone.",
+      variant: "destructive",
+      buttons: [
+        { label: "Cancel", style: "cancel" },
+        {
+          label: "Continue",
+          style: "destructive",
+          onPress: () => {
+            confirm.show({
+              title: "Last Chance",
+              message: "Type nothing, just confirm — there's no going back once this starts. Delete everything?",
+              variant: "destructive",
+              buttons: [
+                { label: "Keep My Account", style: "cancel" },
+                {
+                  label: "Yes, Delete Forever",
+                  style: "destructive",
+                  onPress: async () => {
+                    setDeletingAccount(true)
+                    try {
+                      const result = await permanentlyDeleteAccount(user.id, user)
+                      if (result.success) {
+                        toast.success("Account Deleted", result.message)
+                        router.replace("/")
+                      } else {
+                        confirm.show({ title: "Deletion Failed", message: result.message, variant: "warning" })
+                      }
+                    } catch {
+                      toast.error("Error", "Failed to delete account. Please try again or contact support.")
+                    } finally {
+                      setDeletingAccount(false)
+                    }
+                  },
+                },
+              ],
+            })
+          },
+        },
+      ],
+    })
   }
 
   return (
@@ -411,6 +480,30 @@ export default function ProfileScreen() {
         >
           <Text style={s.footerText}>Logout</Text>
           <Ionicons name="chevron-forward" size={16} color={C.textSub} />
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Danger zone ─────────────────────────────────────── */}
+      <View style={{ paddingHorizontal: 20, marginTop: 8, marginBottom: 40 }}>
+        <TouchableOpacity
+          style={[s.btnDelete, deletingAccount && s.btnDeleteDisabled]}
+          onPress={handleDeleteAccount}
+          disabled={deletingAccount}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Delete account permanently"
+        >
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Trash2 size={18} color={deletingAccount ? "#fca5a5" : "#fff"} />
+            <Text style={[s.btnDeleteText, deletingAccount && { color: "#fca5a5" }]}>
+              {deletingAccount ? "Deleting Account…" : "Delete Account"}
+            </Text>
+          </View>
+          {!deletingAccount && (
+            <View style={s.btnDeleteBadge}>
+              <Text style={s.btnDeleteBadgeText}>Permanent</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -1047,6 +1140,17 @@ const s = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 16,
   },
+  btnDelete: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingVertical: 15, paddingHorizontal: 18, borderRadius: 16,
+    backgroundColor: "#ef4444",
+    shadowColor: "#ef4444", shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25, shadowRadius: 10,
+  },
+  btnDeleteDisabled: { backgroundColor: "#fca5a5", shadowOpacity: 0 },
+  btnDeleteText: { fontSize: 15, fontWeight: "600", color: "#ffffff", marginLeft: 10, letterSpacing: 0.2 },
+  btnDeleteBadge: { backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  btnDeleteBadgeText: { fontSize: 11, fontWeight: "700", color: "#fecaca", letterSpacing: 0.5, textTransform: "uppercase" },
   footerText: {
     fontSize: 15,
     color: C.textMuted,

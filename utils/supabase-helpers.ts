@@ -1176,3 +1176,86 @@ export const deleteUserAccount = async (userId: string) => {
     throw error
   }
 }
+
+// ==================== AI RECOMMENDATION ENGINE ("For You" tab) ====================
+
+export interface TasteProfileRow {
+  id: string
+  user_id: string
+  genres: string[]
+  vibe: string | null
+  seed_movies: { title: string; year: number | null; tmdb_id: number | null; poster_path: string | null }[]
+  updated_at: string
+}
+
+export interface FeedbackRow {
+  id: string
+  user_id: string
+  movie_title: string
+  movie_year: number | null
+  liked: boolean
+  created_at: string
+}
+
+export const getTasteProfile = async (userId: string): Promise<TasteProfileRow | null> => {
+  const { data, error } = await supabase
+    .from("ai_taste_profiles")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle()
+  if (error) {
+    console.error("[v0] Error fetching taste profile:", error)
+    return null
+  }
+  return data as TasteProfileRow | null
+}
+
+export const saveTasteProfile = async (
+  userId: string,
+  genres: string[],
+  vibe: string | null,
+  seedMovies: TasteProfileRow["seed_movies"],
+): Promise<TasteProfileRow | null> => {
+  const { data, error } = await supabase
+    .from("ai_taste_profiles")
+    .upsert(
+      { user_id: userId, genres, vibe, seed_movies: seedMovies, updated_at: new Date().toISOString() },
+      { onConflict: "user_id" },
+    )
+    .select()
+    .single()
+  if (error) {
+    console.error("[v0] Error saving taste profile:", error)
+    return null
+  }
+  return data as TasteProfileRow
+}
+
+export const getRecommendationFeedback = async (userId: string): Promise<FeedbackRow[]> => {
+  const { data, error } = await supabase
+    .from("ai_recommendation_feedback")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+  if (error) {
+    console.error("[v0] Error fetching recommendation feedback:", error)
+    return []
+  }
+  return (data ?? []) as FeedbackRow[]
+}
+
+export const saveRecommendationFeedback = async (
+  userId: string,
+  movieTitle: string,
+  movieYear: number | null,
+  liked: boolean,
+): Promise<boolean> => {
+  const { error } = await supabase
+    .from("ai_recommendation_feedback")
+    .insert({ user_id: userId, movie_title: movieTitle, movie_year: movieYear, liked })
+  if (error) {
+    console.error("[v0] Error saving recommendation feedback:", error)
+    return false
+  }
+  return true
+}
