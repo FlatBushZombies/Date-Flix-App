@@ -71,6 +71,7 @@ import { shadow } from "@/constants/theme"
 import { TasteOnboarding, type SeedMovie } from "@/components/debate/TasteOnboarding"
 import { TasteResults } from "@/components/debate/TasteResults"
 import { useTasteEngine } from "@/hooks/useTasteEngine"
+import { AI_CONSENT_REQUIRED, buildAIConsentPrompt } from "@/lib/aiConsent"
 import { Sparkles as SparklesLucide } from "lucide-react-native"
 
 const { height } = Dimensions.get("window")
@@ -471,6 +472,9 @@ export default function DebateSettlerScreen() {
     }
   }
 
+  // Reused by the debate settler and the "For You" taste engine below.
+  const promptAIConsent = (onAllow: () => void) => confirm.show(buildAIConsentPrompt(onAllow))
+
   const settleDebate = async (session: DebateSession) => {
     if (!session.host_preferences || !session.partner_preferences) {
       toast.info("Not Ready", "Both partners need to submit their preferences first.")
@@ -496,6 +500,8 @@ export default function DebateSettlerScreen() {
           setShowVerdictModal(true)
           if (user) incrementAiSettlementUsage(user.id).then(setAiSettlementsThisMonth)
         }
+      } else if (result.error === AI_CONSENT_REQUIRED) {
+        promptAIConsent(() => settleDebate(session))
       } else {
         confirm.show({
           title: "AI Error",
@@ -1406,9 +1412,11 @@ export default function DebateSettlerScreen() {
         loading={tasteEngine.loading}
         loadingMessage={tasteEngine.loadingMessage}
         error={tasteEngine.error}
+        needsConsent={tasteEngine.needsConsent}
         onRate={tasteEngine.rate}
         onRefresh={tasteEngine.refresh}
         onRetake={tasteEngine.retake}
+        onEnableAI={() => promptAIConsent(() => tasteEngine.refresh())}
       />
     )
   }

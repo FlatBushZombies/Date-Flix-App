@@ -14,6 +14,11 @@ export interface LocalPreferences {
   // (e.g. "Last connected: Living Room TV" in Profile). This is never treated
   // as an active session — see lib/cast/CastProvider.native.tsx.
   lastCastDevice: { id: string; name: string } | null
+  // Explicit opt-in to send typed movie preferences to Google Gemini (Debate
+  // Settler, Movie Night Planner, "For You"). Defaults to false — Apple's App
+  // Review Guideline 5.1.2(i) requires this to start unchecked and gate the
+  // AI features until granted. See lib/aiConsent.ts.
+  aiDataConsent: boolean
 }
 
 const KEY = "@local_preferences"
@@ -22,6 +27,7 @@ const DEFAULTS: LocalPreferences = {
   partnerActivityMuted: false,
   pushEnabled: true,
   lastCastDevice: null,
+  aiDataConsent: false,
 }
 
 export async function getPreferences(): Promise<LocalPreferences> {

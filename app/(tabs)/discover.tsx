@@ -9,9 +9,11 @@ import { Step4Prefs } from '@/components/steps/Step4Prefs';
 import { Step5Occasion } from '@/components/steps/Step5Occasion';
 import { useMoviePlanner } from '@/hooks/useMoviePlanner';
 import { useWatchlist } from '@/hooks/useWatchlist';
+import { buildAIConsentPrompt } from '@/lib/aiConsent';
+import { useConfirm } from '@/components/Confirm/ConfirmProvider';
 import { Genre, PlannerState, StreamingPlatform } from '@/types/planner';
 import { useUser } from '@clerk/clerk-expo';
-import { AlertTriangle } from 'lucide-react-native';
+import { AlertTriangle, Sparkles } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   SafeAreaView,
@@ -39,16 +41,21 @@ export default function MoviePlannerScreen() {
   const [showLanding, setShowLanding] = useState(true);
   const [step, setStep] = useState(1);
   const [plannerState, setPlannerState] = useState<PlannerState>(initialState);
-  const { plan, prompt, loading, loadingMessage, progress, error, generatePlan, reset } =
+  const { plan, prompt, loading, loadingMessage, progress, error, needsConsent, generatePlan, reset } =
     useMoviePlanner();
   const { user } = useUser();
   const { isSaved, toggleSave } = useWatchlist(user?.id);
+  const confirm = useConfirm();
 
   const update = (patch: Partial<PlannerState>) =>
     setPlannerState((s) => ({ ...s, ...patch }));
 
   const handleSubmit = async () => {
     await generatePlan(plannerState);
+  };
+
+  const handleEnableAI = () => {
+    confirm.show(buildAIConsentPrompt(() => generatePlan(plannerState)));
   };
 
   const handleReset = () => {
@@ -77,6 +84,36 @@ export default function MoviePlannerScreen() {
           </View>
           <LoadingScreen message={loadingMessage} progress={progress} />
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Consent gate — the request never fired, so show the same inline ask
+  // used elsewhere instead of a generic error.
+  if (needsConsent) {
+    return (
+      <SafeAreaView className="flex-1 items-center justify-center px-6" style={{ backgroundColor: '#ffffff' }}>
+        <View className="w-16 h-16 rounded-2xl items-center justify-center mb-4" style={{ backgroundColor: 'rgba(6,182,212,0.12)' }}>
+          <Sparkles size={28} color="#06b6d4" strokeWidth={1.8} />
+        </View>
+        <Text className="text-xl font-bold text-text-primary text-center mb-2">
+          Enable AI Recommendations
+        </Text>
+        <Text className="text-sm text-text-muted text-center mb-8">
+          The Movie Night Planner uses Google Gemini to turn your answers into picks. Allow sharing your preferences to continue.
+        </Text>
+        <TouchableOpacity
+          onPress={handleEnableAI}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Enable AI Recommendations"
+          className="w-full py-4 rounded-xl items-center"
+          style={{ backgroundColor: '#FF3B5C' }}
+        >
+          <Text className="text-white font-medium">
+            Continue
+          </Text>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }

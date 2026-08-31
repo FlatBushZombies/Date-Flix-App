@@ -1,6 +1,7 @@
 import { buildMoviePlannerPrompt } from '@/lib/promptBuilder';
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { assertAIConsent, AI_CONSENT_REQUIRED } from '../lib/aiConsent';
 import { MovieNightPlan, PlannerState } from '../types/planner';
 
 const LOADING_MESSAGES = [
@@ -18,14 +19,21 @@ export function useMoviePlanner() {
   const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  // Set instead of `error` when the user hasn't granted AI consent yet — kept
+  // separate so callers can render an "Enable AI Recommendations" prompt
+  // rather than a generic error message.
+  const [needsConsent, setNeedsConsent] = useState(false);
 
   const generatePlan = async (state: PlannerState) => {
     setLoading(true);
     setError(null);
+    setNeedsConsent(false);
     setPlan(null);
     setProgress(0);
 
     try {
+      await assertAIConsent();
+
       const builtPrompt = buildMoviePlannerPrompt(state);
       setPrompt(builtPrompt);
 
@@ -48,7 +56,9 @@ export function useMoviePlanner() {
       clearInterval(interval);
       setLoading(false);
     } catch (err: any) {
-      if (err.message.includes('Invalid planner state')) {
+      if (err.message === AI_CONSENT_REQUIRED) {
+        setNeedsConsent(true);
+      } else if (err.message.includes('Invalid planner state')) {
         setError('Invalid input data. Please check your selections and try again.');
       } else {
         setError(err.message ?? 'Something went wrong. Please try again.');
@@ -61,6 +71,7 @@ export function useMoviePlanner() {
     setPlan(null);
     setPrompt('');
     setError(null);
+    setNeedsConsent(false);
     setLoading(false);
     setProgress(0);
   };
@@ -72,6 +83,7 @@ export function useMoviePlanner() {
     loadingMessage,
     progress,
     error,
+    needsConsent,
     generatePlan,
     reset,
   };

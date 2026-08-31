@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics"
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react"
-import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native"
+import { Image, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View, type ImageSourcePropType } from "react-native"
 import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
@@ -22,6 +22,9 @@ interface ConfirmOptions {
   message: string
   variant?: ConfirmVariant
   buttons?: ConfirmButton[]
+  // Overrides the variant's default heroicon with a custom /assets/icons
+  // image (e.g. require("@/assets/icons/bin.png")) — same slot, same size.
+  icon?: ImageSourcePropType
 }
 
 interface ConfirmContextValue {
@@ -99,7 +102,11 @@ function ConfirmCard({ options, onClose }: { options: ConfirmOptions; onClose: (
           style={styles.card}
         >
           <View style={[styles.iconWrap, { backgroundColor: config.iconBg, borderColor: `${config.accent}33` }]}>
-            <ConfirmIcon variant={variant} color={config.accent} />
+            {options.icon ? (
+              <Image source={options.icon} style={styles.iconImage} resizeMode="contain" />
+            ) : (
+              <ConfirmIcon variant={variant} color={config.accent} />
+            )}
           </View>
 
           <Text style={styles.title}>{options.title}</Text>
@@ -193,6 +200,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
+  },
+  iconImage: {
+    width: 26,
+    height: 26,
   },
   title: {
     fontSize: 17,

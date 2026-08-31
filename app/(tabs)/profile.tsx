@@ -147,6 +147,7 @@ export default function ProfileScreen() {
       title: "Log Out?",
       message: "You'll need to sign back in with Google or Apple to continue swiping and see your matches.",
       variant: "warning",
+      icon: require("@/assets/icons/warning.png"),
       buttons: [
         { label: "Cancel", style: "cancel" },
         {
@@ -176,6 +177,7 @@ export default function ProfileScreen() {
       message:
         "This permanently deletes:\n\n• Your profile and photos\n• All matches and swipe history\n• Your watchlist and upvotes\n• Streaks and debate sessions\n\nThis cannot be undone.",
       variant: "destructive",
+      icon: require("@/assets/icons/bin.png"),
       buttons: [
         { label: "Cancel", style: "cancel" },
         {
@@ -186,6 +188,7 @@ export default function ProfileScreen() {
               title: "Last Chance",
               message: "Type nothing, just confirm — there's no going back once this starts. Delete everything?",
               variant: "destructive",
+              icon: require("@/assets/icons/bin.png"),
               buttons: [
                 { label: "Keep My Account", style: "cancel" },
                 {

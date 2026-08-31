@@ -15,6 +15,7 @@
 
 import type { AIVerdict } from "@/types"
 import { supabase } from "@/lib/supabase"
+import { assertAIConsent } from "@/lib/aiConsent"
 
 // API Keys from environment
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY
@@ -58,6 +59,8 @@ Respond ONLY with valid JSON, no markdown or extra text.`
 
 // Gemini via Supabase Edge Function (server-side key)
 const callGeminiAPI = async (prompt: string): Promise<string> => {
+  await assertAIConsent()
+
   const { data, error } = await supabase.functions.invoke("super-function", {
     body: { prompt },
   })

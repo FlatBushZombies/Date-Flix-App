@@ -1,5 +1,6 @@
 import { buildTasteEnginePrompt, type FeedbackEntry } from "@/lib/tasteEnginePrompt"
 import { supabase } from "@/lib/supabase"
+import { assertAIConsent, AI_CONSENT_REQUIRED } from "@/lib/aiConsent"
 import type { Movie } from "@/types"
 import {
   getRecommendationFeedback,
@@ -38,6 +39,10 @@ export function useTasteEngine(userId: string | undefined) {
   const [loading, setLoading] = useState(false)
   const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0])
   const [error, setError] = useState<string | null>(null)
+  // Set instead of `error` when the user hasn't granted AI consent yet — kept
+  // separate so callers can render an "Enable AI Recommendations" prompt
+  // rather than a generic error message.
+  const [needsConsent, setNeedsConsent] = useState(false)
 
   useEffect(() => {
     if (!userId) return
@@ -56,6 +61,7 @@ export function useTasteEngine(userId: string | undefined) {
     async (activeProfile: TasteProfileRow, pastFeedback: FeedbackRow[]) => {
       setLoading(true)
       setError(null)
+      setNeedsConsent(false)
 
       let idx = 0
       const interval = setInterval(() => {
@@ -64,6 +70,8 @@ export function useTasteEngine(userId: string | undefined) {
       }, 1200)
 
       try {
+        await assertAIConsent()
+
         const feedbackEntries: FeedbackEntry[] = pastFeedback.map((f) => ({
           movieTitle: f.movie_title,
           liked: f.liked,
@@ -97,7 +105,11 @@ export function useTasteEngine(userId: string | undefined) {
         )
         setRecommendations(enriched)
       } catch (err: any) {
-        setError(err?.message ?? "Something went wrong. Please try again.")
+        if (err?.message === AI_CONSENT_REQUIRED) {
+          setNeedsConsent(true)
+        } else {
+          setError(err?.message ?? "Something went wrong. Please try again.")
+        }
       } finally {
         clearInterval(interval)
         setLoading(false)
@@ -111,7 +123,7 @@ export function useTasteEngine(userId: string | undefined) {
   // generates the first batch for them automatically, once, the moment
   // their profile finishes loading.
   useEffect(() => {
-    if (profile && recommendations.length === 0 && !loading && !error) {
+    if (profile && recommendations.length === 0 && !loading && !error && !needsConsent) {
       runGeneration(profile, feedback)
     }
     // Deliberately only reacts to the profile finishing its initial load —
@@ -172,6 +184,7 @@ export function useTasteEngine(userId: string | undefined) {
     loading,
     loadingMessage,
     error,
+    needsConsent,
     submitOnboarding,
     refresh,
     rate,

@@ -48,6 +48,7 @@ import * as Haptics from "expo-haptics"
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio"
 import { registerForPushNotificationsAsync, updateUserPushToken } from "@/utils/notifications"
 import { setPreferences } from "@/lib/preferences"
+import { setAIConsent } from "@/lib/aiConsent"
 import { TapDemoIcon } from "@/components/onboarding/TapDemoIcon"
 import { SwipeDemoIcon } from "@/components/onboarding/SwipeDemoIcon"
 
@@ -185,6 +186,18 @@ const SCREENS = [
   },
   {
     id: 8,
+    type: "aiConsent",
+    headline: "AI-Powered\nRecommendations",
+    subtext: "To settle debates and plan movie nights, DateFlix sends the preferences you type to Google Gemini, Google's AI service.",
+    aiPoints: [
+      { icon: "sparkles",         color: "#06b6d4", text: "Only the text you type is shared — never your account or contacts" },
+      { icon: "shield-checkmark", color: "#10b981", text: "Off by default — change this anytime in Settings" },
+    ],
+    cta: "Almost Done",
+    accent: "#E50914",
+  },
+  {
+    id: 9,
     type: "notifications",
     headline: "Never Miss\na Moment",
     subtext: "Turn on notifications so you're always first to know.",
@@ -196,7 +209,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 9,
+    id: 10,
     type: "final",
     headline: "Ready to Find\nYour Perfect Movie?",
     subtext: "Start swiping and discover what you'll watch tonight.",
@@ -248,6 +261,12 @@ function PrivacyIcon({ name, size, color }: { name: string; size: number; color:
   if (name === "shield-checkmark") return <ShieldCheckIcon {...p} />
   if (name === "eye-off")          return <EyeSlashIcon {...p} />
   return <TrashIcon {...p} />
+}
+
+function AIPointIcon({ name, size, color }: { name: string; size: number; color: string }) {
+  const p = { size, color, strokeWidth: 1.8 as number }
+  if (name === "shield-checkmark") return <ShieldCheckIcon {...p} />
+  return <SparklesIcon {...p} />
 }
 
 // ─── Shared UI primitives ──────────────────────────────────────────────────────
@@ -526,6 +545,14 @@ export default function OnboardingScreen() {
   }
   const handleSkip = () => completeOnboarding()
   const handleBack = () => { if (currentScreen > 0) setCurrentScreen((p) => p - 1) }
+
+  // Explicit choice, not a pre-checked default: "Not Now" leaves consent at
+  // its false default (set in lib/preferences.ts) instead of skipping the
+  // write, so re-visiting this screen after declining still records intent.
+  const handleAIConsent = async (granted: boolean) => {
+    await setAIConsent(granted)
+    handleNext()
+  }
 
   // Benefit-framed priming screen fires the *real* system permission dialog
   // here — never earlier, never silently. Whatever the user answers, we
@@ -896,6 +923,40 @@ export default function OnboardingScreen() {
           </View>
         )
 
+      case "aiConsent":
+        return (
+          <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center", gap: 22 }}>
+            {/* Sparkles icon */}
+            <Animated.View entering={FadeInDown.delay(100)} style={{ alignItems: "center" }}>
+              <View style={{
+                width: 88, height: 88, borderRadius: 26,
+                alignItems: "center", justifyContent: "center",
+                backgroundColor: "rgba(6,182,212,0.12)",
+                borderWidth: 1, borderColor: "rgba(6,182,212,0.25)",
+                shadowColor: "#06b6d4", shadowOpacity: 0.22, shadowRadius: 20,
+                shadowOffset: { width: 0, height: 6 }, elevation: 8,
+              }}>
+                <SparklesIcon size={42} color="#06b6d4" strokeWidth={1.8} />
+              </View>
+            </Animated.View>
+
+            {"aiPoints" in screen && screen.aiPoints && (
+              <View style={{ gap: 12 }}>
+                {screen.aiPoints.map((point, i) => (
+                  <Animated.View key={i} entering={FadeInDown.delay(230 + i * 90).springify()}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                      <View style={{ width: 44, height: 44, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: T.surface, borderWidth: 1, borderColor: T.borderLo, flexShrink: 0 }}>
+                        <AIPointIcon name={point.icon} size={20} color={point.color} />
+                      </View>
+                      <Text style={{ fontSize: 15, fontWeight: "500", color: "rgba(21,21,28,0.78)", flex: 1, lineHeight: 22 }}>{point.text}</Text>
+                    </View>
+                  </Animated.View>
+                ))}
+              </View>
+            )}
+          </View>
+        )
+
       case "final":
         return (
           <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center", gap: 22 }}>
@@ -925,11 +986,12 @@ export default function OnboardingScreen() {
 
   const isFinal = screen.type === "final"
   const isNotifPriming = screen.type === "notifications"
+  const isAIConsentPriming = screen.type === "aiConsent"
   // Screens built around a centered illustration/carousel read the headline
   // centered too, so the whole screen reads as one aligned block instead of
   // a left-anchored title floating over centered content. List-driven
   // screens (features) keep their left-aligned reading flow.
-  const isCentered = isFinal || ["hero", "social", "streaks", "privacy", "genres", "howItWorks", "notifications"].includes(screen.type)
+  const isCentered = isFinal || ["hero", "social", "streaks", "privacy", "aiConsent", "genres", "howItWorks", "notifications"].includes(screen.type)
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
@@ -1102,6 +1164,18 @@ export default function OnboardingScreen() {
               icon={<BellIcon size={19} color="#fff" strokeWidth={2} />}
             />
             <GhostButton label="Maybe Later" onPress={handleNext} />
+          </View>
+        ) : isAIConsentPriming ? (
+          <View style={{ gap: 10 }}>
+            <CTAButton
+              label="Allow AI Recommendations"
+              onPress={() => handleAIConsent(true)}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              animStyle={animatedButtonStyle}
+              icon={<SparklesIcon size={19} color="#fff" strokeWidth={2} />}
+            />
+            <GhostButton label="Not Now" onPress={() => handleAIConsent(false)} />
           </View>
         ) : (
           <CTAButton

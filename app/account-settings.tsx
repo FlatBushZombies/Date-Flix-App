@@ -72,6 +72,9 @@ export default function AccountSettingsScreen() {
   const [partnerActivityMuted, setPartnerActivityMuted] = useState(false)
   const [pushBusy, setPushBusy] = useState(false)
 
+  // ── AI data sharing (Google Gemini) ─────────────────────────
+  const [aiDataConsent, setAiDataConsent] = useState(false)
+
   // ── Relationship settings ─────────────────────────────────
   const [sessions, setSessions] = useState<(SwipeSession & { user1: SupabaseUser; user2: SupabaseUser })[]>([])
   const [invitations, setInvitations] = useState<(Invitation & { sender: SupabaseUser })[]>([])
@@ -92,6 +95,7 @@ export default function AccountSettingsScreen() {
     getPreferences().then((p) => {
       setPushEnabled(p.pushEnabled)
       setPartnerActivityMuted(p.partnerActivityMuted)
+      setAiDataConsent(p.aiDataConsent)
     })
   }, [])
 
@@ -211,6 +215,11 @@ export default function AccountSettingsScreen() {
   const handleTogglePartnerMute = async (value: boolean) => {
     setPartnerActivityMuted(value)
     await setPreferences({ partnerActivityMuted: value })
+  }
+
+  const handleToggleAIConsent = async (value: boolean) => {
+    setAiDataConsent(value)
+    await setPreferences({ aiDataConsent: value })
   }
 
   // ── Cast & TV handlers ──────────────────────────────────────
@@ -534,6 +543,13 @@ export default function AccountSettingsScreen() {
       {/* ── Data & Privacy ── */}
       <SectionLabel text="Data & Privacy" />
       <View style={s.card}>
+        <SettingRow
+          title="AI Recommendations (Google Gemini)"
+          description="Share the preferences you type with Google Gemini to power the Debate Settler, Movie Night Planner, and For You picks"
+          value={aiDataConsent}
+          onValueChange={handleToggleAIConsent}
+        />
+        <View style={s.rowDivider} />
         <TouchableOpacity
           onPress={handleExportData}
           disabled={exporting}
