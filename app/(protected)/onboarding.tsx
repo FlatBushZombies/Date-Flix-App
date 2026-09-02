@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Dimensions, ScrollView, Pressable } from "react-native"
+import { View, Text, TouchableOpacity, Dimensions, ScrollView, Pressable, Image } from "react-native"
 import { useEffect, useState } from "react"
 import { useRouter } from "expo-router"
 import { useUser } from "@clerk/clerk-expo"
@@ -27,7 +27,6 @@ import {
   HeartIcon as HeartSolid,
   ShieldCheckIcon as ShieldSolid,
   CheckIcon as CheckSolid,
-  BellIcon as BellSolid,
 } from "react-native-heroicons/solid"
 import Animated, {
   Easing,
@@ -685,16 +684,11 @@ export default function OnboardingScreen() {
         return (
           <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center", gap: 22 }}>
             <Animated.View entering={FadeInDown.delay(100)} style={{ alignItems: "center" }}>
-              <View style={{
-                width: 88, height: 88, borderRadius: 26,
-                alignItems: "center", justifyContent: "center",
-                backgroundColor: T.accentBg,
-                borderWidth: 1, borderColor: T.accentRim,
-                shadowColor: T.accent, shadowOpacity: 0.22, shadowRadius: 20,
-                shadowOffset: { width: 0, height: 6 }, elevation: 8,
-              }}>
-                <BellSolid size={42} color={T.accent} />
-              </View>
+              <Image
+                source={require("@/assets/icons/notification-3.png")}
+                style={{ width: 96, height: 96 }}
+                resizeMode="contain"
+              />
             </Animated.View>
 
             {"benefits" in screen && screen.benefits && (
@@ -926,18 +920,13 @@ export default function OnboardingScreen() {
       case "aiConsent":
         return (
           <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center", gap: 22 }}>
-            {/* Sparkles icon */}
+            {/* AI icon */}
             <Animated.View entering={FadeInDown.delay(100)} style={{ alignItems: "center" }}>
-              <View style={{
-                width: 88, height: 88, borderRadius: 26,
-                alignItems: "center", justifyContent: "center",
-                backgroundColor: "rgba(6,182,212,0.12)",
-                borderWidth: 1, borderColor: "rgba(6,182,212,0.25)",
-                shadowColor: "#06b6d4", shadowOpacity: 0.22, shadowRadius: 20,
-                shadowOffset: { width: 0, height: 6 }, elevation: 8,
-              }}>
-                <SparklesIcon size={42} color="#06b6d4" strokeWidth={1.8} />
-              </View>
+              <Image
+                source={require("@/assets/icons/ai.png")}
+                style={{ width: 96, height: 96 }}
+                resizeMode="contain"
+              />
             </Animated.View>
 
             {"aiPoints" in screen && screen.aiPoints && (

@@ -422,7 +422,7 @@ export default function SwipeScreen() {
               elevation: 5,
             }}
           >
-            <UserPlusIcon size={18} color="#fff" strokeWidth={1.6} />
+            <Image source={require("@/assets/icons/sync.png")} style={{ width: 18, height: 18 }} resizeMode="contain" />
             <Text className="text-white font-bold text-sm">Invite</Text>
           </TouchableOpacity>
 
@@ -576,10 +576,10 @@ export default function SwipeScreen() {
             {/* Title section */}
             <View className="items-center px-6 pt-6">
               <LinearGradient
-                colors={["#fce7f3", "#fbcfe8"]}
+                colors={["#fee2e2", "#fecaca"]}
                 className="w-16 h-16 rounded-full justify-center items-center mb-4"
               >
-                <UserPlusIcon size={30} color="#ec4899" strokeWidth={1.6} />
+                <Image source={require("@/assets/icons/sync.png")} style={{ width: 32, height: 32 }} resizeMode="contain" />
               </LinearGradient>
               <Text className="text-2xl font-extrabold text-gray-900 mb-2">
                 Swipe Together
@@ -619,10 +619,10 @@ export default function SwipeScreen() {
                   <TouchableOpacity
                     onPress={handleCreateInvite}
                     disabled={isCreatingInvite}
-                    className="rounded-2xl overflow-hidden shadow-md shadow-pink-500/30"
+                    className="rounded-2xl overflow-hidden shadow-md shadow-red-600/30"
                   >
                     <LinearGradient
-                      colors={["#ec4899", "#f472b6"]}
+                      colors={["#FF2D2D", "#E50914"]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={{
@@ -637,7 +637,7 @@ export default function SwipeScreen() {
                         <Text className="text-white text-base font-bold">Creating...</Text>
                       ) : (
                         <>
-                          <UserPlusIcon size={22} color="#fff" strokeWidth={1.6} />
+                          <Image source={require("@/assets/icons/sync.png")} style={{ width: 22, height: 22 }} resizeMode="contain" />
                           <Text className="text-white text-base font-bold">
                             Generate Invite Code
                           </Text>
@@ -665,9 +665,10 @@ export default function SwipeScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={handleShareInvite}
-                        className="flex-row items-center px-5 py-3.5 rounded-2xl bg-pink-500 gap-2"
+                        className="flex-row items-center px-5 py-3.5 rounded-2xl gap-2"
+                        style={{ backgroundColor: "#E50914" }}
                       >
-                        <UserPlusIcon size={20} color="#fff" strokeWidth={1.6} />
+                        <Image source={require("@/assets/icons/sync.png")} style={{ width: 20, height: 20 }} resizeMode="contain" />
                         <Text className="text-sm font-semibold text-white">Share</Text>
                       </TouchableOpacity>
                     </View>

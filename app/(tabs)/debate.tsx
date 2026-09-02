@@ -1390,7 +1390,7 @@ export default function DebateSettlerScreen() {
   const renderTrackerTab = () => {
     if (tasteEngine.hasProfile === undefined) {
       return (
-        <View style={{ flex: 1, backgroundColor: "#0a0a0f", alignItems: "center", justifyContent: "center" }}>
+        <View style={{ flex: 1, backgroundColor: "#fffafa", alignItems: "center", justifyContent: "center" }}>
           <ActivityIndicator color="#E50914" size="large" />
         </View>
       )
@@ -1422,13 +1422,13 @@ export default function DebateSettlerScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: activeTab === "tracker" ? "#0a0a0f" : "#fffafa" }}>
+    <View style={{ flex: 1, backgroundColor: "#fffafa" }}>
       {/* ── Tab switcher ── */}
       <View style={{ paddingTop: 56, paddingHorizontal: 20, paddingBottom: 12 }}>
         <View
           style={{
             flexDirection: "row",
-            backgroundColor: activeTab === "tracker" ? "rgba(255,255,255,0.08)" : "#f3f4f6",
+            backgroundColor: "#f3f4f6",
             borderRadius: 999,
             padding: 4,
           }}
