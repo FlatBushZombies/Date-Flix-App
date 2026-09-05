@@ -174,15 +174,15 @@ export function ResultsScreen({ plan, prompt, onReset, isSaved, toggleSave }: Re
         {/* ── Full-bleed hero reveal ───────────────────────────────── */}
         <View style={{ height: HERO_HEIGHT, width: '100%' }}>
           {backdropUri ? (
-            <Image source={{ uri: backdropUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+            <Image source={{ uri: backdropUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           ) : (
             <LinearGradient
               colors={['#3a0a1a', '#150509', '#0a0a0f']}
-              style={StyleSheet.absoluteFillObject}
+              style={StyleSheet.absoluteFill}
             />
           )}
           {!backdropUri && (
-            <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center' }]}>
+            <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
               <Clapperboard size={64} color="rgba(255,255,255,0.12)" strokeWidth={1.2} />
             </View>
           )}

@@ -86,7 +86,7 @@ function LogoGlow({ width, height }: { width: number; height: number }) {
   const cy = height * 0.50
 
   return (
-    <Svg width={width} height={height} style={StyleSheet.absoluteFillObject}>
+    <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
       <Defs>
         <SvgRadialGradient id="glow" cx="50%" cy="50%" r="50%">
           <Stop offset="0%"   stopColor="#E50914" stopOpacity="0.22" />

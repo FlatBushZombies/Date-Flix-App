@@ -1,4 +1,5 @@
 import type { Movie } from "@/types"
+import { TASTE_GENRES, TASTE_VIBES } from "@/lib/tasteTaxonomy"
 import { fetchTrendingMovies } from "@/utils/tmdb"
 import { Check, Sparkles } from "lucide-react-native"
 import { useEffect, useState } from "react"
@@ -7,25 +8,19 @@ import Animated, { FadeIn, FadeInDown } from "react-native-reanimated"
 
 const RED = "#E50914"
 
-const GENRES = [
-  { value: "romance", label: "Romance", emoji: "💕" },
-  { value: "thriller", label: "Thriller", emoji: "🔪" },
-  { value: "comedy", label: "Comedy", emoji: "😂" },
-  { value: "drama", label: "Drama", emoji: "🎭" },
-  { value: "action", label: "Action", emoji: "💥" },
-  { value: "horror", label: "Horror", emoji: "👻" },
-  { value: "sci-fi", label: "Sci-Fi", emoji: "🚀" },
-  { value: "documentary", label: "Documentary", emoji: "🎞️" },
-]
+const GENRE_EMOJI: Record<string, string> = {
+  romance: "💕",
+  thriller: "🔪",
+  comedy: "😂",
+  drama: "🎭",
+  action: "💥",
+  horror: "👻",
+  "sci-fi": "🚀",
+  documentary: "🎞️",
+}
 
-const VIBES = [
-  { value: "cozy", label: "Cozy" },
-  { value: "excited", label: "Excited" },
-  { value: "emotional", label: "Emotional" },
-  { value: "chill", label: "Chill" },
-  { value: "laugh", label: "Laughing" },
-  { value: "surprised", label: "Surprised" },
-]
+const GENRES = TASTE_GENRES.map((g) => ({ value: g.value, label: g.label, emoji: GENRE_EMOJI[g.value] }))
+const VIBES = TASTE_VIBES.map((v) => ({ value: v.value, label: v.label }))
 
 const MIN_SEEDS = 3
 

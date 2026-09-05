@@ -22,6 +22,12 @@ import {
   TrashIcon,
   ArrowRightIcon,
   ChatBubbleLeftIcon,
+  HeartIcon,
+  EyeIcon,
+  FaceSmileIcon,
+  BoltIcon,
+  MoonIcon,
+  RocketLaunchIcon,
 } from "react-native-heroicons/outline"
 import {
   HeartIcon as HeartSolid,
@@ -41,13 +47,14 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated"
-import AsyncStorage from "@react-native-async-storage/async-storage"
 import { Ionicons } from "@expo/vector-icons"
 import * as Haptics from "expo-haptics"
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio"
 import { registerForPushNotificationsAsync, updateUserPushToken } from "@/utils/notifications"
 import { setPreferences } from "@/lib/preferences"
 import { setAIConsent } from "@/lib/aiConsent"
+import { TASTE_GENRES, TASTE_VIBES } from "@/lib/tasteTaxonomy"
+import { saveTasteProfile } from "@/utils/supabase-helpers"
 import { TapDemoIcon } from "@/components/onboarding/TapDemoIcon"
 import { SwipeDemoIcon } from "@/components/onboarding/SwipeDemoIcon"
 
@@ -117,10 +124,8 @@ const SCREENS = [
     type: "features",
     headline: "Packed with\nSmart Features",
     features: [
-      { icon: "analytics",      color: "#06b6d4", title: "AI-Powered Recommendations", text: "Our algorithm learns your taste and suggests movies you'll both enjoy" },
-      { icon: "notifications",  color: "#ec4899", title: "Real-Time Notifications",    text: "Get instant alerts when you have a new match" },
-      { icon: "globe",          color: "#10b981", title: "Streaming Info",             text: "See where each movie is available to watch" },
-      { icon: "star",           color: "#eab308", title: "Ratings & Reviews",          text: "IMDB, Rotten Tomatoes, and Metacritic scores" },
+      { icon: "globe", color: "#10b981", title: "Streaming Info",    text: "See where each movie is available to watch" },
+      { icon: "star",  color: "#eab308", title: "Ratings & Reviews", text: "IMDB, Rotten Tomatoes, and Metacritic scores" },
     ],
     cta: "Continue",
     accent: "#E50914",
@@ -142,22 +147,20 @@ const SCREENS = [
     id: 5,
     type: "genres",
     headline: "Every Genre,\nEvery Mood",
-    subtext: "From action-packed blockbusters to cozy rom-coms, we've got it all covered. Tap the ones you love.",
-    genres: [
-      { name: "Action",    emoji: "💥", color: "#ef4444" },
-      { name: "Comedy",    emoji: "😂", color: "#f97316" },
-      { name: "Drama",     emoji: "🎭", color: "#8B5CF6" },
-      { name: "Horror",    emoji: "👻", color: "#6b7280" },
-      { name: "Romance",   emoji: "💕", color: "#ec4899" },
-      { name: "Sci-Fi",    emoji: "🚀", color: "#06b6d4" },
-      { name: "Thriller",  emoji: "🔪", color: "#dc2626" },
-      { name: "Animation", emoji: "✨", color: "#10b981" },
-    ],
-    cta: "Almost There",
+    subtext: "Pick the genres you love — this shapes the picks waiting for you in your For You tab.",
+    cta: "Continue",
     accent: "#E50914",
   },
   {
     id: 6,
+    type: "vibe",
+    headline: "What's Your\nVibe?",
+    subtext: "Pick how you want to feel tonight and we'll match movies to it.",
+    cta: "Almost There",
+    accent: "#E50914",
+  },
+  {
+    id: 7,
     type: "streaks",
     headline: "Make It a\nNightly Ritual",
     subtext: "Build habits, earn rewards, and never miss movie night again.",
@@ -170,7 +173,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 7,
+    id: 8,
     type: "privacy",
     headline: "Your Privacy\nMatters",
     subtext: "We take your data seriously. Here's what you should know:",
@@ -184,7 +187,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 8,
+    id: 9,
     type: "aiConsent",
     headline: "AI-Powered\nRecommendations",
     subtext: "To settle debates and plan movie nights, DateFlix sends the preferences you type to Google Gemini, Google's AI service.",
@@ -196,7 +199,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 9,
+    id: 10,
     type: "notifications",
     headline: "Never Miss\na Moment",
     subtext: "Turn on notifications so you're always first to know.",
@@ -208,7 +211,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 10,
+    id: 11,
     type: "final",
     headline: "Ready to Find\nYour Perfect Movie?",
     subtext: "Start swiping and discover what you'll watch tonight.",
@@ -266,6 +269,30 @@ function AIPointIcon({ name, size, color }: { name: string; size: number; color:
   const p = { size, color, strokeWidth: 1.8 as number }
   if (name === "shield-checkmark") return <ShieldCheckIcon {...p} />
   return <SparklesIcon {...p} />
+}
+
+// Custom illustrations for genres that have one in assets/icons/genre —
+// everything else falls back to this file's tinted-heroicon system (see
+// IconBox below) unchanged.
+const GENRE_ICON_IMAGES: Partial<Record<string, ReturnType<typeof require>>> = {
+  comedy: require("@/assets/icons/genre/comedy.png"),
+  documentary: require("@/assets/icons/genre/documentary.png"),
+  horror: require("@/assets/icons/genre/horror.png"),
+  "sci-fi": require("@/assets/icons/genre/sci-fi.png"),
+}
+
+function GenreIcon({ value, size, color }: { value: string; size: number; color: string }) {
+  const image = GENRE_ICON_IMAGES[value]
+  if (image) return <Image source={image} style={{ width: size, height: size }} resizeMode="contain" />
+  const p = { size, color, strokeWidth: 1.8 as number }
+  if (value === "romance") return <HeartIcon {...p} />
+  if (value === "thriller") return <EyeIcon {...p} />
+  if (value === "comedy") return <FaceSmileIcon {...p} />
+  if (value === "drama") return <ChatBubbleLeftIcon {...p} />
+  if (value === "action") return <BoltIcon {...p} />
+  if (value === "horror") return <MoonIcon {...p} />
+  if (value === "sci-fi") return <RocketLaunchIcon {...p} />
+  return <FilmIcon {...p} /> // documentary
 }
 
 // ─── Shared UI primitives ──────────────────────────────────────────────────────
@@ -443,6 +470,8 @@ function IconBox({ color, children }: { color: string; children: React.ReactNode
 // decoded and ready by the time the user can possibly tap (zero playback
 // latency). Swap this file to change the sound; nothing else needs updating.
 const TAP_SOUND = require("@/assets/audio/intergalactic-alien-vibration.mp3")
+const THUMBS_UP_ICON = require("@/assets/icons/thumbs-up.png")
+const GREEN_CHECKMARK_ICON = require("@/assets/icons/green-checkmark.png")
 
 // ─── Wake gate ─────────────────────────────────────────────────────────────────
 // Mirrors the reference design's plain "tap to wake" interstitial: flat
@@ -515,7 +544,8 @@ export default function OnboardingScreen() {
     setAudioModeAsync({ playsInSilentMode: true, interruptionMode: "mixWithOthers" }).catch(() => {})
   }, [])
   const [currentScreen, setCurrentScreen] = useState(0)
-  const [selectedGenres, setSelectedGenres] = useState<string[]>(["Romance", "Comedy"])
+  const [selectedGenres, setSelectedGenres] = useState<string[]>(["romance", "comedy"])
+  const [selectedVibe, setSelectedVibe] = useState<string | null>("cozy")
   const [requestingPush, setRequestingPush] = useState(false)
   const screen = SCREENS[currentScreen]
 
@@ -533,8 +563,27 @@ export default function OnboardingScreen() {
     setSelectedGenres((prev) => (prev.includes(name) ? prev.filter((g) => g !== name) : [...prev, name]))
   }
 
+  const toggleVibe = (value: string) => {
+    Haptics.selectionAsync()
+    setSelectedVibe(value)
+  }
+
   const completeOnboarding = async () => {
-    try { await AsyncStorage.setItem("@onboarding_complete", "true") } catch {}
+    // Marks onboarding done where post-auth.tsx actually checks it
+    // (user.unsafeMetadata.onboarded) — nothing previously wrote this field,
+    // so every fresh login re-ran onboarding regardless of history.
+    try {
+      await user?.update({ unsafeMetadata: { ...user.unsafeMetadata, onboarded: true } })
+    } catch {}
+    // Seeds the real "For You" taste profile with what was picked here —
+    // saveTasteProfile/buildTasteEnginePrompt both handle an empty
+    // seed-movies list fine, and useTasteEngine auto-generates recommendations
+    // the moment a profile exists, so the Movie Tracker tab has real picks
+    // waiting immediately. Independent of AI consent — consent only gates
+    // the Gemini call, not storing the profile itself.
+    if (user?.id) {
+      try { await saveTasteProfile(user.id, selectedGenres, selectedVibe, []) } catch {}
+    }
     router.replace("/(tabs)/home")
   }
 
@@ -603,7 +652,7 @@ export default function OnboardingScreen() {
                       <FilmIcon size={32} color="#d7d9e4" strokeWidth={1.5} />
                     </View>
                     <View style={{ position: "absolute", bottom: 10, right: 10 }}>
-                      <HeartSolid size={18} color={T.accent} />
+                      <Image source={THUMBS_UP_ICON} style={{ width: 18, height: 18 }} resizeMode="contain" />
                     </View>
                   </View>
                 </View>
@@ -620,18 +669,18 @@ export default function OnboardingScreen() {
                       <VideoCameraIcon size={32} color="#d7d9e4" strokeWidth={1.5} />
                     </View>
                     <View style={{ position: "absolute", bottom: 10, right: 10 }}>
-                      <HeartSolid size={18} color={T.accent} />
+                      <Image source={THUMBS_UP_ICON} style={{ width: 18, height: 18 }} resizeMode="contain" />
                     </View>
                   </View>
                 </View>
-                {/* Centre heart */}
+                {/* Centre thumbs up */}
                 <View style={{
                   position: "absolute", bottom: 0, zIndex: 10,
                   shadowColor: T.accent, shadowOpacity: 0.35, shadowRadius: 18,
                   shadowOffset: { width: 0, height: 6 }, elevation: 10,
                 }}>
                   <View style={{ width: 70, height: 70, borderRadius: 35, backgroundColor: T.accent, alignItems: "center", justifyContent: "center" }}>
-                    <HeartSolid size={38} color="#fff" />
+                    <Image source={THUMBS_UP_ICON} style={{ width: 36, height: 36 }} resizeMode="contain" />
                   </View>
                 </View>
               </View>
@@ -773,47 +822,83 @@ export default function OnboardingScreen() {
       case "genres":
         return (
           <View style={{ flex: 1, justifyContent: "center", gap: 14 }}>
-            {"genres" in screen && screen.genres && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 28, gap: 12 }}
-              >
-                {screen.genres.map((genre, i) => {
-                  const isSelected = selectedGenres.includes(genre.name)
-                  return (
-                    <Animated.View key={i} entering={FadeInDown.delay(100 + i * 45).springify()}>
-                      <TouchableOpacity
-                        activeOpacity={0.85}
-                        onPress={() => toggleGenre(genre.name)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`${genre.name}${isSelected ? ", selected" : ""}`}
-                        style={{
-                          width: 108, height: 122, borderRadius: 22,
-                          backgroundColor: T.dark,
-                          borderWidth: isSelected ? 2 : 1,
-                          borderColor: isSelected ? T.accent : "rgba(255,255,255,0.10)",
-                          alignItems: "center", justifyContent: "center",
-                          padding: 12,
-                        }}
-                      >
-                        {isSelected && (
-                          <View style={{
-                            position: "absolute", top: 8, right: 8,
-                            width: 20, height: 20, borderRadius: 10,
-                            backgroundColor: T.accent, alignItems: "center", justifyContent: "center",
-                          }}>
-                            <CheckSolid size={11} color="#fff" />
-                          </View>
-                        )}
-                        <Text style={{ fontSize: 28, marginBottom: 8 }}>{genre.emoji}</Text>
-                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff", textAlign: "center" }}>{genre.name}</Text>
-                      </TouchableOpacity>
-                    </Animated.View>
-                  )
-                })}
-              </ScrollView>
-            )}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: 28, gap: 12 }}
+            >
+              {TASTE_GENRES.map((genre, i) => {
+                const isSelected = selectedGenres.includes(genre.value)
+                return (
+                  <Animated.View key={genre.value} entering={FadeInDown.delay(100 + i * 45).springify()}>
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={() => toggleGenre(genre.value)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${genre.label}${isSelected ? ", selected" : ""}`}
+                      style={{
+                        width: 108, height: 122, borderRadius: 22,
+                        backgroundColor: T.dark,
+                        borderWidth: isSelected ? 2 : 1,
+                        borderColor: isSelected ? T.accent : "rgba(255,255,255,0.10)",
+                        alignItems: "center", justifyContent: "center",
+                        padding: 12,
+                      }}
+                    >
+                      {isSelected && (
+                        <View style={{
+                          position: "absolute", top: 8, right: 8,
+                          width: 20, height: 20, borderRadius: 10,
+                          backgroundColor: T.accent, alignItems: "center", justifyContent: "center",
+                        }}>
+                          <CheckSolid size={11} color="#fff" />
+                        </View>
+                      )}
+                      <IconBox color={genre.color}>
+                        <GenreIcon value={genre.value} size={22} color={genre.color} />
+                      </IconBox>
+                      <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff", textAlign: "center", marginTop: 10 }}>{genre.label}</Text>
+                    </TouchableOpacity>
+                  </Animated.View>
+                )
+              })}
+            </ScrollView>
+          </View>
+        )
+
+      case "vibe":
+        return (
+          <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center" }}>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, justifyContent: "center" }}>
+              {TASTE_VIBES.map((vibe, i) => {
+                const isSelected = selectedVibe === vibe.value
+                return (
+                  <Animated.View
+                    key={vibe.value}
+                    entering={FadeInDown.delay(100 + i * 60).springify()}
+                    style={{ width: "47%" }}
+                  >
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={() => toggleVibe(vibe.value)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${vibe.label}${isSelected ? ", selected" : ""}`}
+                      style={{
+                        borderRadius: 22, paddingVertical: 20, alignItems: "center", gap: 10,
+                        backgroundColor: isSelected ? T.accentBg : T.surface,
+                        borderWidth: isSelected ? 2 : 1,
+                        borderColor: isSelected ? T.accent : T.borderLo,
+                        shadowColor: "#1a1a2e", shadowOpacity: 0.06, shadowRadius: 16,
+                        shadowOffset: { width: 0, height: 4 }, elevation: 2,
+                      }}
+                    >
+                      <Image source={vibe.icon} style={{ width: 56, height: 56 }} resizeMode="contain" />
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: T.textPrimary }}>{vibe.label}</Text>
+                    </TouchableOpacity>
+                  </Animated.View>
+                )
+              })}
+            </View>
           </View>
         )
 
@@ -980,7 +1065,7 @@ export default function OnboardingScreen() {
   // centered too, so the whole screen reads as one aligned block instead of
   // a left-anchored title floating over centered content. List-driven
   // screens (features) keep their left-aligned reading flow.
-  const isCentered = isFinal || ["hero", "social", "streaks", "privacy", "aiConsent", "genres", "howItWorks", "notifications"].includes(screen.type)
+  const isCentered = isFinal || ["hero", "social", "streaks", "privacy", "aiConsent", "genres", "vibe", "howItWorks", "notifications"].includes(screen.type)
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
@@ -1075,7 +1160,7 @@ export default function OnboardingScreen() {
                   alignItems: "center", justifyContent: "center",
                   backgroundColor: T.accent,
                 }}>
-                  <CheckSolid size={32} color="#fff" />
+                  <Image source={GREEN_CHECKMARK_ICON} style={{ width: 34, height: 34 }} resizeMode="contain" />
                 </View>
               </View>
             </View>

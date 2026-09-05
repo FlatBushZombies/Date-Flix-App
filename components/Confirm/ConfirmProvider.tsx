@@ -90,15 +90,15 @@ function ConfirmCard({ options, onClose }: { options: ConfirmOptions; onClose: (
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose}>
       <Animated.View
-        entering={FadeIn.duration(180)}
-        exiting={FadeOut.duration(150)}
+        entering={FadeIn.duration(200)}
+        exiting={FadeOut.duration(160)}
         style={styles.backdrop}
       >
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
         <Animated.View
-          entering={ZoomIn.springify().damping(17).stiffness(210)}
-          exiting={ZoomOut.duration(150)}
+          entering={ZoomIn.withInitialValues({ transform: [{ scale: 0.86 }] }).springify().damping(16).stiffness(300).mass(0.8)}
+          exiting={ZoomOut.duration(160)}
           style={styles.card}
         >
           <View style={[styles.iconWrap, { backgroundColor: config.iconBg, borderColor: `${config.accent}33` }]}>
