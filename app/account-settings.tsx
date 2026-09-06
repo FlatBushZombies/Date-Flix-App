@@ -46,7 +46,7 @@ const C = {
   surface: "#f9fafb",
   surfaceHigh: "#f3f4f6",
   border: "#e5e7eb",
-  cyan: "#06b6d4",
+  accent: "#B3323A",
   text: "#111827",
   textMuted: "#6b7280",
   textSub: "#9ca3af",
@@ -329,7 +329,7 @@ export default function AccountSettingsScreen() {
               <Image source={{ uri: user.imageUrl }} style={s.avatar} />
             ) : (
               <View style={[s.avatar, s.avatarFallback]}>
-                <Text style={{ fontSize: 22, fontWeight: "700", color: C.cyan }}>
+                <Text style={{ fontSize: 22, fontWeight: "700", color: C.accent }}>
                   {(user?.firstName?.[0] ?? "U").toUpperCase()}
                 </Text>
               </View>
@@ -395,7 +395,7 @@ export default function AccountSettingsScreen() {
       <View style={s.card}>
         <View style={s.castIntro}>
           <View style={s.castIntroIconWrap}>
-            <Tv size={16} color={C.cyan} />
+            <Tv size={16} color={C.accent} />
           </View>
           <Text style={s.castIntroText}>
             Duo App doesn&apos;t stream video itself — &quot;Watch on TV&quot; opens a title in its
@@ -406,7 +406,7 @@ export default function AccountSettingsScreen() {
 
         {checkingCast ? (
           <View style={{ paddingVertical: 16, alignItems: "center" }}>
-            <ActivityIndicator color={C.cyan} />
+            <ActivityIndicator color={C.accent} />
           </View>
         ) : (
           CASTABLE_PLATFORMS.map((name, i) => {
@@ -423,8 +423,8 @@ export default function AccountSettingsScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={s.linkedName}>{name}</Text>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
-                    {installed && <CheckCircle2 size={12} color={C.cyan} />}
-                    <Text style={[s.linkedMeta, installed && { color: C.cyan, fontWeight: "700" }]}>
+                    {installed && <CheckCircle2 size={12} color={C.accent} />}
+                    <Text style={[s.linkedMeta, installed && { color: C.accent, fontWeight: "700" }]}>
                       {installed ? "Ready to cast" : "Not installed — opens in browser"}
                     </Text>
                   </View>
@@ -438,7 +438,7 @@ export default function AccountSettingsScreen() {
                   accessibilityLabel={`Test casting to ${name}`}
                 >
                   {testing ? (
-                    <ActivityIndicator size="small" color={C.cyan} />
+                    <ActivityIndicator size="small" color={C.accent} />
                   ) : (
                     <Text style={s.castTestBtnText}>Test</Text>
                   )}
@@ -454,7 +454,7 @@ export default function AccountSettingsScreen() {
       <View style={s.card}>
         {relationshipLoading ? (
           <View style={{ paddingVertical: 20, alignItems: "center" }}>
-            <ActivityIndicator color={C.cyan} />
+            <ActivityIndicator color={C.accent} />
           </View>
         ) : (
           <>
@@ -498,7 +498,7 @@ export default function AccountSettingsScreen() {
 
             {freeze && (
               <View style={[s.freezeCard, sessions.length > 0 && { marginTop: 12 }]}>
-                <Snowflake size={16} color={freeze.available > 0 ? C.cyan : C.textSub} />
+                <Snowflake size={16} color={freeze.available > 0 ? C.accent : C.textSub} />
                 <Text style={s.freezeText}>
                   {freeze.available > 0
                     ? "1 free Streak Freeze available this month"
@@ -516,7 +516,7 @@ export default function AccountSettingsScreen() {
       <View style={s.card}>
         {relationshipLoading ? (
           <View style={{ paddingVertical: 20, alignItems: "center" }}>
-            <ActivityIndicator color={C.cyan} />
+            <ActivityIndicator color={C.accent} />
           </View>
         ) : matches.length === 0 ? (
           <Text style={s.emptyText}>Your matched movies will show up here.</Text>
@@ -557,13 +557,13 @@ export default function AccountSettingsScreen() {
           style={s.exportRow}
         >
           <View style={s.exportIconWrap}>
-            <Download size={16} color={C.cyan} />
+            <Download size={16} color={C.accent} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={s.linkedName}>Export My Data</Text>
             <Text style={s.linkedMeta}>Share a copy of your matches and profile info</Text>
           </View>
-          {exporting && <ActivityIndicator size="small" color={C.cyan} />}
+          {exporting && <ActivityIndicator size="small" color={C.accent} />}
         </TouchableOpacity>
       </View>
       {/* Account deletion now lives on the Profile screen, not buried here. */}
@@ -577,7 +577,7 @@ export default function AccountSettingsScreen() {
 function SectionLabel({ text }: { text: string }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", marginHorizontal: 20, marginTop: 28, marginBottom: 12 }}>
-      <View style={{ width: 3, height: 14, backgroundColor: C.cyan, borderRadius: 2, marginRight: 8 }} />
+      <View style={{ width: 3, height: 14, backgroundColor: C.accent, borderRadius: 2, marginRight: 8 }} />
       <Text style={s.sectionLabel}>{text}</Text>
     </View>
   )
@@ -606,7 +606,7 @@ function SettingRow({
         value={value}
         onValueChange={onValueChange}
         disabled={disabled}
-        trackColor={{ false: C.border, true: C.cyan }}
+        trackColor={{ false: C.border, true: C.accent }}
         thumbColor="#ffffff"
       />
     </View>
@@ -650,7 +650,7 @@ const s = StyleSheet.create({
   avatarBadge: {
     position: "absolute", bottom: -2, right: -2,
     width: 26, height: 26, borderRadius: 13,
-    backgroundColor: C.cyan, alignItems: "center", justifyContent: "center",
+    backgroundColor: C.accent, alignItems: "center", justifyContent: "center",
     borderWidth: 2, borderColor: C.surface,
   },
   input: {
@@ -661,7 +661,7 @@ const s = StyleSheet.create({
   },
   emailText: { fontSize: 12, color: C.textSub, marginBottom: 14 },
   btnCyan: {
-    backgroundColor: C.cyan, borderRadius: 14, paddingVertical: 13,
+    backgroundColor: C.accent, borderRadius: 14, paddingVertical: 13,
     alignItems: "center",
   },
   btnCyanText: { fontSize: 14, fontWeight: "700", color: "#fff" },
@@ -716,7 +716,7 @@ const s = StyleSheet.create({
     backgroundColor: C.surfaceHigh,
     borderWidth: 1, borderColor: C.border,
   },
-  castTestBtnText: { fontSize: 12, fontWeight: "700", color: C.cyan },
+  castTestBtnText: { fontSize: 12, fontWeight: "700", color: C.accent },
   exportRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   exportIconWrap: {
     width: 36, height: 36, borderRadius: 12,

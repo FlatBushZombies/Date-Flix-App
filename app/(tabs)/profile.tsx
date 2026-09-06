@@ -39,8 +39,8 @@ const C = {
   surface:     "#f9fafb",
   surfaceHigh: "#f3f4f6",
   border:      "#e5e7eb",
-  cyan:        "#06b6d4",
-  cyanDim:     "#06b6d420",
+  accent:      "#B3323A",
+  accentDim:   "#B3323A20",
   text:        "#111827",
   textMuted:   "#6b7280",
   textSub:     "#9ca3af",
@@ -299,7 +299,7 @@ export default function ProfileScreen() {
       {/* ── Stats ────────────────────────────────────────────── */}
       <View style={s.statsGrid}>
         <View style={s.statsRow}>
-          <StatCard value={stats.totalSwipes} label="Total Swipes" color={C.cyan} />
+          <StatCard value={stats.totalSwipes} label="Total Swipes" color={C.accent} />
           <View style={s.statsDivider} />
           <StatCard value={stats.totalMatches} label="Matches" color="#E879A0" />
         </View>
@@ -320,7 +320,7 @@ export default function ProfileScreen() {
             <Text style={s.btnCyanText}>Invite Friend</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.btnGhost} onPress={() => setShowJoinModal(true)} activeOpacity={0.85}>
-            <Ionicons name="enter" size={16} color={C.cyan} />
+            <Ionicons name="enter" size={16} color={C.accent} />
             <Text style={s.btnGhostText}>Join Code</Text>
           </TouchableOpacity>
         </View>
@@ -362,21 +362,21 @@ export default function ProfileScreen() {
           title="Movie Match"
           description="Swipe and match movies with a friend"
           action="Start"
-          icon={<Film size={18} color={C.cyan} />}
+          icon={<Film size={18} color={C.accent} />}
           onPress={() => router.push("/(tabs)/home")}
         />
         <ActionCard
           title="Watch Together"
           description="Invite a friend and swipe in a synced session"
           action="Invite"
-          icon={<Users size={18} color={C.cyan} />}
+          icon={<Users size={18} color={C.accent} />}
           onPress={() => setShowInviteModal(true)}
         />
         <ActionCard
           title="Shared Watchlist"
           description="Movies you both saved to watch later"
           action="View"
-          icon={<Bookmark size={18} color={C.cyan} />}
+          icon={<Bookmark size={18} color={C.accent} />}
           onPress={() => router.push("/watchlist")}
         />
       </View>
@@ -389,7 +389,7 @@ export default function ProfileScreen() {
             <>
               <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
                 <View style={s.tvIconWrap}>
-                  <Tv size={20} color={C.cyan} />
+                  <Tv size={20} color={C.accent} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={s.tvConnectedTitle}>TV Connected</Text>
@@ -432,7 +432,7 @@ export default function ProfileScreen() {
           ) : (
             <>
               <View style={s.tvIconWrap}>
-                <Tv size={20} color={C.cyan} />
+                <Tv size={20} color={C.accent} />
               </View>
               <Text style={s.tvTitle}>Watch on TV</Text>
               <Text style={s.tvDesc}>
@@ -571,7 +571,7 @@ export default function ProfileScreen() {
 function SectionLabel({ text }: { text: string }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14 }}>
-      <View style={{ width: 3, height: 14, backgroundColor: C.cyan, borderRadius: 2, marginRight: 8 }} />
+      <View style={{ width: 3, height: 14, backgroundColor: C.accent, borderRadius: 2, marginRight: 8 }} />
       <Text style={s.sectionLabel}>{text}</Text>
     </View>
   )
@@ -657,7 +657,7 @@ const s = StyleSheet.create({
   headerAccentLine: {
     width: 40,
     height: 2,
-    backgroundColor: C.cyan,
+    backgroundColor: C.accent,
     borderRadius: 1,
     marginBottom: 16,
     opacity: 0.7,
@@ -689,10 +689,10 @@ const s = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: C.cyan,
+    backgroundColor: C.accent,
     opacity: 0.07,
     // blur via shadow simulation
-    shadowColor: C.cyan,
+    shadowColor: C.accent,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
     shadowRadius: 40,
@@ -739,9 +739,9 @@ const s = StyleSheet.create({
     height: 84,
     borderRadius: 42,
     borderWidth: 2,
-    borderColor: C.cyan,
+    borderColor: C.accent,
     padding: 3,
-    shadowColor: C.cyan,
+    shadowColor: C.accent,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 12,
@@ -876,7 +876,7 @@ const s = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: `${C.cyan}18`,
+    backgroundColor: `${C.accent}18`,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -947,7 +947,7 @@ const s = StyleSheet.create({
   },
   btnCyanFlex: {
     flex: 1,
-    backgroundColor: C.cyan,
+    backgroundColor: C.accent,
     borderRadius: 14,
     paddingVertical: 13,
     alignItems: "center",
@@ -973,10 +973,10 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: C.cyan,
+    backgroundColor: C.accent,
     borderRadius: 14,
     paddingVertical: 14,
-    shadowColor: C.cyan,
+    shadowColor: C.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
@@ -997,12 +997,12 @@ const s = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 14,
     borderWidth: 1.5,
-    borderColor: C.cyan,
+    borderColor: C.accent,
   },
   btnGhostText: {
     fontSize: 14,
     fontWeight: "700",
-    color: C.cyan,
+    color: C.accent,
     letterSpacing: 0.3,
   },
 
@@ -1075,9 +1075,9 @@ const s = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: `${C.cyan}18`,
+    backgroundColor: `${C.accent}18`,
     borderWidth: 1,
-    borderColor: C.cyanDim,
+    borderColor: C.accentDim,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1106,7 +1106,7 @@ const s = StyleSheet.create({
   actionBtnText: {
     fontSize: 13,
     fontWeight: "600",
-    color: C.cyan,
+    color: C.accent,
     letterSpacing: 0.2,
   },
   actionBtnSoon: {
@@ -1197,12 +1197,12 @@ const s = StyleSheet.create({
     lineHeight: 20,
   },
   btnCyanFull: {
-    backgroundColor: C.cyan,
+    backgroundColor: C.accent,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
     marginBottom: 12,
-    shadowColor: C.cyan,
+    shadowColor: C.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,

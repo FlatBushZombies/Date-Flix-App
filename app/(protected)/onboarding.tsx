@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, Dimensions, ScrollView, Pressable, Image } from "react-native"
+import { View, Text, TouchableOpacity, Dimensions, ScrollView, Pressable, Image, StyleSheet } from "react-native"
+import { LinearGradient } from "expo-linear-gradient"
 import { useEffect, useState } from "react"
 import { useRouter } from "expo-router"
 import { useUser } from "@clerk/clerk-expo"
@@ -28,6 +29,7 @@ import {
   BoltIcon,
   MoonIcon,
   RocketLaunchIcon,
+  BriefcaseIcon,
 } from "react-native-heroicons/outline"
 import {
   HeartIcon as HeartSolid,
@@ -145,6 +147,19 @@ const SCREENS = [
   },
   {
     id: 5,
+    type: "crew",
+    headline: "Movie Night,\nAny Crew",
+    subtext: "Couples, roommates, friend groups, or your work team — everyone gets a say in what's next.",
+    crews: [
+      { icon: "couple",  color: "#ec4899", title: "Couples",      text: "Date night, decided together" },
+      { icon: "friends", color: "#06b6d4", title: "Friend Groups", text: "Movie marathons, zero arguments" },
+      { icon: "team",    color: "#8B5CF6", title: "Teams",        text: "Wind down after work, together" },
+    ],
+    cta: "Continue",
+    accent: "#E50914",
+  },
+  {
+    id: 6,
     type: "genres",
     headline: "Every Genre,\nEvery Mood",
     subtext: "Pick the genres you love — this shapes the picks waiting for you in your For You tab.",
@@ -152,7 +167,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 6,
+    id: 7,
     type: "vibe",
     headline: "What's Your\nVibe?",
     subtext: "Pick how you want to feel tonight and we'll match movies to it.",
@@ -160,7 +175,20 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 7,
+    id: 8,
+    type: "debate",
+    headline: "Can't Agree?\nLet AI Settle It",
+    subtext: "Everyone swipes their favorites — our AI finds the pick you'll all actually enjoy, no endless back-and-forth.",
+    debatePoints: [
+      { icon: "sparkles", color: "#06b6d4", title: "AI Verdict",       text: "A fair pick, backed by everyone's taste" },
+      { icon: "group",    color: "#8B5CF6", title: "Group Sessions",   text: "Invite the whole crew to one debate" },
+      { icon: "chat",     color: "#ec4899", title: "No More Deadlock", text: "Skip the 20-minute scrolling standoff" },
+    ],
+    cta: "Continue",
+    accent: "#E50914",
+  },
+  {
+    id: 9,
     type: "streaks",
     headline: "Make It a\nNightly Ritual",
     subtext: "Build habits, earn rewards, and never miss movie night again.",
@@ -173,7 +201,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 8,
+    id: 10,
     type: "privacy",
     headline: "Your Privacy\nMatters",
     subtext: "We take your data seriously. Here's what you should know:",
@@ -187,7 +215,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 9,
+    id: 11,
     type: "aiConsent",
     headline: "AI-Powered\nRecommendations",
     subtext: "To settle debates and plan movie nights, DateFlix sends the preferences you type to Google Gemini, Google's AI service.",
@@ -199,7 +227,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 10,
+    id: 12,
     type: "notifications",
     headline: "Never Miss\na Moment",
     subtext: "Turn on notifications so you're always first to know.",
@@ -211,7 +239,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 11,
+    id: 13,
     type: "final",
     headline: "Ready to Find\nYour Perfect Movie?",
     subtext: "Start swiping and discover what you'll watch tonight.",
@@ -250,6 +278,20 @@ function OptionIcon({ name, size, color }: { name: string; size: number; color: 
   return <UserIcon {...p} />
 }
 
+function CrewIcon({ name, size, color }: { name: string; size: number; color: string }) {
+  const p = { size, color, strokeWidth: 1.8 as number }
+  if (name === "couple") return <HeartIcon {...p} />
+  if (name === "team")   return <BriefcaseIcon {...p} />
+  return <UserGroupIcon {...p} /> // friends
+}
+
+function DebatePointIcon({ name, size, color }: { name: string; size: number; color: string }) {
+  const p = { size, color, strokeWidth: 1.8 as number }
+  if (name === "sparkles") return <SparklesIcon {...p} />
+  if (name === "group")    return <UserGroupIcon {...p} />
+  return <ChatBubbleLeftIcon {...p} /> // chat
+}
+
 function RewardIcon({ name, size, color }: { name: string; size: number; color: string }) {
   const p = { size, color, strokeWidth: 1.8 as number }
   if (name === "flame")  return <FireIcon {...p} />
@@ -282,8 +324,6 @@ const GENRE_ICON_IMAGES: Partial<Record<string, ReturnType<typeof require>>> = {
 }
 
 function GenreIcon({ value, size, color }: { value: string; size: number; color: string }) {
-  const image = GENRE_ICON_IMAGES[value]
-  if (image) return <Image source={image} style={{ width: size, height: size }} resizeMode="contain" />
   const p = { size, color, strokeWidth: 1.8 as number }
   if (value === "romance") return <HeartIcon {...p} />
   if (value === "thriller") return <EyeIcon {...p} />
@@ -651,9 +691,6 @@ export default function OnboardingScreen() {
                     <View style={{ width: 50, height: 74, borderRadius: 12, backgroundColor: T.surface, alignItems: "center", justifyContent: "center" }}>
                       <FilmIcon size={32} color="#d7d9e4" strokeWidth={1.5} />
                     </View>
-                    <View style={{ position: "absolute", bottom: 10, right: 10 }}>
-                      <Image source={THUMBS_UP_ICON} style={{ width: 18, height: 18 }} resizeMode="contain" />
-                    </View>
                   </View>
                 </View>
                 {/* Right card */}
@@ -668,20 +705,15 @@ export default function OnboardingScreen() {
                     <View style={{ width: 50, height: 74, borderRadius: 12, backgroundColor: T.surface, alignItems: "center", justifyContent: "center" }}>
                       <VideoCameraIcon size={32} color="#d7d9e4" strokeWidth={1.5} />
                     </View>
-                    <View style={{ position: "absolute", bottom: 10, right: 10 }}>
-                      <Image source={THUMBS_UP_ICON} style={{ width: 18, height: 18 }} resizeMode="contain" />
-                    </View>
                   </View>
                 </View>
                 {/* Centre thumbs up */}
                 <View style={{
-                  position: "absolute", bottom: 0, zIndex: 10,
+                  position: "absolute", bottom: -6, zIndex: 10,
                   shadowColor: T.accent, shadowOpacity: 0.35, shadowRadius: 18,
                   shadowOffset: { width: 0, height: 6 }, elevation: 10,
                 }}>
-                  <View style={{ width: 70, height: 70, borderRadius: 35, backgroundColor: T.accent, alignItems: "center", justifyContent: "center" }}>
-                    <Image source={THUMBS_UP_ICON} style={{ width: 36, height: 36 }} resizeMode="contain" />
-                  </View>
+                  <Image source={THUMBS_UP_ICON} style={{ width: 92, height: 92 }} resizeMode="contain" />
                 </View>
               </View>
             </Animated.View>
@@ -819,6 +851,48 @@ export default function OnboardingScreen() {
           </View>
         )
 
+      case "crew":
+        return (
+          <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center", gap: 20 }}>
+            {/* Group cluster illustration */}
+            <Animated.View entering={FadeInDown.delay(100)} style={{ alignItems: "center" }}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                {["#ec4899", "#06b6d4", "#8B5CF6", "#f97316"].map((c, i) => (
+                  <View
+                    key={i}
+                    style={{
+                      width: 52, height: 52, borderRadius: 26,
+                      backgroundColor: c, alignItems: "center", justifyContent: "center",
+                      borderWidth: 2, borderColor: T.wedge,
+                      marginLeft: i > 0 ? -14 : 0,
+                    }}
+                  >
+                    <UserIcon size={22} color="#fff" strokeWidth={1.8} />
+                  </View>
+                ))}
+              </View>
+            </Animated.View>
+
+            {"crews" in screen && screen.crews && (
+              <View style={{ gap: 10 }}>
+                {screen.crews.map((crew, i) => (
+                  <Animated.View key={i} entering={FadeInDown.delay(260 + i * 100).springify()}>
+                    <RowCard>
+                      <IconBox color={crew.color}>
+                        <CrewIcon name={crew.icon} size={22} color={crew.color} />
+                      </IconBox>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 15, fontWeight: "700", color: T.textPrimary, marginBottom: 3 }}>{crew.title}</Text>
+                        <Text style={{ fontSize: 13, color: T.textSecondary }}>{crew.text}</Text>
+                      </View>
+                    </RowCard>
+                  </Animated.View>
+                ))}
+              </View>
+            )}
+          </View>
+        )
+
       case "genres":
         return (
           <View style={{ flex: 1, justifyContent: "center", gap: 14 }}>
@@ -829,6 +903,7 @@ export default function OnboardingScreen() {
             >
               {TASTE_GENRES.map((genre, i) => {
                 const isSelected = selectedGenres.includes(genre.value)
+                const image = GENRE_ICON_IMAGES[genre.value]
                 return (
                   <Animated.View key={genre.value} entering={FadeInDown.delay(100 + i * 45).springify()}>
                     <TouchableOpacity
@@ -841,10 +916,32 @@ export default function OnboardingScreen() {
                         backgroundColor: T.dark,
                         borderWidth: isSelected ? 2 : 1,
                         borderColor: isSelected ? T.accent : "rgba(255,255,255,0.10)",
-                        alignItems: "center", justifyContent: "center",
-                        padding: 12,
+                        overflow: "hidden",
+                        ...(image ? null : { alignItems: "center", justifyContent: "center", padding: 12 }),
                       }}
                     >
+                      {image ? (
+                        <>
+                          <Image source={image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                          <LinearGradient
+                            colors={["transparent", "rgba(0,0,0,0.78)"]}
+                            style={StyleSheet.absoluteFill}
+                          />
+                          <Text style={{
+                            position: "absolute", left: 10, right: 10, bottom: 10,
+                            fontSize: 13, fontWeight: "700", color: "#fff", textAlign: "center",
+                          }}>
+                            {genre.label}
+                          </Text>
+                        </>
+                      ) : (
+                        <>
+                          <IconBox color={genre.color}>
+                            <GenreIcon value={genre.value} size={22} color={genre.color} />
+                          </IconBox>
+                          <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff", textAlign: "center", marginTop: 10 }}>{genre.label}</Text>
+                        </>
+                      )}
                       {isSelected && (
                         <View style={{
                           position: "absolute", top: 8, right: 8,
@@ -854,10 +951,6 @@ export default function OnboardingScreen() {
                           <CheckSolid size={11} color="#fff" />
                         </View>
                       )}
-                      <IconBox color={genre.color}>
-                        <GenreIcon value={genre.value} size={22} color={genre.color} />
-                      </IconBox>
-                      <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff", textAlign: "center", marginTop: 10 }}>{genre.label}</Text>
                     </TouchableOpacity>
                   </Animated.View>
                 )
@@ -899,6 +992,52 @@ export default function OnboardingScreen() {
                 )
               })}
             </View>
+          </View>
+        )
+
+      case "debate":
+        return (
+          <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center", gap: 20 }}>
+            {/* Two people converging on an AI verdict */}
+            <Animated.View entering={FadeInDown.delay(100)} style={{ alignItems: "center" }}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: "#06b6d4", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: T.wedge }}>
+                  <UserIcon size={24} color="#fff" strokeWidth={1.8} />
+                </View>
+                <View style={{ width: 28, height: 1.5, backgroundColor: T.borderMid }} />
+                <View style={{
+                  width: 66, height: 66, borderRadius: 33,
+                  alignItems: "center", justifyContent: "center",
+                  backgroundColor: T.accent,
+                  shadowColor: T.accent, shadowOpacity: 0.3, shadowRadius: 16,
+                  shadowOffset: { width: 0, height: 6 }, elevation: 8,
+                }}>
+                  <SparklesIcon size={28} color="#fff" strokeWidth={1.8} />
+                </View>
+                <View style={{ width: 28, height: 1.5, backgroundColor: T.borderMid }} />
+                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: "#ec4899", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: T.wedge }}>
+                  <UserIcon size={24} color="#fff" strokeWidth={1.8} />
+                </View>
+              </View>
+            </Animated.View>
+
+            {"debatePoints" in screen && screen.debatePoints && (
+              <View style={{ gap: 10 }}>
+                {screen.debatePoints.map((point, i) => (
+                  <Animated.View key={i} entering={FadeInDown.delay(260 + i * 100).springify()}>
+                    <RowCard>
+                      <IconBox color={point.color}>
+                        <DebatePointIcon name={point.icon} size={22} color={point.color} />
+                      </IconBox>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 15, fontWeight: "700", color: T.textPrimary, marginBottom: 3 }}>{point.title}</Text>
+                        <Text style={{ fontSize: 13, color: T.textSecondary }}>{point.text}</Text>
+                      </View>
+                    </RowCard>
+                  </Animated.View>
+                ))}
+              </View>
+            )}
           </View>
         )
 
@@ -1065,7 +1204,7 @@ export default function OnboardingScreen() {
   // centered too, so the whole screen reads as one aligned block instead of
   // a left-anchored title floating over centered content. List-driven
   // screens (features) keep their left-aligned reading flow.
-  const isCentered = isFinal || ["hero", "social", "streaks", "privacy", "aiConsent", "genres", "vibe", "howItWorks", "notifications"].includes(screen.type)
+  const isCentered = isFinal || ["hero", "social", "crew", "streaks", "debate", "privacy", "aiConsent", "genres", "vibe", "howItWorks", "notifications"].includes(screen.type)
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
@@ -1155,13 +1294,7 @@ export default function OnboardingScreen() {
                 shadowColor: T.accent, shadowOpacity: 0.22, shadowRadius: 22,
                 shadowOffset: { width: 0, height: 8 }, elevation: 6,
               }}>
-                <View style={{
-                  width: 66, height: 66, borderRadius: 33,
-                  alignItems: "center", justifyContent: "center",
-                  backgroundColor: T.accent,
-                }}>
-                  <Image source={GREEN_CHECKMARK_ICON} style={{ width: 34, height: 34 }} resizeMode="contain" />
-                </View>
+                <Image source={GREEN_CHECKMARK_ICON} style={{ width: 68, height: 68 }} resizeMode="contain" />
               </View>
             </View>
           </Animated.View>
