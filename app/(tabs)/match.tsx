@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/EmptyState"
 import { Ionicons } from "@expo/vector-icons"
 import { CloudOff } from "lucide-react-native"
 import { getUserMatches, syncUserWithSupabase } from "@/utils/supabase-helpers"
+import { posthog } from "@/lib/posthog"
 import { STREAMING_PLATFORMS, getWatchUrl } from "@/lib/streaming"
 import type { SupabaseMatch, SupabaseUser } from "@/types"
 import { LinearGradient } from "expo-linear-gradient"
@@ -66,6 +67,7 @@ export default function MatchScreen() {
       const canOpen = await Linking.canOpenURL(url)
       if (canOpen) {
         await Linking.openURL(url)
+        posthog?.capture("streaming_platform_opened", { platform: platform.name })
       } else {
         toast.error("Unable to Open", `Could not open ${platform.name}. Please make sure the app is installed.`)
       }

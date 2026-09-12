@@ -5,6 +5,7 @@ import { useToast } from "@/components/Toast/ToastProvider"
 import { DeviceSheet } from "@/components/cast/DeviceSheet"
 import { shadow } from "@/constants/theme"
 import { useCast } from "@/lib/cast/CastProvider"
+import { posthog } from "@/lib/posthog"
 import type { Invitation, SupabaseUser, SwipeSession } from "@/types"
 import { permanentlyDeleteAccount } from "@/utils/account"
 import {
@@ -156,6 +157,7 @@ export default function ProfileScreen() {
           onPress: async () => {
             try {
               await clerk.signOut()
+              posthog?.reset()
               router.replace("/")
             } catch (e) {
               console.error(e)
@@ -199,6 +201,7 @@ export default function ProfileScreen() {
                     try {
                       const result = await permanentlyDeleteAccount(user.id, user)
                       if (result.success) {
+                        posthog?.reset()
                         toast.success("Account Deleted", result.message)
                         router.replace("/")
                       } else {

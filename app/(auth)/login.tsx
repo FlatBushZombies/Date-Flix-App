@@ -1,6 +1,7 @@
 import { useToast } from "@/components/Toast/ToastProvider"
 import { IMAGES } from "@/constants"
 import { appleOAuth, googleOAuth } from "@/lib/auth"
+import { posthog } from "@/lib/posthog"
 import { useOAuth } from "@clerk/clerk-expo"
 import { router } from "expo-router"
 import React from "react"
@@ -106,6 +107,7 @@ export default function LoginScreen() {
   const toast = useToast()
 
   const handleGoogleSignIn = async () => {
+    posthog?.capture("login_started", { provider: "google" })
     const result = await googleOAuth(startGoogleOAuthFlow)
     if (result.success) {
       router.replace("/(protected)/post-auth")
@@ -115,6 +117,7 @@ export default function LoginScreen() {
   }
 
   const handleAppleSignIn = async () => {
+    posthog?.capture("login_started", { provider: "apple" })
     const result = await appleOAuth(startAppleOAuthFlow)
     if (result.success) {
       router.replace("/(protected)/post-auth")

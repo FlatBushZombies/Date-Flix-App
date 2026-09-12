@@ -1,3 +1,4 @@
+import { posthog } from "@/lib/posthog"
 import { supabase } from "@/lib/supabase"
 import type { Movie } from "@/types"
 import { getNewMovies } from "@/utils/tmdb"
@@ -122,6 +123,8 @@ export function useTopPicks() {
         if (error) {
           console.error("Remove upvote error:", error)
           setUpvotedIds((prev) => new Set(prev).add(movie.id))
+        } else {
+          posthog?.capture("movie_upvote_updated", { action: "removed" })
         }
       } else {
         const { error } = await supabase.from("movie_upvotes").insert({
@@ -137,6 +140,8 @@ export function useTopPicks() {
             next.delete(movie.id)
             return next
           })
+        } else {
+          posthog?.capture("movie_upvote_updated", { action: "added" })
         }
       }
     },

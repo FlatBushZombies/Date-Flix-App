@@ -3,6 +3,7 @@
 import { useConfirm } from "@/components/Confirm/ConfirmProvider"
 import { useToast } from "@/components/Toast/ToastProvider"
 import { getPreferences, setPreferences } from "@/lib/preferences"
+import { posthog } from "@/lib/posthog"
 import { getStreamingConfig } from "@/lib/streaming"
 import { CASTABLE_PLATFORMS, isAppInstalled, sendToStreamingApp } from "@/lib/tvCast"
 import type { Invitation, SupabaseMatch, SupabaseUser, SwipeSession } from "@/types"
@@ -152,6 +153,7 @@ export default function AccountSettingsScreen() {
     setSavingProfile(true)
     try {
       await user.update({ firstName: firstName.trim(), lastName: lastName.trim() })
+      posthog?.capture("profile_updated")
       toast.success("Saved", "Your profile has been updated")
     } catch {
       toast.error("Error", "Failed to update your profile")
@@ -207,6 +209,7 @@ export default function AccountSettingsScreen() {
         await updateUserPushToken(user.id, null)
       }
       await setPreferences({ pushEnabled: value })
+      posthog?.capture("push_notifications_updated", { enabled: value })
     } finally {
       setPushBusy(false)
     }
@@ -262,6 +265,7 @@ export default function AccountSettingsScreen() {
             setEndingSessionId(session.id)
             const result = await deleteSwipeSession(session.id)
             if (result.success) {
+              posthog?.capture("relationship_session_ended")
               toast.success("Session Ended", `You're no longer swiping with ${partnerName}`)
               loadRelationshipData()
             } else {

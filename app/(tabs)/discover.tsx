@@ -10,6 +10,7 @@ import { Step5Occasion } from '@/components/steps/Step5Occasion';
 import { useMoviePlanner } from '@/hooks/useMoviePlanner';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { buildAIConsentPrompt } from '@/lib/aiConsent';
+import { posthog } from '@/lib/posthog';
 import { useConfirm } from '@/components/Confirm/ConfirmProvider';
 import { Genre, PlannerState, StreamingPlatform } from '@/types/planner';
 import { useUser } from '@clerk/clerk-expo';
@@ -50,12 +51,23 @@ export default function MoviePlannerScreen() {
   const update = (patch: Partial<PlannerState>) =>
     setPlannerState((s) => ({ ...s, ...patch }));
 
-  const handleSubmit = async () => {
+  const requestMoviePlan = async () => {
+    posthog?.capture('movie_plan_requested', {
+      genre_count: plannerState.genres.length,
+      streaming_platform_count: plannerState.streaming.length,
+      any_streaming: plannerState.anyStreaming,
+      has_vibe: Boolean(plannerState.vibe),
+      has_occasion: Boolean(plannerState.occasion),
+    });
     await generatePlan(plannerState);
   };
 
+  const handleSubmit = async () => {
+    await requestMoviePlan();
+  };
+
   const handleEnableAI = () => {
-    confirm.show(buildAIConsentPrompt(() => generatePlan(plannerState)));
+    confirm.show(buildAIConsentPrompt(requestMoviePlan));
   };
 
   const handleReset = () => {

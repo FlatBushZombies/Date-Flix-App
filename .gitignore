@@ -33,6 +33,12 @@ yarn-error.*
 # local env files
 .env*.local
 
+# PostHog wizard run artifacts (safe to delete, shouldn't be committed)
+.posthog-wizard-cache/
+
+# Personal/local Claude Code settings — not shared
+.claude/settings.local.json
+
 # typescript
 *.tsbuildinfo
 

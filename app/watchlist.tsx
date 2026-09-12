@@ -2,6 +2,7 @@
 
 import { EmptyState as IllustratedEmptyState } from "@/components/EmptyState"
 import { EmptyState } from "@/components/ui/EmptyState"
+import { posthog } from "@/lib/posthog"
 import type { Movie } from "@/types"
 import { getWatchlist, removeFromWatchlist } from "@/utils/supabase-helpers"
 import { useUser } from "@clerk/clerk-expo"
@@ -83,6 +84,7 @@ export default function WatchlistScreen() {
     setRows((prev) => prev.filter((r) => r.movie_id !== movieId))
     const ok = await removeFromWatchlist(user.id, movieId)
     if (!ok) setRows(previous) // revert on failure
+    else posthog?.capture("watchlist_item_removed")
     setRemovingId(null)
   }
 

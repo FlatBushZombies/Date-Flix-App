@@ -72,6 +72,7 @@ import { TasteOnboarding, type SeedMovie } from "@/components/debate/TasteOnboar
 import { TasteResults } from "@/components/debate/TasteResults"
 import { useTasteEngine } from "@/hooks/useTasteEngine"
 import { AI_CONSENT_REQUIRED, buildAIConsentPrompt } from "@/lib/aiConsent"
+import { posthog } from "@/lib/posthog"
 import { Sparkles as SparklesLucide } from "lucide-react-native"
 
 const { height } = Dimensions.get("window")
@@ -380,6 +381,7 @@ export default function DebateSettlerScreen() {
         )
         setActiveSession(session)
         setCurrentView("session")
+        posthog?.capture("debate_session_created")
         if (inviteResult.sent) {
           toast.success(
             "Invite Sent!",
@@ -432,6 +434,7 @@ export default function DebateSettlerScreen() {
       if (result.success && result.session) {
         setActiveSession(result.session)
         setCurrentView("session")
+        posthog?.capture("debate_session_joined")
       } else {
         toast.error("Error", result.error || "Failed to join session")
       }
@@ -458,6 +461,7 @@ export default function DebateSettlerScreen() {
       )
       if (updated) {
         setActiveSession(updated)
+        posthog?.capture("debate_preferences_submitted", { role: isHost ? "host" : "participant" })
         if (
           updated.status === "settling" ||
           (updated.host_preferences && updated.partner_preferences)
@@ -498,6 +502,7 @@ export default function DebateSettlerScreen() {
         if (updated) {
           setActiveSession(updated)
           setShowVerdictModal(true)
+          posthog?.capture("debate_verdict_generated")
           if (user) incrementAiSettlementUsage(user.id).then(setAiSettlementsThisMonth)
         }
       } else if (result.error === AI_CONSENT_REQUIRED) {
@@ -534,6 +539,7 @@ export default function DebateSettlerScreen() {
       const canShare = await Sharing.isAvailableAsync()
       if (canShare) {
         await Sharing.shareAsync(uri, { mimeType: "image/png", dialogTitle: "Share your compatibility" })
+        posthog?.capture("compatibility_card_shared")
       } else {
         toast.error("Sharing Unavailable", "Sharing isn't supported on this device.")
       }

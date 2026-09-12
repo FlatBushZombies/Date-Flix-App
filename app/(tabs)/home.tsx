@@ -12,6 +12,7 @@ import { useWatchlist } from "@/hooks/useWatchlist"
 import { useCast } from "@/lib/cast/CastProvider"
 import { castableMovieFromTmdb } from "@/lib/cast/media"
 import { getPreferences } from "@/lib/preferences"
+import { posthog } from "@/lib/posthog"
 import type { StreakEvaluation, SupabaseUser, SwipeSession, Movie } from "@/types"
 import {
     acceptInvitation,
@@ -210,7 +211,10 @@ export default function SwipeScreen() {
     if (!user) return
     setIsCreatingInvite(true)
     const invitation = await createInvitation(user.id)
-    if (invitation) setInviteCode(invitation.invite_code)
+    if (invitation) {
+      setInviteCode(invitation.invite_code)
+      posthog?.capture("swipe_invitation_created")
+    }
     setIsCreatingInvite(false)
   }
 
@@ -219,6 +223,7 @@ export default function SwipeScreen() {
       await Share.share({
         message: `Join me on Duo App! Use my invite code: ${inviteCode}\n\nLet's find movies we both love!`,
       })
+      posthog?.capture("swipe_invitation_shared")
     } catch (error) {
       console.error("Error sharing:", error)
     }
@@ -234,6 +239,7 @@ export default function SwipeScreen() {
     setIsJoining(true)
     const result = await acceptInvitation(joinCode.trim().toUpperCase(), user.id)
     if (result.success) {
+      posthog?.capture("swipe_session_joined")
       toast.success("Success!", "You've joined the swipe session. Start swiping to find matches!")
       setInviteModalVisible(false)
       setJoinCode("")
@@ -257,6 +263,7 @@ export default function SwipeScreen() {
           onPress: async () => {
             const result = await deleteSwipeSession(sessionId)
             if (result.success) {
+              posthog?.capture("swipe_session_deleted")
               toast.success("Session Deleted", "The swipe session has been removed.")
               loadActiveSessions()
             } else {
@@ -281,6 +288,7 @@ export default function SwipeScreen() {
     if (user && userSynced) {
       saveSwipe(user.id, currentMovie.id, liked, currentMovie)
         .then((result) => {
+          posthog?.capture("movie_swiped", { liked })
           const evaluations: { sessionId: string; evaluation: StreakEvaluation }[] =
             result?.streakEvaluations ?? []
           evaluations.forEach(({ sessionId, evaluation }) => {
@@ -303,6 +311,7 @@ export default function SwipeScreen() {
       toast.error("Error", wasSaved ? "Failed to remove from watchlist" : "Failed to save to watchlist")
       return
     }
+    posthog?.capture("watchlist_item_updated", { action: wasSaved ? "removed" : "saved" })
     if (wasSaved) {
       toast.info("Removed", `${movie.title} removed from your watchlist`)
     } else {
@@ -316,6 +325,7 @@ export default function SwipeScreen() {
       await Share.share({
         message: shareMessage,
       })
+      posthog?.capture("movie_shared")
       toast.success("Shared!", "Movie shared successfully")
     } catch (error) {
       toast.error("Error", "Failed to share movie")
@@ -325,6 +335,7 @@ export default function SwipeScreen() {
   const handleTrailerPress = async (movie: Movie, youtubeKey: string) => {
     try {
       await WebBrowser.openBrowserAsync(`https://www.youtube.com/watch?v=${youtubeKey}`)
+      posthog?.capture("trailer_opened")
     } catch {
       toast.error("Error", `Couldn't open the trailer for ${movie.title}`)
     }
