@@ -1,5 +1,4 @@
-import { View, Text, TouchableOpacity, Dimensions, ScrollView, Pressable, Image, StyleSheet } from "react-native"
-import { LinearGradient } from "expo-linear-gradient"
+import { View, Text, TouchableOpacity, Dimensions, ScrollView, Pressable, Image } from "react-native"
 import { useEffect, useState } from "react"
 import { useRouter } from "expo-router"
 import { useUser } from "@clerk/clerk-expo"
@@ -30,11 +29,13 @@ import {
   MoonIcon,
   RocketLaunchIcon,
   BriefcaseIcon,
+  TvIcon,
 } from "react-native-heroicons/outline"
 import {
   HeartIcon as HeartSolid,
   ShieldCheckIcon as ShieldSolid,
   CheckIcon as CheckSolid,
+  StarIcon as StarSolid,
 } from "react-native-heroicons/solid"
 import Animated, {
   Easing,
@@ -48,6 +49,7 @@ import Animated, {
   useAnimatedStyle,
   withSequence,
   withTiming,
+  withRepeat,
 } from "react-native-reanimated"
 import { Ionicons } from "@expo/vector-icons"
 import * as Haptics from "expo-haptics"
@@ -55,6 +57,7 @@ import { useAudioPlayer, setAudioModeAsync } from "expo-audio"
 import { registerForPushNotificationsAsync, updateUserPushToken } from "@/utils/notifications"
 import { setPreferences } from "@/lib/preferences"
 import { setAIConsent } from "@/lib/aiConsent"
+import { posthog } from "@/lib/posthog"
 import { TASTE_GENRES, TASTE_VIBES } from "@/lib/tasteTaxonomy"
 import { saveTasteProfile } from "@/utils/supabase-helpers"
 import { TapDemoIcon } from "@/components/onboarding/TapDemoIcon"
@@ -115,6 +118,21 @@ const SCREENS = [
   },
   {
     id: 2,
+    type: "goal",
+    headline: "What Brings You\nHere Tonight?",
+    subtext: "We'll tailor your picks around what matters most to you.",
+    goals: [
+      { value: "date-night",   icon: "heart",    label: "Plan the perfect date night" },
+      { value: "group-debate", icon: "sparkles", label: "Settle a group movie debate" },
+      { value: "discover",     icon: "compass",  label: "Discover something new to watch" },
+      { value: "habit",        icon: "flame",    label: "Build a nightly movie habit" },
+      { value: "explore",      icon: "film",     label: "Just exploring for now" },
+    ],
+    cta: "Continue",
+    accent: "#E50914",
+  },
+  {
+    id: 3,
     type: "howItWorks",
     headline: "Try It Yourself",
     subtext: "Swipe left to pass, right to like — this is exactly how movie night decisions happen.",
@@ -122,7 +140,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 3,
+    id: 4,
     type: "features",
     headline: "Packed with\nSmart Features",
     features: [
@@ -133,7 +151,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 4,
+    id: 5,
     type: "social",
     headline: "Better Together",
     subtext: "Connect with your partner, friends, or family to start matching movies in real-time.",
@@ -146,7 +164,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 5,
+    id: 6,
     type: "crew",
     headline: "Movie Night,\nAny Crew",
     subtext: "Couples, roommates, friend groups, or your work team — everyone gets a say in what's next.",
@@ -159,7 +177,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 6,
+    id: 7,
     type: "genres",
     headline: "Every Genre,\nEvery Mood",
     subtext: "Pick the genres you love — this shapes the picks waiting for you in your For You tab.",
@@ -167,7 +185,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 7,
+    id: 8,
     type: "vibe",
     headline: "What's Your\nVibe?",
     subtext: "Pick how you want to feel tonight and we'll match movies to it.",
@@ -175,7 +193,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 8,
+    id: 9,
     type: "debate",
     headline: "Can't Agree?\nLet AI Settle It",
     subtext: "Everyone swipes their favorites — our AI finds the pick you'll all actually enjoy, no endless back-and-forth.",
@@ -188,7 +206,14 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 9,
+    id: 10,
+    type: "processing",
+    headline: "Building Your\nMovie DNA",
+    subtext: "Analyzing your genres, vibe, and crew to line up picks you'll actually want to watch.",
+    accent: "#E50914",
+  },
+  {
+    id: 11,
     type: "streaks",
     headline: "Make It a\nNightly Ritual",
     subtext: "Build habits, earn rewards, and never miss movie night again.",
@@ -201,7 +226,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 10,
+    id: 12,
     type: "privacy",
     headline: "Your Privacy\nMatters",
     subtext: "We take your data seriously. Here's what you should know:",
@@ -215,7 +240,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 11,
+    id: 13,
     type: "aiConsent",
     headline: "AI-Powered\nRecommendations",
     subtext: "To settle debates and plan movie nights, DateFlix sends the preferences you type to Google Gemini, Google's AI service.",
@@ -227,7 +252,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 12,
+    id: 14,
     type: "notifications",
     headline: "Never Miss\na Moment",
     subtext: "Turn on notifications so you're always first to know.",
@@ -239,7 +264,7 @@ const SCREENS = [
     accent: "#E50914",
   },
   {
-    id: 13,
+    id: 15,
     type: "final",
     headline: "Ready to Find\nYour Perfect Movie?",
     subtext: "Start swiping and discover what you'll watch tonight.",
@@ -250,6 +275,26 @@ const SCREENS = [
       { text: "Finally ended the 'what should we watch' debate!", author: "Sarah K." },
       { text: "We've discovered so many great movies together.",   author: "Mike T." },
     ],
+  },
+  {
+    id: 16,
+    type: "paywall",
+    headline: "Unlock\nDateFlix Premium",
+    subtext: "Everything you need for a perfect movie night, every night.",
+    paywallFeatures: [
+      { icon: "sparkles", text: "Unlimited AI debate verdicts" },
+      { icon: "compass",  text: "Personalized For You picks" },
+      { icon: "flame",    text: "Streak freezes & bonus rewards" },
+      { icon: "tv",       text: "Unlimited casting to TV" },
+      { icon: "shield",   text: "Ad-free, always" },
+    ],
+    testimonial: { text: "Worth every penny — we use it every single week.", author: "Jamie & Alex" },
+    plans: {
+      weekly: { label: "Weekly", price: "$4.95", period: "/week" },
+      yearly: { label: "Yearly", price: "$27.75", period: "/year", perWeek: "$0.53/wk", badge: "BEST VALUE", save: "Save 89%" },
+    },
+    ctaTrial: "Continue",
+    accent: "#E50914",
   },
 ]
 
@@ -276,6 +321,24 @@ function OptionIcon({ name, size, color }: { name: string; size: number; color: 
   if (name === "people")      return <UserGroupIcon {...p} />
   if (name === "person-add")  return <UserPlusIcon {...p} />
   return <UserIcon {...p} />
+}
+
+function GoalIcon({ name, size, color }: { name: string; size: number; color: string }) {
+  const p = { size, color, strokeWidth: 1.8 as number }
+  if (name === "heart")    return <HeartIcon {...p} />
+  if (name === "sparkles") return <SparklesIcon {...p} />
+  if (name === "compass")  return <MapIcon {...p} />
+  if (name === "flame")    return <FireIcon {...p} />
+  return <FilmIcon {...p} /> // explore
+}
+
+function PaywallFeatureIcon({ name, size, color }: { name: string; size: number; color: string }) {
+  const p = { size, color, strokeWidth: 1.8 as number }
+  if (name === "sparkles") return <SparklesIcon {...p} />
+  if (name === "compass")  return <MapIcon {...p} />
+  if (name === "flame")    return <FireIcon {...p} />
+  if (name === "tv")       return <TvIcon {...p} />
+  return <ShieldCheckIcon {...p} /> // shield
 }
 
 function CrewIcon({ name, size, color }: { name: string; size: number; color: string }) {
@@ -321,6 +384,10 @@ const GENRE_ICON_IMAGES: Partial<Record<string, ReturnType<typeof require>>> = {
   documentary: require("@/assets/icons/genre/documentary.png"),
   horror: require("@/assets/icons/genre/horror.png"),
   "sci-fi": require("@/assets/icons/genre/sci-fi.png"),
+  romance: require("@/assets/icons/genre/romance.png"),
+  thriller: require("@/assets/icons/genre/thriller.png"),
+  drama: require("@/assets/icons/genre/drama.png"),
+  action: require("@/assets/icons/genre/action.png"),
 }
 
 function GenreIcon({ value, size, color }: { value: string; size: number; color: string }) {
@@ -506,6 +573,28 @@ function IconBox({ color, children }: { color: string; children: React.ReactNode
   )
 }
 
+// Spinning ring for the "processing" screen — purely decorative, signals
+// that personalization is happening even though nothing is actually loading.
+function ProcessingSpinner() {
+  const rotation = useSharedValue(0)
+  useEffect(() => {
+    rotation.value = withRepeat(withTiming(360, { duration: 1100, easing: Easing.linear }), -1, false)
+  }, [])
+  const style = useAnimatedStyle(() => ({ transform: [{ rotate: `${rotation.value}deg` }] }))
+  return (
+    <Animated.View
+      style={[
+        {
+          width: 64, height: 64, borderRadius: 32,
+          borderWidth: 4, borderColor: "rgba(229,9,20,0.15)",
+          borderTopColor: T.accent,
+        },
+        style,
+      ]}
+    />
+  )
+}
+
 // The entry sound effect — preloaded via useAudioPlayer below so it's fully
 // decoded and ready by the time the user can possibly tap (zero playback
 // latency). Swap this file to change the sound; nothing else needs updating.
@@ -584,9 +673,11 @@ export default function OnboardingScreen() {
     setAudioModeAsync({ playsInSilentMode: true, interruptionMode: "mixWithOthers" }).catch(() => {})
   }, [])
   const [currentScreen, setCurrentScreen] = useState(0)
+  const [selectedGoal, setSelectedGoal] = useState<string | null>(null)
   const [selectedGenres, setSelectedGenres] = useState<string[]>(["romance", "comedy"])
   const [selectedVibe, setSelectedVibe] = useState<string | null>("cozy")
   const [requestingPush, setRequestingPush] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState<"weekly" | "yearly">("yearly")
   const screen = SCREENS[currentScreen]
 
   const scale = useSharedValue(1)
@@ -597,6 +688,11 @@ export default function OnboardingScreen() {
   // 120ms / ~3% scale — press feedback ceiling for something touched this often.
   const handlePressIn  = () => { scale.value = withTiming(0.97, { duration: 120, easing: EASE_OUT }) }
   const handlePressOut = () => { scale.value = withTiming(1, { duration: 160, easing: EASE_OUT }) }
+
+  const toggleGoal = (value: string) => {
+    Haptics.selectionAsync()
+    setSelectedGoal(value)
+  }
 
   const toggleGenre = (name: string) => {
     Haptics.selectionAsync()
@@ -624,6 +720,11 @@ export default function OnboardingScreen() {
     if (user?.id) {
       try { await saveTasteProfile(user.id, selectedGenres, selectedVibe, []) } catch {}
     }
+    posthog?.capture("onboarding_completed", {
+      selected_goal: selectedGoal,
+      selected_genre_count: selectedGenres.length,
+      selected_vibe: selectedVibe,
+    })
     router.replace("/(tabs)/home")
   }
 
@@ -631,7 +732,34 @@ export default function OnboardingScreen() {
     if (currentScreen < SCREENS.length - 1) setCurrentScreen((p) => p + 1)
     else completeOnboarding()
   }
-  const handleSkip = () => completeOnboarding()
+
+  // Purely psychological — nothing is actually loading. A brief pause here
+  // makes the "For You" picks feel earned/personalized rather than instant.
+  useEffect(() => {
+    if (screen.type !== "processing") return
+    const timer = setTimeout(handleNext, 1900)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentScreen])
+
+  // Per-slide funnel — the only way to see which screen actually drives
+  // drop-off (especially into the paywall) instead of guessing from
+  // aggregate completion rate alone. Gated on `awake` so the hero slide
+  // isn't counted before the user has even tapped past the wake gate.
+  useEffect(() => {
+    if (!awake) return
+    posthog?.capture("onboarding_screen_viewed", {
+      screen_type: screen.type,
+      screen_index: currentScreen,
+      total_screens: SCREENS.length,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentScreen, awake])
+
+  const handleSkip = () => {
+    posthog?.capture("onboarding_skipped", { screen_type: screen.type, screen_index: currentScreen })
+    completeOnboarding()
+  }
   const handleBack = () => { if (currentScreen > 0) setCurrentScreen((p) => p - 1) }
 
   // Explicit choice, not a pre-checked default: "Not Now" leaves consent at
@@ -749,6 +877,46 @@ export default function OnboardingScreen() {
                 ))}
               </Animated.View>
             )}
+          </View>
+        )
+
+      case "goal":
+        return (
+          <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: "center" }}>
+            <View style={{ gap: 10 }}>
+              {"goals" in screen && screen.goals && screen.goals.map((goal, i) => {
+                const isSelected = selectedGoal === goal.value
+                return (
+                  <Animated.View key={goal.value} entering={FadeInDown.delay(100 + i * 70).springify()}>
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={() => toggleGoal(goal.value)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${goal.label}${isSelected ? ", selected" : ""}`}
+                    >
+                      <RowCard style={{
+                        backgroundColor: isSelected ? T.accentBg : T.surface,
+                        borderWidth: isSelected ? 2 : 1,
+                        borderColor: isSelected ? T.accent : T.borderLo,
+                      }}>
+                        <IconBox color={isSelected ? T.accent : "#6b7280"}>
+                          <GoalIcon name={goal.icon} size={22} color={isSelected ? T.accent : "#6b7280"} />
+                        </IconBox>
+                        <Text style={{ flex: 1, fontSize: 15, fontWeight: "700", color: T.textPrimary }}>{goal.label}</Text>
+                        {isSelected && (
+                          <View style={{
+                            width: 22, height: 22, borderRadius: 11,
+                            backgroundColor: T.accent, alignItems: "center", justifyContent: "center",
+                          }}>
+                            <CheckSolid size={12} color="#fff" />
+                          </View>
+                        )}
+                      </RowCard>
+                    </TouchableOpacity>
+                  </Animated.View>
+                )
+              })}
+            </View>
           </View>
         )
 
@@ -912,7 +1080,7 @@ export default function OnboardingScreen() {
                       accessibilityRole="button"
                       accessibilityLabel={`${genre.label}${isSelected ? ", selected" : ""}`}
                       style={{
-                        width: 108, height: 122, borderRadius: 22,
+                        width: 108, height: image ? 150 : 122, borderRadius: 22,
                         backgroundColor: T.dark,
                         borderWidth: isSelected ? 2 : 1,
                         borderColor: isSelected ? T.accent : "rgba(255,255,255,0.10)",
@@ -922,17 +1090,15 @@ export default function OnboardingScreen() {
                     >
                       {image ? (
                         <>
-                          <Image source={image} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                          <LinearGradient
-                            colors={["transparent", "rgba(0,0,0,0.78)"]}
-                            style={StyleSheet.absoluteFill}
-                          />
-                          <Text style={{
-                            position: "absolute", left: 10, right: 10, bottom: 10,
-                            fontSize: 13, fontWeight: "700", color: "#fff", textAlign: "center",
-                          }}>
-                            {genre.label}
-                          </Text>
+                          {/* Square crop matches the source images' native 500x500
+                              ratio exactly, so the full icon always shows — never
+                              cropped or dimmed by an overlay. */}
+                          <Image source={image} style={{ width: 108, height: 108 }} resizeMode="cover" />
+                          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 }}>
+                            <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff", textAlign: "center" }}>
+                              {genre.label}
+                            </Text>
+                          </View>
                         </>
                       ) : (
                         <>
@@ -1038,6 +1204,13 @@ export default function OnboardingScreen() {
                 ))}
               </View>
             )}
+          </View>
+        )
+
+      case "processing":
+        return (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+            <ProcessingSpinner />
           </View>
         )
 
@@ -1192,6 +1365,75 @@ export default function OnboardingScreen() {
           </View>
         )
 
+      case "paywall":
+        return (
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingHorizontal: 28, paddingBottom: 8, gap: 20 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Premium badge */}
+            <Animated.View entering={ZoomIn.delay(60).springify().damping(14)} style={{ alignItems: "center" }}>
+              <View style={{
+                width: 76, height: 76, borderRadius: 38,
+                alignItems: "center", justifyContent: "center",
+                backgroundColor: T.accentBg,
+                borderWidth: 1, borderColor: T.accentRim,
+                shadowColor: T.accent, shadowOpacity: 0.24, shadowRadius: 20,
+                shadowOffset: { width: 0, height: 8 }, elevation: 6,
+              }}>
+                <SparklesIcon size={34} color={T.accent} strokeWidth={1.8} />
+              </View>
+            </Animated.View>
+
+            {/* Feature checklist */}
+            {"paywallFeatures" in screen && screen.paywallFeatures && (
+              <View style={{ gap: 14 }}>
+                {screen.paywallFeatures.map((feature, i) => (
+                  <Animated.View
+                    key={i}
+                    entering={FadeInDown.delay(140 + i * 70).springify()}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+                  >
+                    <View style={{
+                      width: 34, height: 34, borderRadius: 17,
+                      alignItems: "center", justifyContent: "center",
+                      backgroundColor: T.accentBg,
+                    }}>
+                      <PaywallFeatureIcon name={feature.icon} size={17} color={T.accent} />
+                    </View>
+                    <Text style={{ flex: 1, fontSize: 14.5, fontWeight: "600", color: T.textPrimary }}>{feature.text}</Text>
+                    <CheckSolid size={18} color="#10b981" />
+                  </Animated.View>
+                ))}
+              </View>
+            )}
+
+            {/* Testimonial */}
+            {"testimonial" in screen && screen.testimonial && (
+              <Animated.View entering={FadeInDown.delay(520).springify()} style={{
+                padding: 16, borderRadius: 18,
+                backgroundColor: T.surface,
+                borderWidth: 1, borderColor: T.borderLo,
+                shadowColor: "#1a1a2e", shadowOpacity: 0.05, shadowRadius: 12,
+                shadowOffset: { width: 0, height: 2 }, elevation: 1,
+              }}>
+                <View style={{ flexDirection: "row", gap: 2, marginBottom: 8 }}>
+                  {[...Array(5)].map((_, i) => (
+                    <StarSolid key={i} size={13} color="#eab308" />
+                  ))}
+                </View>
+                <Text style={{ fontSize: 13.5, fontStyle: "italic", lineHeight: 20, color: "rgba(21,21,28,0.72)" }}>
+                  "{screen.testimonial.text}"
+                </Text>
+                <Text style={{ fontSize: 12, fontWeight: "600", marginTop: 8, color: T.textTertiary }}>
+                  — {screen.testimonial.author}
+                </Text>
+              </Animated.View>
+            )}
+          </ScrollView>
+        )
+
       default:
         return null
     }
@@ -1200,11 +1442,13 @@ export default function OnboardingScreen() {
   const isFinal = screen.type === "final"
   const isNotifPriming = screen.type === "notifications"
   const isAIConsentPriming = screen.type === "aiConsent"
+  const isProcessing = screen.type === "processing"
+  const isPaywall = screen.type === "paywall"
   // Screens built around a centered illustration/carousel read the headline
   // centered too, so the whole screen reads as one aligned block instead of
   // a left-anchored title floating over centered content. List-driven
   // screens (features) keep their left-aligned reading flow.
-  const isCentered = isFinal || ["hero", "social", "crew", "streaks", "debate", "privacy", "aiConsent", "genres", "vibe", "howItWorks", "notifications"].includes(screen.type)
+  const isCentered = isFinal || ["hero", "social", "crew", "streaks", "debate", "processing", "paywall", "privacy", "aiConsent", "genres", "vibe", "howItWorks", "notifications"].includes(screen.type)
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
@@ -1357,7 +1601,7 @@ export default function OnboardingScreen() {
             />
             <GhostButton
               label={"ctaSecondary" in screen ? (screen as any).ctaSecondary : ""}
-              onPress={completeOnboarding}
+              onPress={handleNext}
             />
           </View>
         ) : isNotifPriming ? (
@@ -1383,6 +1627,83 @@ export default function OnboardingScreen() {
               icon={<SparklesIcon size={19} color="#fff" strokeWidth={2} />}
             />
             <GhostButton label="Not Now" onPress={() => handleAIConsent(false)} />
+          </View>
+        ) : isProcessing ? null : isPaywall ? (
+          <View style={{ gap: 12 }}>
+            {/* Plan selector */}
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              {(["weekly", "yearly"] as const).map((key) => {
+                const plan = (screen as any).plans[key]
+                const isSelected = selectedPlan === key
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      Haptics.selectionAsync()
+                      setSelectedPlan(key)
+                      posthog?.capture("paywall_plan_selected", { plan: key })
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${plan.label} plan, ${plan.price}${plan.period}${isSelected ? ", selected" : ""}`}
+                    style={{
+                      flex: 1, borderRadius: 18, padding: 14, paddingTop: plan.badge ? 20 : 14,
+                      backgroundColor: isSelected ? T.accentBg : T.surface,
+                      borderWidth: isSelected ? 2 : 1,
+                      borderColor: isSelected ? T.accent : T.borderLo,
+                    }}
+                  >
+                    {plan.badge && (
+                      <View style={{
+                        position: "absolute", top: -10, alignSelf: "center",
+                        backgroundColor: T.accent, borderRadius: 8,
+                        paddingHorizontal: 8, paddingVertical: 3,
+                      }}>
+                        <Text style={{ fontSize: 9, fontWeight: "800", color: "#fff", letterSpacing: 0.4 }}>{plan.badge}</Text>
+                      </View>
+                    )}
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: T.textTertiary }}>{plan.label}</Text>
+                    <Text style={{ fontSize: 20, fontWeight: "800", color: T.textPrimary, marginTop: 2 }}>
+                      {plan.price}
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: T.textTertiary }}>{plan.period}</Text>
+                    </Text>
+                    {plan.perWeek && (
+                      <Text style={{ fontSize: 11, fontWeight: "600", color: "#10b981", marginTop: 2 }}>
+                        {plan.perWeek} · {plan.save}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+
+            <CTAButton
+              label={`${(screen as any).ctaTrial} — ${(screen as any).plans[selectedPlan].price}${(screen as any).plans[selectedPlan].period}`}
+              onPress={() => {
+                posthog?.capture("paywall_cta_clicked", { plan: selectedPlan })
+                completeOnboarding()
+              }}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              animStyle={animatedButtonStyle}
+              icon={<SparklesIcon size={19} color="#fff" strokeWidth={2} />}
+            />
+
+            <Text style={{ fontSize: 11, color: T.textTertiary, textAlign: "center", lineHeight: 16 }}>
+              Cancel anytime. By continuing you agree to our Terms of Service and Privacy Policy.
+            </Text>
+
+            <TouchableOpacity
+              onPress={() => {
+                posthog?.capture("paywall_dismissed", { plan_shown: selectedPlan })
+                completeOnboarding()
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Continue without subscribing"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: "600", color: T.textTertiary, textAlign: "center" }}>Not Now</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <CTAButton
